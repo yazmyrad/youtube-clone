@@ -8,6 +8,9 @@ x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
 
+x-backend-env: &backend-env
+  DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:?run ./install.sh}:${POSTGRES_PASSWORD:?run ./install.sh}@postgres:5432/${POSTGRES_DB:?run ./install.sh}"
+
 services:
   nginx:
     <<: *hardening
@@ -31,14 +34,31 @@ services:
       timeout: 3s
       retries: 12
 
-  api:
+  # One-shot: applies migrations before the API starts.
+  migrate:
     <<: *hardening
+    restart: "no"
     build: backend
-    environment:
-      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:?run ./install.sh}:${POSTGRES_PASSWORD:?run ./install.sh}@postgres:5432/${POSTGRES_DB:?run ./install.sh}"
+    command: ["alembic", "upgrade", "head"]
+    environment: *backend-env
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
+  api:
+    <<: *hardening
+    build: backend
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     networks:
       - backend
     read_only: true
