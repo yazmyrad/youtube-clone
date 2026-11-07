@@ -1,10 +1,13 @@
 import asyncio
 import os
+from pathlib import Path
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
+from app.core import config
+from app.core.config import get_settings
 from app.core.db import get_engine, get_session
 from app.main import create_app, lifespan
 from app.services import health as health_service
@@ -82,6 +85,33 @@ async def test_startup_fails_without_database_url(monkeypatch: pytest.MonkeyPatc
     with pytest.raises(ValidationError):
         async with lifespan(create_app()):
             pass
+
+
+async def test_app_starts_with_database_url_from_env_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Running uvicorn outside Docker: DATABASE_URL comes only from backend/.env."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("DATABASE_URL=postgresql+asyncpg://app:pw@127.0.0.1:1/app\n")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    app = create_app()
+    async with lifespan(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
+            docs = await http_client.get("/docs")
+
+    assert docs.status_code == 200
+
+
+def test_environment_overrides_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("DATABASE_URL=postgresql+asyncpg://from-file/app\n")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://from-env/app")
+
+    assert get_settings().database_url == "postgresql+asyncpg://from-env/app"
 
 
 async def test_health_is_documented_in_swagger(client: httpx.AsyncClient) -> None:
