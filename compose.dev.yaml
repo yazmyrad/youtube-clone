@@ -1,0 +1,44 @@
+# Development overrides, used only through the Makefile (`make dev`).
+# A separate project (youtube-clone-dev) and .env.dev keep dev data away from a real deploy.
+
+services:
+  api:
+    command:
+      - uvicorn
+      - app.main:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+      - --reload
+      - --reload-dir=app
+    volumes:
+      - ./backend/app:/srv/app:ro
+
+  migrate:
+    volumes:
+      - ./backend/app:/srv/app:ro
+      - ./backend/alembic:/srv/alembic:ro
+      - ./backend/alembic.ini:/srv/alembic.ini:ro
+
+  nginx:
+    # Replaces the deploy's port, so the dev site is reachable from this machine only.
+    ports: !override
+      - "127.0.0.1:${HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/proxy_headers.inc:/etc/nginx/conf.d/proxy_headers.inc:ro
+
+  postgres:
+    # Reachable from the host for migrations, tests and database tools, on localhost only.
+    # Docker can't publish ports on an internal network, so this adds a regular one.
+    ports:
+      - "127.0.0.1:${DEV_DB_PORT:-55432}:5432"
+    networks:
+      - backend
+      - dev-host
+    volumes:
+      - ./infra/postgres/dev-init:/docker-entrypoint-initdb.d:ro
+
+networks:
+  dev-host:

@@ -28,5 +28,8 @@ frontend/src/{pages,components,api,hooks}  infra/  docs/  scripts/seed.py  insta
 9. Keep replies short. Don't paste big files back; reference paths.
 
 ## Commands
-- Run: `docker compose up -d --build`   Tests: `cd backend && pytest -q`   Lint: `ruff check backend`
-- Migrate: `cd backend && alembic revision --autogenerate -m "..." && alembic upgrade head`
+Development goes through the Makefile (`make` lists all targets). It runs a separate dev stack with hot reload.
+- First time: `make setup`   Run: `make dev` (site and /docs at http://localhost:8080)   Stop: `make down`
+- Before commit: `make check` (ruff + pytest; database tests need the dev stack running)
+- Migrations: `make migration m="..."`, review the file, then `make migrate`. The stack also applies them on start.
+- Deploy (clean Ubuntu): `./install.sh`   Deploy tests: `scripts/test-install.sh`, `scripts/test-clean-install.sh`

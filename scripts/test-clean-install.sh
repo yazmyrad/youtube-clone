@@ -12,7 +12,7 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=youtube-clone
     exit 1
 fi
 
-tar --exclude=.git --exclude=.env --exclude=.venv --exclude=__pycache__ --exclude='*.egg-info' \
+tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude=.venv --exclude=__pycache__ --exclude='*.egg-info' \
     --exclude=.pytest_cache --exclude=.ruff_cache -cf - . \
     | docker run --rm -i --network host -v /var/run/docker.sock:/var/run/docker.sock \
         -e HTTP_PORT=18081 ubuntu:24.04 bash -c '
