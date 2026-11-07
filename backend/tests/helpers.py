@@ -1,6 +1,8 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from app.models import UserRole
+
 PASSWORD = "correct horse battery"
 
 
@@ -17,3 +19,4 @@ class ApiUser:
 
 
 CreateUser = Callable[..., Awaitable[ApiUser]]
+SetRole = Callable[[ApiUser, UserRole], Awaitable[None]]

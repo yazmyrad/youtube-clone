@@ -7,7 +7,7 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +15,7 @@ from app.core import config
 from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.main import create_app
-from app.models import Base
+from app.models import Base, User, UserRole
 from tests.helpers import PASSWORD, ApiUser
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
@@ -125,3 +125,14 @@ def create_user(api: httpx.AsyncClient) -> Callable[..., Awaitable[ApiUser]]:
         return ApiUser(user_id, username, email, login.json()["access_token"])
 
     return create
+
+
+@pytest.fixture
+def set_role(session: AsyncSession) -> Callable[[ApiUser, UserRole], Awaitable[None]]:
+    """Gives a user a role directly in the database, the way install.sh seeds the admin."""
+
+    async def set_(user: ApiUser, role: UserRole) -> None:
+        await session.execute(update(User).where(User.id == user.id).values(role=role))
+        await session.commit()
+
+    return set_
