@@ -25,6 +25,8 @@ EOF
     )
     echo "Created .env.dev"
 fi
+# Secrets added by later versions are appended, so existing ones are kept.
+grep -q '^JWT_SECRET=' .env.dev || echo "JWT_SECRET=$(random_hex)" >> .env.dev
 
 set -a
 # shellcheck disable=SC1091
@@ -44,5 +46,6 @@ db="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${DEV_D
 $MARKER
 DATABASE_URL=${db}/${POSTGRES_DB}
 TEST_DATABASE_URL=${db}/${POSTGRES_DB}_test
+JWT_SECRET=${JWT_SECRET}
 EOF
 )

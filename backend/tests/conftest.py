@@ -1,6 +1,6 @@
 import os
 import socket
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
 
 import httpx
@@ -16,6 +16,7 @@ from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.main import create_app
 from app.models import Base
+from tests.helpers import PASSWORD, ApiUser
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 
@@ -33,6 +34,7 @@ def fresh_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[
     Also ignores any developer backend/.env, so it can't change test results.
     """
     monkeypatch.setattr(config, "ENV_FILE", tmp_path / "absent.env")
+    monkeypatch.setenv("JWT_SECRET", "test-secret-" + "x" * 32)
     _clear_caches()
     yield
     _clear_caches()
@@ -92,3 +94,34 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=create_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
         yield http_client
+
+
+@pytest.fixture
+async def api(db: None, client: httpx.AsyncClient) -> httpx.AsyncClient:
+    """A client against the app with the test database behind it."""
+    return client
+
+
+@pytest.fixture
+def create_user(api: httpx.AsyncClient) -> Callable[..., Awaitable[ApiUser]]:
+    """Registers and logs in a user through the API."""
+
+    async def create(username: str = "alice") -> ApiUser:
+        email = f"{username}@example.com"
+        response = await api.post(
+            "/api/auth/register",
+            json={
+                "username": username,
+                "email": email,
+                "password": PASSWORD,
+                "display_name": username.title(),
+            },
+        )
+        assert response.status_code == 201, response.text
+        user_id = response.json()["id"]
+        login = await api.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+        assert login.status_code == 200, login.text
+        api.cookies.clear()  # Each test opts into the refresh cookie explicitly.
+        return ApiUser(user_id, username, email, login.json()["access_token"])
+
+    return create

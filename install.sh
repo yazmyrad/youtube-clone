@@ -83,6 +83,13 @@ else
 fi
 chmod 600 .env
 
+# Secrets added by later versions are appended, so an upgrade keeps the existing ones.
+# Each purpose gets its own random secret.
+add_secret() {
+    grep -q "^$1=" .env || { echo "$1=$(random_hex)" >> .env; log "Added $1 to .env"; }
+}
+add_secret JWT_SECRET
+
 # Compose prefers a shell variable over .env, so make .env the single source of the port.
 port="$(sed -n 's/^HTTP_PORT=//p' .env)"
 export HTTP_PORT="$port"

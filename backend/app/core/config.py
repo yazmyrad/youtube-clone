@@ -1,6 +1,8 @@
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Optional backend/.env for running the API outside Docker (see .env.example).
@@ -14,6 +16,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     database_url: str
+    jwt_secret: SecretStr = Field(min_length=32)
+    access_token_ttl: timedelta = timedelta(minutes=15)
+    refresh_token_ttl: timedelta = timedelta(days=30)
+    # Off by default: the IP-only deploy serves plain HTTP. `--domain` mode turns it on.
+    cookie_secure: bool = False
 
 
 @lru_cache
