@@ -1,5 +1,6 @@
 """Password hashing, access tokens (JWT) and refresh token values. No database access here."""
 
+import asyncio
 import hashlib
 import secrets
 import uuid
@@ -19,11 +20,16 @@ _hasher = PasswordHasher()
 _DUMMY_HASH = _hasher.hash(secrets.token_urlsafe(16))
 
 
-def hash_password(password: str) -> str:
-    return _hasher.hash(password)
+# argon2 is CPU-heavy on purpose; it runs in a thread so it doesn't stall the event loop.
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(_hasher.hash, password)
 
 
-def verify_password(password_hash: str | None, password: str) -> bool:
+async def verify_password(password_hash: str | None, password: str) -> bool:
+    return await asyncio.to_thread(_verify, password_hash, password)
+
+
+def _verify(password_hash: str | None, password: str) -> bool:
     try:
         return _hasher.verify(password_hash or _DUMMY_HASH, password) and password_hash is not None
     except (VerificationError, InvalidHashError):

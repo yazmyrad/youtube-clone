@@ -28,7 +28,7 @@ async def register(session: AsyncSession, data: RegisterIn) -> User:
     user = User(
         username=data.username,
         email=data.email,
-        password_hash=security.hash_password(data.password),
+        password_hash=await security.hash_password(data.password),
         display_name=data.display_name,
     )
     session.add(user)
@@ -49,7 +49,7 @@ async def register(session: AsyncSession, data: RegisterIn) -> User:
 async def login(session: AsyncSession, data: LoginIn) -> IssuedTokens:
     user = await session.scalar(select(User).where(User.email == data.email))
     # Always runs argon2, even for an unknown email, so timing doesn't reveal accounts.
-    if not security.verify_password(user.password_hash if user else None, data.password):
+    if not await security.verify_password(user.password_hash if user else None, data.password):
         raise Unauthorized(INVALID_CREDENTIALS)
     assert user is not None  # noqa: S101 - verify_password fails without a hash
     if not user.is_active:
