@@ -200,8 +200,31 @@ async def test_update_unknown_user_is_404(
     assert response.status_code == 404
 
 
+async def test_admin_self_update_that_keeps_admin_is_allowed(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, set_role: SetRole
+) -> None:
+    admin = await _admin(create_user, set_role)
+
+    response = await api.patch(
+        f"/api/admin/users/{admin.id}",
+        headers=admin.headers,
+        json={"role": "admin", "is_active": True},
+    )
+
+    assert response.status_code == 200
+    stored = await _stored(session, admin)
+    assert (stored.role, stored.is_active) == (UserRole.admin, True)
+
+
 @pytest.mark.parametrize(
-    "body", [{"role": "superuser"}, {"username": "mallory"}, {"password_hash": "x"}]
+    "body",
+    [
+        {},
+        {"role": None, "is_active": None},
+        {"role": "superuser"},
+        {"username": "mallory"},
+        {"password_hash": "x"},
+    ],
 )
 async def test_update_rejects_unknown_values(
     api: httpx.AsyncClient, create_user: CreateUser, set_role: SetRole, body: dict[str, str]
