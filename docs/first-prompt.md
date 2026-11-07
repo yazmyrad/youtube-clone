@@ -1,24 +1,24 @@
-Ты — архитектор и ведущий разработчик. Мы делаем клон YouTube по тестовому заданию (текст ниже).
-Весь код пишет ИИ, я — постановщик задач и ревьюер, поэтому работаем маленькими шагами с тестами и осмысленными коммитами.
+You are the architect and lead developer. We are building a YouTube clone as a take-home assignment (text below).
+AI writes all the code; I set the tasks and review, so we work in small steps with tests and meaningful commits.
 
-Технологии (зафиксировано заданием): Python + FastAPI, PostgreSQL, Swagger /docs, деплой на чистой Ubuntu одной командой.
-Мой выбор: SQLAlchemy 2 async + Alembic; MinIO (S3) для видео с presigned-загрузкой; воркер с ffmpeg (HLS 360p/720p, превью),
-очередь на PostgreSQL (SKIP LOCKED), без Redis; nginx; docker compose + install.sh; фронт Vite + React + TypeScript + Tailwind + hls.js;
+Technologies (fixed by the assignment): Python + FastAPI, PostgreSQL, Swagger /docs, deployment on a clean Ubuntu machine with one command.
+My choices: SQLAlchemy 2 async + Alembic; MinIO (S3) for video with presigned uploads; a worker with ffmpeg (HLS 360p/720p, thumbnails),
+a PostgreSQL-based queue (SKIP LOCKED), no Redis; nginx; docker compose + install.sh; frontend with Vite + React + TypeScript + Tailwind + hls.js;
 pytest + httpx; ruff.
 
-Агентная обвязка уже лежит в .claude/: агенты architect, reviewer, security-auditor, test-writer; скиллы add-endpoint, db-migration,
-deploy-check; команды /feature, /review, /commit. CLAUDE.md содержит правила. Используй их, где уместно.
+The agent tooling is already in .claude/: agents architect, reviewer, security-auditor, test-writer; skills add-endpoint, db-migration,
+deploy-check; commands /feature, /review, /commit. CLAUDE.md contains the rules. Use them where appropriate.
 
-Задача сейчас — только проектирование, код не пиши. Создай docs/architecture.md:
-1. Цели и границы (что делаем, что сознательно НЕ делаем).
-2. Компоненты и потоки данных: загрузка, обработка, раздача, приватные видео (как именно защищены сегменты HLS).
-3. Схема БД: таблицы, поля, связи, индексы, ограничения, enum'ы.
-4. Роли и матрица прав (user/moderator/admin × действия, public/unlisted/private).
-5. API: список эндпоинтов по экранам.
-6. Безопасность: угрозы и меры.
-7. «Definition of done»: проверяемые критерии «работает правильно» для критичного поведения.
-8. План из ~25 шагов, каждый шаг = один коммит, по дням (у меня 9 дней), с приоритетом на сценарий
-   «регистрация → загрузка → просмотр → лайк и комментарий» после одной команды деплоя.
-Задавай вопросы, если что-то неоднозначно. Потом дождись моего одобрения.
+The task for now is design only; do not write code. Create docs/architecture.md:
+1. Goals and scope (what we are building, what we are deliberately NOT building).
+2. Components and data flows: upload, processing, delivery, private videos (exactly how HLS segments are protected).
+3. Database schema: tables, fields, relationships, indexes, constraints, enums.
+4. Roles and permission matrix (user/moderator/admin × actions, public/unlisted/private).
+5. API: list of endpoints by screen.
+6. Security: threats and mitigations.
+7. "Definition of done": verifiable criteria for "works correctly" for critical behavior.
+8. A plan of ~25 steps, each step = one commit, organized by day (I have 9 days), prioritizing the scenario
+   "sign-up → upload → watch → like and comment" after a single deploy command.
+Ask questions if anything is ambiguous. Then wait for my approval.
 
---- ТЕКСТ ЗАДАНИЯ ---
+--- ASSIGNMENT TEXT LINK -> docs/assignment.md
