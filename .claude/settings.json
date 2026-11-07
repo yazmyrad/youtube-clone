@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && (command -v ruff >/dev/null && ruff check backend --quiet || true)" }
+        ]
+      }
+    ]
+  }
+}
