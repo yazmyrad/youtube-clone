@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 
@@ -5,6 +6,7 @@ import pytest
 
 from app.core import security
 from app.core.security import MEDIA_SCOPE_HLS, MEDIA_SCOPE_THUMB, sign_media, verify_media
+from app.services.playback import thumbnail_url
 
 VIDEO = uuid.uuid4()
 OTHER_VIDEO = uuid.uuid4()
@@ -83,3 +85,32 @@ def test_malformed_input_is_invalid_and_never_raises(
     scope: str, video_id: str, exp: str, sig: str
 ) -> None:
     assert verify_media(scope, video_id, exp, sig) is False
+
+
+def _thumbnail_parts(url: str) -> tuple[str, str]:
+    match = re.fullmatch(rf"/thumbs/(\d+)\.([0-9a-f]{{64}})/{VIDEO}\.jpg", url)
+    assert match
+    return match.group(1), match.group(2)
+
+
+def test_thumbnail_url_verifies_only_in_its_own_scope() -> None:
+    exp, sig = _thumbnail_parts(thumbnail_url(VIDEO))
+
+    assert verify_media(MEDIA_SCOPE_THUMB, str(VIDEO), exp, sig)
+    assert not verify_media(MEDIA_SCOPE_HLS, str(VIDEO), exp, sig)
+
+
+def test_thumbnail_url_expires_on_an_hour_boundary_one_to_two_hours_out() -> None:
+    exp = int(_thumbnail_parts(thumbnail_url(VIDEO))[0])
+
+    assert exp % 3600 == 0
+    assert 3600 < exp - time.time() <= 7200
+
+
+def test_thumbnail_url_is_stable_within_the_hour(monkeypatch: pytest.MonkeyPatch) -> None:
+    hour = 1_800_000_000 // 3600 * 3600
+    monkeypatch.setattr(time, "time", lambda: hour + 1)
+    first = thumbnail_url(VIDEO)
+    monkeypatch.setattr(time, "time", lambda: hour + 3599)
+
+    assert thumbnail_url(VIDEO) == first

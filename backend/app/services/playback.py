@@ -37,6 +37,17 @@ async def issue_playback(
     )
 
 
+def thumbnail_url(video_id: uuid.UUID) -> str:
+    """A signed thumbnail URL. Callers include it only for users who may see the video.
+
+    Expires at the next hour boundary plus one hour, so the URL stays the same for an hour
+    and browsers can cache the image.
+    """
+    exp = (int(time.time()) // 3600 + 2) * 3600
+    sig = security.sign_media(security.MEDIA_SCOPE_THUMB, video_id, exp)
+    return f"/thumbs/{exp}.{sig}/{video_id}.jpg"
+
+
 def authorize_media(scope: str, video_id: str, exp: str, sig: str) -> None:
     """Checks one media request. The permission check already happened when the URL was
     issued, so this is only the signature and expiry, with no database lookup per segment."""

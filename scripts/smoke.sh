@@ -241,6 +241,24 @@ expect "D44 /internal/ with a valid signature's headers" 404 "/internal/playback
 expect "D44 /internal/ through /api/" 404 "/api/..%2finternal/playback-auth"
 expect "D44 nginx's auth location"    404 "/_playback_auth"
 
+# --- Thumbnails: same check, separate signing scope ------------------------
+
+thumb_exp=$(( $(date +%s) + 3600 ))
+thumb="$thumb_exp.$(sign thumb "$id_a" "$thumb_exp")"
+
+expect "thumbnail with a valid token" 200 "/thumbs/$thumb/$id_a.jpg"
+has_header 'content-type: image/jpeg' && pass "thumbnail has its media type" \
+    || fail "thumbnail has the wrong media type"
+[ "$(head -c 1 "$work/body" | od -An -tx1 | tr -d ' \n')" = ff ] && pass "thumbnail is a JPEG" \
+    || fail "thumbnail isn't a JPEG"
+expect "thumbnail with a forged signature"   403 "/thumbs/$thumb_exp.$forged_sig/$id_a.jpg"
+expect "thumbnail with another video's token" 403 "/thumbs/$thumb/$id_b.jpg"
+expect "thumbnail with an HLS token"         403 "/thumbs/$token/$id_a.jpg"
+expect "HLS playlist with a thumbnail token" 403 "/hls/$thumb/$id_a/master.m3u8"
+expect "thumbnail without a token"           403 "/thumbs/$id_a.jpg"
+no_object "thumbnail by its bucket path"     "/media/thumbs/$id_a.jpg"
+no_object "traversal out of /thumbs/"        "/thumbs/$thumb/../../media/thumbs/$id_a.jpg"
+
 # --- D45: path traversal ---------------------------------------------------
 
 traversals=(
