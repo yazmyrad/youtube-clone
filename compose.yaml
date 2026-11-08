@@ -92,6 +92,8 @@ services:
     build: backend
     command: ["python", "-m", "app.workers.main"]
     environment: *backend-env
+    # Time to stop ffmpeg and hand the job back; see jobs.release.
+    stop_grace_period: 30s
     depends_on:
       migrate:
         condition: service_completed_successfully

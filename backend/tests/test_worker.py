@@ -163,10 +163,7 @@ async def test_a_lost_lease_cancels_the_work_and_writes_nothing(
     assert (await load_video(session, queued.video_id)).status is VideoStatus.processing
 
 
-async def test_shutdown_stops_the_work_and_leaves_the_job_to_its_lease(
-    session: AsyncSession,
-) -> None:
-    queued = await enqueue(session)
+async def _shut_down_mid_work() -> None:
     started = asyncio.Event()
 
     async def hang(_: ClaimedJob) -> MediaResult:
@@ -180,8 +177,72 @@ async def test_shutdown_stops_the_work_and_leaves_the_job_to_its_lease(
     with pytest.raises(asyncio.CancelledError):
         await running
 
+
+async def test_shutdown_stops_the_work_before_releasing_the_job(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+    status_when_stopped = []
+    started = asyncio.Event()
+
+    async def hang(_: ClaimedJob) -> MediaResult:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            async with get_sessionmaker()() as other:
+                status_when_stopped.append((await load_job(other, queued.id)).status)
+            raise
+        return MEDIA
+
+    running = asyncio.ensure_future(worker.run_one(hang, "w1"))
+    await asyncio.wait_for(started.wait(), timeout=5)
+    running.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await running
+
+    assert status_when_stopped == [JobStatus.running]
     job = await load_job(session, queued.id)
-    assert (job.status, job.last_error) == (JobStatus.running, None)
+    assert (job.status, job.last_error, job.locked_by) == (JobStatus.queued, None, None)
+
+
+async def test_a_released_job_can_be_claimed_at_once(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+
+    await _shut_down_mid_work()
+
+    next_claim = await claim("next")
+    assert next_claim is not None and next_claim.id == queued.id
+
+
+async def test_restarts_during_a_job_do_not_fail_the_video(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+
+    for _ in range(5):
+        await _shut_down_mid_work()
+
+    assert await worker.run_one(_succeed, "w1") is True
+    job = await load_job(session, queued.id)
+    assert job.status is JobStatus.done
+    assert (await load_video(session, queued.video_id)).status is VideoStatus.ready
+
+
+async def test_real_failures_still_stop_after_three_when_mixed_with_restarts(
+    session: AsyncSession,
+) -> None:
+    queued = await enqueue(session)
+    await _shut_down_mid_work()
+    runs = 0
+
+    async def always_fail(_: ClaimedJob) -> MediaResult:
+        nonlocal runs
+        runs += 1
+        raise JobError("Not a video file")
+
+    for _ in range(5):
+        await worker.run_one(always_fail, "w1")
+        await make_due(session, queued.id)
+
+    assert runs == 3
+    assert (await load_job(session, queued.id)).status is JobStatus.failed
 
 
 async def test_the_loop_outlives_errors(

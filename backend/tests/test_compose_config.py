@@ -47,3 +47,9 @@ def test_nginx_resolves_upstreams_per_request() -> None:
     targets = re.findall(r"^\s*proxy_pass\s+([^;]+);", conf, re.MULTILINE)
     assert targets
     assert all(target.startswith("$") for target in targets)
+
+
+def test_worker_has_time_to_hand_its_job_back() -> None:
+    worker = yaml.safe_load(COMPOSE.read_text())["services"]["worker"]
+
+    assert worker["stop_grace_period"] == "30s"

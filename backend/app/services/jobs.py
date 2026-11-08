@@ -117,6 +117,28 @@ async def heartbeat(session: AsyncSession, claim: ClaimedJob) -> bool:
     return result.rowcount == 1
 
 
+async def release(session: AsyncSession, claim: ClaimedJob) -> bool:
+    """Hands the job back on a clean shutdown, without using up an attempt.
+
+    Raises the budget rather than lowering `attempts`, which has to stay unique as the fence.
+    False means the lease was already lost.
+    """
+    result = await session.execute(
+        update(ProcessingJob)
+        .where(*_fence(claim))
+        .values(
+            status=JobStatus.queued,
+            max_attempts=ProcessingJob.max_attempts + 1,
+            run_after=func.now(),
+            locked_by=None,
+            locked_until=None,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await session.commit()
+    return result.rowcount == 1
+
+
 async def complete(session: AsyncSession, claim: ClaimedJob, media: MediaResult) -> bool:
     """Marks the job done and the video ready together. False means the lease was lost."""
     result = await session.execute(

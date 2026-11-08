@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 Processor = Callable[[ClaimedJob], Awaitable[MediaResult]]
 
+RELEASE_TIMEOUT_SECONDS = 5
+
 
 async def _renew_until_lost(claim: ClaimedJob) -> None:
     """Returns only when the lease is lost. A failed renewal is retried: if the database
@@ -33,6 +35,24 @@ async def _renew_until_lost(claim: ClaimedJob) -> None:
             logger.exception("Couldn't renew the lease on job %s", claim.id)
 
 
+async def _stop(*tasks: asyncio.Future) -> None:
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _release(claim: ClaimedJob) -> None:
+    """Best effort: if this fails, the lease expires and the job is picked up anyway."""
+    try:
+        async with asyncio.timeout(RELEASE_TIMEOUT_SECONDS), get_sessionmaker()() as session:
+            released = await jobs.release(session, claim)
+    except Exception:
+        logger.exception("Couldn't release job %s", claim.id)
+        return
+    if released:
+        logger.info("Job %s: released attempt %s on shutdown", claim.id, claim.attempt)
+
+
 async def run_one(process: Processor, worker_id: str) -> bool:
     """Runs one job if any is available. No transaction stays open during the work."""
     async with get_sessionmaker()() as session:
@@ -45,13 +65,13 @@ async def run_one(process: Processor, worker_id: str) -> bool:
     lease = asyncio.ensure_future(_renew_until_lost(claim))
     try:
         await asyncio.wait({work, lease}, return_when=asyncio.FIRST_COMPLETED)
-        lost = not work.done()
-    finally:
-        # Also runs on shutdown, when this task is cancelled. The lease then expires
-        # and the job is picked up again.
-        work.cancel()
-        lease.cancel()
-        await asyncio.gather(work, lease, return_exceptions=True)
+    except asyncio.CancelledError:
+        # Shutdown. The work must be fully stopped before the job is handed back.
+        await _stop(work, lease)
+        await _release(claim)
+        raise
+    lost = not work.done()
+    await _stop(work, lease)
 
     if lost:
         logger.warning("Job %s: lease lost, abandoning attempt %s", claim.id, claim.attempt)

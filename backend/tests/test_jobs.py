@@ -263,3 +263,33 @@ async def test_a_final_video_status_is_not_overwritten(
     video = await load_video(session, queued.video_id)
     assert video.status is final
     assert video.hls_prefix == ("hls/old" if final is VideoStatus.ready else None)
+
+
+async def test_release_requeues_without_spending_the_attempt(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+    claimed = await claim_job()
+    assert claimed is not None
+
+    async with get_sessionmaker()() as other:
+        assert await jobs.release(other, claimed) is True
+
+    job = await load_job(session, queued.id)
+    assert (job.status, job.locked_by, job.locked_until) == (JobStatus.queued, None, None)
+    # The fence stays unique: the attempt number is never handed out twice.
+    assert (job.attempts, job.max_attempts) == (1, 4)
+    assert job.last_error is None
+    assert (await load_video(session, queued.video_id)).status is VideoStatus.processing
+
+
+async def test_a_stale_worker_cannot_release_the_job(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+    stale = await claim_job("old")
+    assert stale is not None
+    await expire_lease(session, queued.id)
+    assert await claim_job("new") is not None
+
+    async with get_sessionmaker()() as other:
+        assert await jobs.release(other, stale) is False
+
+    job = await load_job(session, queued.id)
+    assert (job.status, job.locked_by, job.max_attempts) == (JobStatus.running, "new", 3)
