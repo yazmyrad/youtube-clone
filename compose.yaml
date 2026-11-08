@@ -129,7 +129,10 @@ services:
   storage-init:
     <<: *hardening
     restart: "no"
-    image: *minio-image
+    build:
+      context: infra/minio
+      args:
+        MINIO_IMAGE: *minio-image
     entrypoint: ["sh", "/init/init.sh"]
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER:?run ./install.sh}"
@@ -137,8 +140,6 @@ services:
       MINIO_APP_ACCESS_KEY: "${MINIO_APP_ACCESS_KEY:?run ./install.sh}"
       MINIO_APP_SECRET_KEY: "${MINIO_APP_SECRET_KEY:?run ./install.sh}"
       HOME: /tmp
-    volumes:
-      - ./infra/minio:/init:ro
     depends_on:
       minio:
         condition: service_healthy
