@@ -1,3 +1,4 @@
+import contextlib
 import os
 import socket
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -16,15 +17,18 @@ from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.main import create_app
 from app.models import Base, User, UserRole
+from app.services import storage
 from tests.helpers import PASSWORD, ApiUser
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
+TEST_BUCKET = "uploads-test"
 
 
 def _clear_caches() -> None:
     get_sessionmaker.cache_clear()
     get_engine.cache_clear()
     get_settings.cache_clear()
+    storage.get_client.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +39,11 @@ def fresh_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[
     """
     monkeypatch.setattr(config, "ENV_FILE", tmp_path / "absent.env")
     monkeypatch.setenv("JWT_SECRET", "test-secret-" + "x" * 32)
+    # Storage is unreachable unless a test asks for it, and never holds dev objects.
+    monkeypatch.setenv("MINIO_ENDPOINT", "http://storage.invalid:9000")
+    monkeypatch.setenv("MINIO_APP_ACCESS_KEY", "test-access-key")
+    monkeypatch.setenv("MINIO_APP_SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("UPLOADS_BUCKET", TEST_BUCKET)
     _clear_caches()
     yield
     _clear_caches()
@@ -100,6 +109,27 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
 async def api(db: None, client: httpx.AsyncClient) -> httpx.AsyncClient:
     """A client against the app with the test database behind it."""
     return client
+
+
+@pytest.fixture
+def minio(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Points the app at a real MinIO with an empty test bucket; yields the bucket's URL."""
+    endpoint = os.environ.get("TEST_MINIO_ENDPOINT")
+    if not endpoint:
+        pytest.skip("needs a real MinIO: set TEST_MINIO_ENDPOINT (make test and CI do)")
+    monkeypatch.setenv("MINIO_ENDPOINT", endpoint)
+    # Root, because only root can create the test bucket; the app user can't touch it.
+    monkeypatch.setenv("MINIO_APP_ACCESS_KEY", os.environ["TEST_MINIO_ACCESS_KEY"])
+    monkeypatch.setenv("MINIO_APP_SECRET_KEY", os.environ["TEST_MINIO_SECRET_KEY"])
+    get_settings.cache_clear()
+    storage.get_client.cache_clear()
+    client = storage.get_client()
+    with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):
+        client.create_bucket(Bucket=TEST_BUCKET)
+    yield f"{endpoint}/{TEST_BUCKET}/"
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket=TEST_BUCKET):
+        for item in page.get("Contents", []):
+            client.delete_object(Bucket=TEST_BUCKET, Key=item["Key"])
 
 
 @pytest.fixture

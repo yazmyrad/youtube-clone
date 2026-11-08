@@ -40,5 +40,13 @@ services:
     volumes:
       - ./infra/postgres/dev-init:/docker-entrypoint-initdb.d:ro
 
+  minio:
+    # Reachable from the host for tests, on localhost only (see postgres above).
+    ports:
+      - "127.0.0.1:${DEV_MINIO_PORT:-59000}:9000"
+    networks:
+      - storage
+      - dev-host
+
 networks:
   dev-host:

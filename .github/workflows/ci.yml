@@ -30,11 +30,25 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
       JWT_SECRET: ci-only-throwaway-value-not-a-real-secret
+      MINIO_APP_ACCESS_KEY: ci-only
+      MINIO_APP_SECRET_KEY: ci-only-throwaway-value
+      TEST_MINIO_ENDPOINT: http://127.0.0.1:9000
+      TEST_MINIO_ACCESS_KEY: ci-only
+      TEST_MINIO_SECRET_KEY: ci-only-throwaway-value
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Not a `services:` entry: those can't pass the `server /data` command MinIO needs.
+      - name: Start MinIO
+        run: |
+          docker run -d -p 9000:9000 \
+            -e MINIO_ROOT_USER="$TEST_MINIO_ACCESS_KEY" \
+            -e MINIO_ROOT_PASSWORD="$TEST_MINIO_SECRET_KEY" \
+            pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372 \
+            server /data
+          timeout 60 bash -c 'until curl -fsS "$TEST_MINIO_ENDPOINT/minio/health/live"; do sleep 1; done'
       - run: pip install -c requirements.lock -e ".[dev]"
       - run: ruff check .
       - run: pytest -q

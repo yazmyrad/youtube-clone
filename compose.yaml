@@ -13,6 +13,8 @@ x-backend-env: &backend-env
   JWT_SECRET: "${JWT_SECRET:?run ./install.sh}"
   # Off in IP-only (plain HTTP) mode, where a Secure cookie would never be sent back.
   COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+  MINIO_APP_ACCESS_KEY: "${MINIO_APP_ACCESS_KEY:?run ./install.sh}"
+  MINIO_APP_SECRET_KEY: "${MINIO_APP_SECRET_KEY:?run ./install.sh}"
 
 services:
   nginx:
@@ -66,6 +68,7 @@ services:
         condition: service_completed_successfully
     networks:
       - backend
+      - storage
     read_only: true
     tmpfs:
       - /tmp
@@ -155,7 +158,7 @@ networks:
   edge:
   backend:
     internal: true
-  # MinIO and the services that talk to it (api, worker, nginx join as their steps land).
+  # MinIO and the services that talk to it (worker and nginx join as their steps land).
   storage:
     internal: true
 

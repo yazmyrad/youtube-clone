@@ -26,6 +26,7 @@ EOF
     echo "Created .env.dev"
 fi
 # Secrets added by later versions are appended, so existing ones are kept.
+grep -q '^DEV_MINIO_PORT=' .env.dev || echo "DEV_MINIO_PORT=59000" >> .env.dev
 grep -q '^JWT_SECRET=' .env.dev || echo "JWT_SECRET=$(random_hex)" >> .env.dev
 grep -q '^MINIO_ROOT_USER=' .env.dev || echo "MINIO_ROOT_USER=minio-root" >> .env.dev
 grep -q '^MINIO_ROOT_PASSWORD=' .env.dev || echo "MINIO_ROOT_PASSWORD=$(random_hex)" >> .env.dev
@@ -44,6 +45,7 @@ if [ -f backend/.env ] && ! grep -qxF "$MARKER" backend/.env; then
 fi
 
 db="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${DEV_DB_PORT}"
+minio="http://127.0.0.1:${DEV_MINIO_PORT}"
 (
     umask 077
     cat > backend/.env <<EOF
@@ -51,5 +53,11 @@ $MARKER
 DATABASE_URL=${db}/${POSTGRES_DB}
 TEST_DATABASE_URL=${db}/${POSTGRES_DB}_test
 JWT_SECRET=${JWT_SECRET}
+MINIO_ENDPOINT=${minio}
+MINIO_APP_ACCESS_KEY=${MINIO_APP_ACCESS_KEY}
+MINIO_APP_SECRET_KEY=${MINIO_APP_SECRET_KEY}
+TEST_MINIO_ENDPOINT=${minio}
+TEST_MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+TEST_MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
 EOF
 )

@@ -31,6 +31,10 @@ class Conflict(AppError):
     status_code = status.HTTP_409_CONFLICT
 
 
+class ServiceUnavailable(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
 async def _handle(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)  # noqa: S101 - registered for AppError only
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)

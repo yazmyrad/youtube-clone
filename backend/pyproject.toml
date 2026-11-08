@@ -10,6 +10,7 @@ dependencies = [
     "alembic>=1.14",
     "argon2-cffi>=25.1",
     "asyncpg>=0.30",
+    "boto3>=1.35",
     "email-validator>=2.2",
     "fastapi>=0.115",
     "pydantic-settings>=2.6",

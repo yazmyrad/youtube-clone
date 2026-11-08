@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     # Off by default: the IP-only deploy serves plain HTTP. `--domain` mode turns it on.
     cookie_secure: bool = False
 
+    minio_endpoint: str = "http://minio:9000"
+    # The scoped app user from infra/minio/init.sh, never the root account.
+    minio_app_access_key: str
+    minio_app_secret_key: SecretStr
+    uploads_bucket: str = "uploads"
+    # Enforced by storage through the presigned POST policy.
+    max_upload_bytes: int = 2 * 1024**3
+    upload_url_ttl: timedelta = timedelta(hours=1)
+
 
 @lru_cache
 def get_settings() -> Settings:
