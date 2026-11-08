@@ -51,6 +51,25 @@ def test_nginx_resolves_upstreams_per_request() -> None:
     assert all(target.startswith("$") for target in targets)
 
 
+def test_every_nginx_include_is_built_into_the_image() -> None:
+    """The dev stack mounts the whole directory, so a missing COPY would only break a deploy."""
+    conf = NGINX_CONF.read_text()
+    includes = set(re.findall(r"include /etc/nginx/conf\.d/([\w.]+);", conf))
+    copy_line = next(
+        line for line in (NGINX_CONF.parent / "Dockerfile").read_text().splitlines()
+        if line.startswith("COPY default.conf")
+    )  # fmt: skip
+
+    assert includes
+    assert includes <= set(copy_line.split())
+
+
+def test_minio_publishes_no_ports() -> None:
+    services = yaml.safe_load(COMPOSE.read_text())["services"]
+
+    assert "ports" not in services["minio"]
+
+
 def test_worker_has_time_to_hand_its_job_back() -> None:
     worker = yaml.safe_load(COMPOSE.read_text())["services"]["worker"]
 
