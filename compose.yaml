@@ -28,6 +28,7 @@ services:
     networks:
       - edge
       - backend
+      - storage
     read_only: true
     tmpfs:
       - /tmp
@@ -158,7 +159,7 @@ networks:
   edge:
   backend:
     internal: true
-  # MinIO and the services that talk to it (worker and nginx join as their steps land).
+  # MinIO and the services that talk to it (worker joins when its step lands).
   storage:
     internal: true
 

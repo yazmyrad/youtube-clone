@@ -11,7 +11,7 @@ IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
 .PHONY: help setup env venv dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
-	run-local test test-storage lint fix check
+	run-local test test-storage test-upload lint fix check
 
 help: ## Show this list
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) \
@@ -99,6 +99,9 @@ test: test-db ## Run tests; database tests use the dev stack's test database
 
 test-storage: env ## Check MinIO buckets and permissions on the running dev stack
 	@scripts/test-storage.sh $(DEV)
+
+test-upload: env ## Check uploads through nginx on the running dev stack (LARGE=1 sends 2 GB)
+	@LARGE="$(LARGE)" scripts/test-upload.sh $(DEV)
 
 lint: ## Check code with ruff
 	cd backend && $(BIN)/ruff check .
