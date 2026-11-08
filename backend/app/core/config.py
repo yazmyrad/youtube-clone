@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 2 * 1024**3
     upload_url_ttl: timedelta = timedelta(hours=1)
 
+    # A worker that stops renewing its lease for this long is presumed dead.
+    job_lease: timedelta = timedelta(seconds=60)
+    job_heartbeat_interval: timedelta = timedelta(seconds=20)
+    job_poll_interval: timedelta = timedelta(seconds=2)
+    # Doubles after each failed attempt.
+    job_retry_backoff: timedelta = timedelta(seconds=30)
+
 
 @lru_cache
 def get_settings() -> Settings:
