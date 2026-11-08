@@ -58,3 +58,10 @@ class PresignedUploadOut(BaseModel):
 class VideoCreatedOut(BaseModel):
     video: VideoOwnerOut
     upload: PresignedUploadOut
+
+
+class PlaybackOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    url: str = Field(description="Relative URL of the HLS master playlist")
+    expires_at: datetime = Field(description="Request a new URL before this time")

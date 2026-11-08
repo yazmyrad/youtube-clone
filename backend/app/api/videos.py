@@ -2,15 +2,17 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from app.core.permissions import CurrentUser, SessionDep
+from app.core.permissions import CurrentUser, OptionalUser, SessionDep
 from app.schemas.errors import ErrorOut
 from app.schemas.videos import (
+    PlaybackOut,
     PresignedUploadOut,
     VideoCreatedOut,
     VideoCreateIn,
     VideoOwnerOut,
     VideoUpdateIn,
 )
+from app.services import playback as playback_service
 from app.services import videos as videos_service
 
 router = APIRouter(
@@ -66,4 +68,21 @@ async def update_video(
 ) -> VideoOwnerOut:
     return VideoOwnerOut.model_validate(
         await videos_service.update_video(session, user, video_id, data)
+    )
+
+
+@router.post(
+    "/{video_id}/playback",
+    response_model=PlaybackOut,
+    summary="Get a short-lived signed URL for the HLS master playlist",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorOut},
+        status.HTTP_409_CONFLICT: {"model": ErrorOut},
+    },
+)
+async def start_playback(
+    video_id: uuid.UUID, user: OptionalUser, session: SessionDep
+) -> PlaybackOut:
+    return PlaybackOut.model_validate(
+        await playback_service.issue_playback(session, user, video_id)
     )

@@ -13,21 +13,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.core.db import get_session
 from app.core.errors import Forbidden, NotFound, Unauthorized
-from app.models import User, UserRole, Video
+from app.models import User, UserRole, Video, VideoStatus, VideoVisibility
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-async def get_current_user(
-    session: SessionDep,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> User:
-    """The caller, loaded from the database on every request, so a role change or
-    disabling applies at once even while the JWT is still valid."""
-    if credentials is None:
-        raise Unauthorized("Not authenticated")
+BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
+
+
+async def _load_user(session: AsyncSession, credentials: HTTPAuthorizationCredentials) -> User:
+    """Loaded from the database on every request, so a role change or disabling applies
+    at once even while the JWT is still valid."""
     user_id = security.decode_access_token(credentials.credentials)
     user = await session.get(User, user_id) if user_id else None
     if user is None or not user.is_active:
@@ -35,7 +33,20 @@ async def get_current_user(
     return user
 
 
+async def get_current_user(session: SessionDep, credentials: BearerDep) -> User:
+    if credentials is None:
+        raise Unauthorized("Not authenticated")
+    return await _load_user(session, credentials)
+
+
+async def get_optional_user(session: SessionDep, credentials: BearerDep) -> User | None:
+    """None for an anonymous caller. A bad token is still a 401, so an expired session
+    gets refreshed rather than quietly losing access to the caller's own videos."""
+    return await _load_user(session, credentials) if credentials else None
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
 def require_role(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
@@ -57,6 +68,27 @@ def ensure_video_owner(user: User, video: Video) -> None:
     """Only the owner may manage a video, moderators and admins included in the refusal.
     404 and not 403, so the response doesn't reveal that a private video exists."""
     if video.deleted_at is not None or video.owner_id != user.id:
+        raise NotFound("Video not found")
+
+
+def can_view(user: User | None, video: Video) -> bool:
+    """The viewing matrix (architecture.md, section 4). Fails closed for the rows whose
+    tables don't exist yet: the private allowlist and a moderator's open report."""
+    if video.deleted_at is not None:
+        return False
+    if user is not None and video.owner_id == user.id:
+        return True
+    if video.status != VideoStatus.ready:
+        return False
+    if video.hidden_at is not None:
+        return user is not None and user.role in (UserRole.moderator, UserRole.admin)
+    return video.visibility != VideoVisibility.private
+
+
+def ensure_can_play(user: User | None, video: Video) -> None:
+    """Viewing rights, and nobody plays a hidden video: its owner sees only the details.
+    404 and not 403, so the response doesn't reveal that the video exists."""
+    if not can_view(user, video) or video.hidden_at is not None:
         raise NotFound("Video not found")
 
 
