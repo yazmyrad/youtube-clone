@@ -61,7 +61,7 @@ def test_only_the_worker_image_has_ffmpeg() -> None:
     assert services["worker"]["build"]["target"] == "worker"
     assert services["api"]["build"] == "backend"
     dockerfile = (ROOT / "backend" / "Dockerfile").read_text()
-    assert install = dockerfile.index("--no-install-recommends ffmpeg")
+    install = dockerfile.index("--no-install-recommends ffmpeg")
     assert dockerfile.index("AS worker") < install < dockerfile.index("AS api")
 
 
