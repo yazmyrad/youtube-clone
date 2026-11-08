@@ -57,7 +57,8 @@ async def run_one(process: Processor, worker_id: str) -> bool:
         logger.warning("Job %s: lease lost, abandoning attempt %s", claim.id, claim.attempt)
         return True
 
-    error = work.exception()
+    # Nothing outside cancelled it, so a stray cancellation inside the work is just a failure.
+    error = RuntimeError("The work was cancelled") if work.cancelled() else work.exception()
     async with get_sessionmaker()() as session:
         if error is None:
             recorded = await jobs.complete(session, claim, work.result())

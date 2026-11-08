@@ -101,6 +101,19 @@ async def test_unexpected_error_text_stays_internal(session: AsyncSession) -> No
     assert (video.status, video.failure_reason) == (VideoStatus.failed, jobs.GENERIC_FAILURE)
 
 
+async def test_work_that_cancels_itself_counts_as_a_failure(session: AsyncSession) -> None:
+    queued = await enqueue(session)
+
+    async def cancels_itself(_: ClaimedJob) -> MediaResult:
+        raise asyncio.CancelledError
+
+    assert await worker.run_one(cancels_itself, "w1") is True
+
+    job = await load_job(session, queued.id)
+    assert (job.status, job.attempts) == (JobStatus.queued, 1)
+    assert "cancelled" in (job.last_error or "")
+
+
 async def test_heartbeat_renews_the_lease_during_slow_work(
     session: AsyncSession, fast_timers: None
 ) -> None:
