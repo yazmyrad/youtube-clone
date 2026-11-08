@@ -4,7 +4,13 @@ from fastapi import APIRouter, status
 
 from app.core.permissions import CurrentUser, SessionDep
 from app.schemas.errors import ErrorOut
-from app.schemas.videos import PresignedUploadOut, VideoCreatedOut, VideoCreateIn, VideoOwnerOut
+from app.schemas.videos import (
+    PresignedUploadOut,
+    VideoCreatedOut,
+    VideoCreateIn,
+    VideoOwnerOut,
+    VideoUpdateIn,
+)
 from app.services import videos as videos_service
 
 router = APIRouter(
@@ -46,4 +52,18 @@ async def complete_upload(
 ) -> VideoOwnerOut:
     return VideoOwnerOut.model_validate(
         await videos_service.complete_upload(session, user, video_id)
+    )
+
+
+@router.patch(
+    "/{video_id}",
+    response_model=VideoOwnerOut,
+    summary="Edit title, description or visibility",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorOut}},
+)
+async def update_video(
+    video_id: uuid.UUID, data: VideoUpdateIn, user: CurrentUser, session: SessionDep
+) -> VideoOwnerOut:
+    return VideoOwnerOut.model_validate(
+        await videos_service.update_video(session, user, video_id, data)
     )

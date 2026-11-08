@@ -71,6 +71,11 @@ async def _complete_others_upload(ctx: Ctx) -> httpx.Response:
     return await ctx.api.post(url, headers=ctx.headers)
 
 
+async def _edit_others_video(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_video(ctx)}"
+    return await ctx.api.patch(url, headers=ctx.headers, json={"title": "Mine now"})
+
+
 async def _list_users(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/admin/users", headers=ctx.headers)
 
@@ -94,6 +99,7 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
     "edit own profile": (_edit_me, (NO_LOGIN, YES, YES, YES)),
     "upload video": (_create_video, (NO_LOGIN, YES, YES, YES)),
     "confirm someone else's upload": (_complete_others_upload, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)),
+    "edit someone else's video": (_edit_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),
     "change roles": (_change_role, (NO_LOGIN, NO, NO, YES)),
     "disable users": (_disable_user, (NO_LOGIN, NO, NO, YES)),

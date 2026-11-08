@@ -7,7 +7,7 @@ from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
 from app.core.permissions import ensure_video_owner
 from app.models import ProcessingJob, User, Video, VideoStatus
-from app.schemas.videos import VideoCreateIn
+from app.schemas.videos import VideoCreateIn, VideoUpdateIn
 from app.services import storage
 from app.services.storage import PresignedUpload
 
@@ -77,6 +77,21 @@ async def complete_upload(session: AsyncSession, user: User, video_id: uuid.UUID
     video.status = VideoStatus.processing
     video.source_size_bytes = size
     session.add(ProcessingJob(video_id=video.id))
+    await session.commit()
+    await session.refresh(video)
+    return video
+
+
+async def update_video(
+    session: AsyncSession, user: User, video_id: uuid.UUID, data: VideoUpdateIn
+) -> Video:
+    video = await _get_owned_for_update(session, user, video_id)
+    if data.title is not None:
+        video.title = data.title
+    if data.description is not None:
+        video.description = data.description
+    if data.visibility is not None:
+        video.visibility = data.visibility
     await session.commit()
     await session.refresh(video)
     return video

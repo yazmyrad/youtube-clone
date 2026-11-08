@@ -363,3 +363,96 @@ async def test_completing_an_upload_frees_a_slot(
     await _complete(api, user, first)
 
     assert (await _create(api, user)).status_code == 201
+
+
+async def _edit(
+    api: httpx.AsyncClient, user: ApiUser, video_id: str, **fields: Any
+) -> httpx.Response:
+    return await api.patch(f"/api/videos/{video_id}", headers=user.headers, json=fields)
+
+
+async def test_edit_changes_only_the_given_fields(
+    api: httpx.AsyncClient, create_user: CreateUser
+) -> None:
+    user = await create_user()
+    video_id = (await _create(api, user, description="Old")).json()["video"]["id"]
+
+    response = await _edit(api, user, video_id, title="  New title ", visibility="public")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["title"], body["visibility"]) == ("New title", "public")
+    assert body["description"] == "Old"
+
+
+async def test_edit_can_clear_the_description(
+    api: httpx.AsyncClient, create_user: CreateUser
+) -> None:
+    user = await create_user()
+    video_id = (await _create(api, user, description="Old")).json()["video"]["id"]
+
+    response = await _edit(api, user, video_id, description="")
+
+    assert response.json()["description"] == ""
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {},
+        {"title": None},
+        {"title": "   "},
+        {"title": "x" * 101},
+        {"description": "a\x00b"},
+        {"visibility": "secret"},
+        {"status": "ready"},
+        {"owner_id": "00000000-0000-0000-0000-000000000000"},
+    ],
+)
+async def test_edit_rejects_invalid_input(
+    api: httpx.AsyncClient, create_user: CreateUser, fields: dict[str, Any]
+) -> None:
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+
+    response = await _edit(api, user, video_id, **fields)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.parametrize("role", [UserRole.user, UserRole.moderator, UserRole.admin])
+async def test_non_owner_cannot_edit(
+    api: httpx.AsyncClient,
+    create_user: CreateUser,
+    set_role: SetRole,
+    session: AsyncSession,
+    role: UserRole,
+) -> None:
+    """D13."""
+    video_id = (await _create(api, await create_user("alice"))).json()["video"]["id"]
+    other = await create_user("bob")
+    await set_role(other, role)
+
+    response = await _edit(api, other, video_id, title="Stolen")
+
+    assert response.status_code == 404, response.text
+    assert await session.scalar(select(Video.title).where(Video.id == video_id)) == "Clip"
+
+
+async def test_edit_requires_login(api: httpx.AsyncClient, create_user: CreateUser) -> None:
+    video_id = (await _create(api, await create_user())).json()["video"]["id"]
+    response = await api.patch(f"/api/videos/{video_id}", json={"title": "New"})
+    assert response.status_code == 401
+
+
+async def test_edit_deleted_video(
+    api: httpx.AsyncClient, create_user: CreateUser, session: AsyncSession
+) -> None:
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+    await session.execute(
+        update(Video).where(Video.id == video_id).values(deleted_at=datetime.now(UTC))
+    )
+    await session.commit()
+
+    assert (await _edit(api, user, video_id, title="New")).status_code == 404

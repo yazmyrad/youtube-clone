@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.models.video import VideoStatus, VideoVisibility
 from app.schemas.auth import StrictModel
@@ -19,6 +19,18 @@ class VideoCreateIn(StrictModel):
     title: Title
     description: Description = ""
     visibility: VideoVisibility = VideoVisibility.private
+
+
+class VideoUpdateIn(StrictModel):
+    title: Title | None = None
+    description: Description | None = None
+    visibility: VideoVisibility | None = None
+
+    @model_validator(mode="after")
+    def _not_empty(self) -> Self:
+        if self.title is None and self.description is None and self.visibility is None:
+            raise ValueError("Set at least one of title, description, visibility")
+        return self
 
 
 class VideoOwnerOut(BaseModel):
