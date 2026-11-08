@@ -6,9 +6,14 @@ from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from tests.helpers import ApiUser, CreateUser
+from app.models import JobStatus, ProcessingJob, UserRole, Video, VideoStatus
+from app.services import storage
+from tests.conftest import TEST_BUCKET
+from tests.helpers import ApiUser, CreateUser, SetRole
 
 
 async def _create(api: httpx.AsyncClient, user: ApiUser, **fields: Any) -> httpx.Response:
@@ -153,3 +158,208 @@ async def test_empty_file_is_rejected_by_storage(
     response = await _post_form(minio, upload, b"")
 
     assert response.status_code == 400, response.text
+
+
+async def _complete(api: httpx.AsyncClient, user: ApiUser, video_id: str) -> httpx.Response:
+    return await api.post(f"/api/videos/{video_id}/upload/complete", headers=user.headers)
+
+
+async def _uploaded_video(api: httpx.AsyncClient, user: ApiUser, bucket_url: str) -> str:
+    body = (await _create(api, user)).json()
+    response = await _post_form(bucket_url, body["upload"], b"video bytes")
+    assert response.status_code == 204, response.text
+    return body["video"]["id"]
+
+
+async def _job_count(session: AsyncSession, video_id: str) -> int:
+    query = (
+        select(func.count()).select_from(ProcessingJob).where(ProcessingJob.video_id == video_id)
+    )
+    return await session.scalar(query) or 0
+
+
+async def _status(session: AsyncSession, video_id: str) -> VideoStatus:
+    session.expire_all()
+    status = await session.scalar(select(Video.status).where(Video.id == video_id))
+    assert status is not None
+    return status
+
+
+async def test_complete_moves_to_processing_and_enqueues(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str, session: AsyncSession
+) -> None:
+    user = await create_user()
+    video_id = await _uploaded_video(api, user, minio)
+
+    response = await _complete(api, user, video_id)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "processing"
+    video = await session.get(Video, video_id)
+    assert video is not None
+    assert video.source_size_bytes == len(b"video bytes")
+    job = await session.scalar(select(ProcessingJob).where(ProcessingJob.video_id == video_id))
+    assert job is not None
+    assert (job.status, job.attempts) == (JobStatus.queued, 0)
+
+
+async def test_complete_without_object_enqueues_nothing(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str, session: AsyncSession
+) -> None:
+    """D11."""
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+
+    response = await _complete(api, user, video_id)
+
+    assert response.status_code == 409, response.text
+    assert await _status(session, video_id) is VideoStatus.uploading
+    assert await _job_count(session, video_id) == 0
+
+
+async def test_repeating_complete_creates_one_job(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str, session: AsyncSession
+) -> None:
+    """D12."""
+    user = await create_user()
+    video_id = await _uploaded_video(api, user, minio)
+
+    first, second = await _complete(api, user, video_id), await _complete(api, user, video_id)
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert second.json()["status"] == "processing"
+    assert await _job_count(session, video_id) == 1
+
+
+async def test_concurrent_complete_creates_one_job(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str, session: AsyncSession
+) -> None:
+    """D12, for a double click or a client retry racing the first request."""
+    user = await create_user()
+    video_id = await _uploaded_video(api, user, minio)
+
+    responses = await asyncio.gather(*(_complete(api, user, video_id) for _ in range(5)))
+
+    assert [r.status_code for r in responses] == [200] * 5
+    assert await _job_count(session, video_id) == 1
+
+
+@pytest.mark.parametrize("status", [VideoStatus.processing, VideoStatus.failed])
+async def test_complete_never_restarts_a_later_status(
+    api: httpx.AsyncClient,
+    create_user: CreateUser,
+    minio: str,
+    session: AsyncSession,
+    status: VideoStatus,
+) -> None:
+    user = await create_user()
+    video_id = await _uploaded_video(api, user, minio)
+    await session.execute(update(Video).where(Video.id == video_id).values(status=status))
+    await session.commit()
+
+    response = await _complete(api, user, video_id)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == status.value
+    assert await _job_count(session, video_id) == 0
+
+
+async def test_complete_rejects_an_object_over_the_limit(
+    api: httpx.AsyncClient,
+    create_user: CreateUser,
+    minio: str,
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second check, in case the object got there some other way than the policy."""
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+    key = f"raw/{video_id}/source"
+    storage.get_client().put_object(Bucket=TEST_BUCKET, Key=key, Body=b"x" * 2048)
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "1024")
+    get_settings.cache_clear()
+
+    response = await _complete(api, user, video_id)
+
+    assert response.status_code == 409, response.text
+    assert await _job_count(session, video_id) == 0
+
+
+@pytest.mark.parametrize("role", [UserRole.user, UserRole.moderator, UserRole.admin])
+async def test_non_owner_cannot_complete(
+    api: httpx.AsyncClient,
+    create_user: CreateUser,
+    set_role: SetRole,
+    minio: str,
+    session: AsyncSession,
+    role: UserRole,
+) -> None:
+    """D13."""
+    video_id = await _uploaded_video(api, await create_user("alice"), minio)
+    other = await create_user("bob")
+    await set_role(other, role)
+
+    response = await _complete(api, other, video_id)
+
+    assert response.status_code == 404, response.text
+    assert await _status(session, video_id) is VideoStatus.uploading
+    assert await _job_count(session, video_id) == 0
+
+
+async def test_complete_requires_login(api: httpx.AsyncClient, create_user: CreateUser) -> None:
+    video_id = (await _create(api, await create_user())).json()["video"]["id"]
+    response = await api.post(f"/api/videos/{video_id}/upload/complete")
+    assert response.status_code == 401
+
+
+async def test_complete_unknown_video(api: httpx.AsyncClient, create_user: CreateUser) -> None:
+    missing = "00000000-0000-4000-8000-000000000000"
+    response = await _complete(api, await create_user(), missing)
+    assert response.status_code == 404
+
+
+async def test_complete_deleted_video(
+    api: httpx.AsyncClient, create_user: CreateUser, session: AsyncSession
+) -> None:
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+    await session.execute(
+        update(Video).where(Video.id == video_id).values(deleted_at=datetime.now(UTC))
+    )
+    await session.commit()
+
+    assert (await _complete(api, user, video_id)).status_code == 404
+
+
+async def test_complete_when_storage_is_down(
+    api: httpx.AsyncClient,
+    create_user: CreateUser,
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    closed_port: int,
+) -> None:
+    monkeypatch.setenv("MINIO_ENDPOINT", f"http://127.0.0.1:{closed_port}")
+    get_settings.cache_clear()
+    storage.get_client.cache_clear()
+    user = await create_user()
+    video_id = (await _create(api, user)).json()["video"]["id"]
+
+    response = await _complete(api, user, video_id)
+
+    assert response.status_code == 503, response.text
+    assert await _status(session, video_id) is VideoStatus.uploading
+    assert await _job_count(session, video_id) == 0
+
+
+async def test_completing_an_upload_frees_a_slot(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str
+) -> None:
+    user = await create_user()
+    first = await _uploaded_video(api, user, minio)
+    for _ in range(2):
+        await _create(api, user)
+    assert (await _create(api, user)).status_code == 409
+
+    await _complete(api, user, first)
+
+    assert (await _create(api, user)).status_code == 201

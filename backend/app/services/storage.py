@@ -1,5 +1,7 @@
 """Object storage: MinIO through the S3 API. Layout is in architecture.md, section 2."""
 
+import asyncio
+import logging
 import uuid
 from dataclasses import dataclass
 from functools import lru_cache
@@ -7,11 +9,15 @@ from typing import TYPE_CHECKING
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import get_settings
+from app.core.errors import ServiceUnavailable
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
+
+logger = logging.getLogger(__name__)
 
 # Same origin for the browser: nginx forwards this path to the bucket. A POST policy's
 # signature covers the policy and not the host, so signing for the internal address is fine.
@@ -59,3 +65,20 @@ def presign_upload(key: str) -> PresignedUpload:
         ExpiresIn=int(settings.upload_url_ttl.total_seconds()),
     )
     return PresignedUpload(url=UPLOAD_URL, fields=post["fields"])
+
+
+async def uploaded_size(key: str) -> int | None:
+    """The size of an uploaded object, or None if it doesn't exist."""
+    client = get_client()
+    bucket = get_settings().uploads_bucket
+    try:
+        head = await asyncio.to_thread(client.head_object, Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if exc.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
+            return None
+        logger.exception("Storage refused a HEAD request")
+        raise ServiceUnavailable("Storage is unavailable, try again") from exc
+    except BotoCoreError as exc:
+        logger.exception("Storage is unreachable")
+        raise ServiceUnavailable("Storage is unavailable, try again") from exc
+    return head["ContentLength"]

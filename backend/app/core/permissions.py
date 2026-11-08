@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.db import get_session
-from app.core.errors import Forbidden, Unauthorized
-from app.models import User, UserRole
+from app.core.errors import Forbidden, NotFound, Unauthorized
+from app.models import User, UserRole, Video
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
@@ -51,6 +51,13 @@ def require_role(*roles: UserRole) -> Callable[[User], Awaitable[User]]:
 
 ModeratorUser = Annotated[User, Depends(require_role(UserRole.moderator, UserRole.admin))]
 AdminUser = Annotated[User, Depends(require_role(UserRole.admin))]
+
+
+def ensure_video_owner(user: User, video: Video) -> None:
+    """Only the owner may manage a video, moderators and admins included in the refusal.
+    404 and not 403, so the response doesn't reveal that a private video exists."""
+    if video.deleted_at is not None or video.owner_id != user.id:
+        raise NotFound("Video not found")
 
 
 def ensure_can_manage_user(

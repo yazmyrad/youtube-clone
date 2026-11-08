@@ -1,7 +1,8 @@
 """D30: the action matrix from architecture.md section 4, one parametrized case per cell.
 
 Only rows whose endpoints exist so far are here; each later feature adds its rows.
-"Owner" has no meaning for these rows yet, so it isn't a column until videos exist.
+"Owner" isn't a column: these rows are about someone else's video, and test_videos.py
+covers what the owner can do.
 """
 
 from collections.abc import Awaitable, Callable
@@ -20,6 +21,7 @@ ACTORS = (ANON, UserRole.user, UserRole.moderator, UserRole.admin)
 YES = "yes"
 NO_LOGIN = 401
 NO = 403
+HIDDEN = 404  # Denied, without revealing that the video exists.
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,16 @@ async def _create_video(ctx: Ctx) -> httpx.Response:
     return await ctx.api.post("/api/videos", headers=ctx.headers, json={"title": "Clip"})
 
 
+async def _others_video(ctx: Ctx) -> str:
+    created = await ctx.api.post("/api/videos", headers=ctx.other.headers, json={"title": "Theirs"})
+    return created.json()["video"]["id"]
+
+
+async def _complete_others_upload(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_video(ctx)}/upload/complete"
+    return await ctx.api.post(url, headers=ctx.headers)
+
+
 async def _list_users(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/admin/users", headers=ctx.headers)
 
@@ -81,6 +93,7 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
     "view own profile": (_get_me, (NO_LOGIN, YES, YES, YES)),
     "edit own profile": (_edit_me, (NO_LOGIN, YES, YES, YES)),
     "upload video": (_create_video, (NO_LOGIN, YES, YES, YES)),
+    "confirm someone else's upload": (_complete_others_upload, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),
     "change roles": (_change_role, (NO_LOGIN, NO, NO, YES)),
     "disable users": (_disable_user, (NO_LOGIN, NO, NO, YES)),

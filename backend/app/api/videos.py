@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, status
 
 from app.core.permissions import CurrentUser, SessionDep
@@ -26,4 +28,22 @@ async def create_video(
     return VideoCreatedOut(
         video=VideoOwnerOut.model_validate(video),
         upload=PresignedUploadOut.model_validate(upload),
+    )
+
+
+@router.post(
+    "/{video_id}/upload/complete",
+    response_model=VideoOwnerOut,
+    summary="Confirm the upload and start processing (safe to repeat)",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorOut},
+        status.HTTP_409_CONFLICT: {"model": ErrorOut},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorOut},
+    },
+)
+async def complete_upload(
+    video_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> VideoOwnerOut:
+    return VideoOwnerOut.model_validate(
+        await videos_service.complete_upload(session, user, video_id)
     )

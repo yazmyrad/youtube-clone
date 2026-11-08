@@ -3,8 +3,10 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import Conflict
-from app.models import User, Video, VideoStatus
+from app.core.config import get_settings
+from app.core.errors import Conflict, NotFound
+from app.core.permissions import ensure_video_owner
+from app.models import ProcessingJob, User, Video, VideoStatus
 from app.schemas.videos import VideoCreateIn
 from app.services import storage
 from app.services.storage import PresignedUpload
@@ -47,3 +49,34 @@ async def create_video(
     await session.commit()
     await session.refresh(video)
     return video, upload
+
+
+async def _get_owned_for_update(session: AsyncSession, user: User, video_id: uuid.UUID) -> Video:
+    video = await session.scalar(
+        select(Video).where(Video.id == video_id).with_for_update(key_share=True)
+    )
+    if video is None:
+        raise NotFound("Video not found")
+    ensure_video_owner(user, video)
+    return video
+
+
+async def complete_upload(session: AsyncSession, user: User, video_id: uuid.UUID) -> Video:
+    """Confirms the file reached storage and enqueues processing. Safe to repeat: the row
+    lock makes concurrent calls take turns, and later ones find the status already moved."""
+    video = await _get_owned_for_update(session, user, video_id)
+    if video.status != VideoStatus.uploading:
+        return video
+
+    size = await storage.uploaded_size(storage.raw_key(video.id))
+    if size is None:
+        raise Conflict("The file hasn't been uploaded yet")
+    if size > get_settings().max_upload_bytes:
+        raise Conflict("The uploaded file is too large")
+
+    video.status = VideoStatus.processing
+    video.source_size_bytes = size
+    session.add(ProcessingJob(video_id=video.id))
+    await session.commit()
+    await session.refresh(video)
+    return video
