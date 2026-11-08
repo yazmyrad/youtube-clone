@@ -5,6 +5,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / "compose.yaml"
+COMPOSE_DEV = ROOT / "compose.dev.yaml"
+MAKEFILE = ROOT / "Makefile"
 NGINX_CONF = ROOT / "infra" / "nginx" / "default.conf"
 
 
@@ -72,3 +74,18 @@ def test_worker_files_are_on_a_volume_with_resource_limits() -> None:
     assert f"worker-scratch:{scratch}" in worker["volumes"]
     assert worker["cpus"] == "${WORKER_CPUS:-1}"
     assert worker["mem_limit"]
+
+
+def test_dev_nginx_mounts_the_config_directory() -> None:
+    """A single-file mount keeps serving the old file once git or an editor replaces it."""
+    # Plain text: compose's !override tag isn't something yaml.safe_load can read.
+    compose = COMPOSE_DEV.read_text()
+
+    assert "- ./infra/nginx:/etc/nginx/conf.d:ro" in compose
+    assert "./infra/nginx/default.conf" not in compose
+
+
+def test_nginx_reload_validates_first() -> None:
+    recipe = MAKEFILE.read_text().split("nginx-reload:", 1)[1]
+
+    assert recipe.index("nginx nginx -t") < recipe.index("nginx nginx -s reload")

@@ -53,7 +53,8 @@ ps: env ## Show service status
 shell: env ## Open a shell in the API container
 	$(DEV) exec api sh
 
-nginx-reload: env ## Apply edits to infra/nginx/*.conf
+nginx-reload: env ## Validate infra/nginx/*.conf, then apply it (a bad config changes nothing)
+	$(DEV) exec nginx nginx -t
 	$(DEV) exec nginx nginx -s reload
 
 # --- Database --------------------------------------------------------------

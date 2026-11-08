@@ -31,8 +31,9 @@ services:
     ports: !override
       - "127.0.0.1:${HTTP_PORT:-8080}:8080"
     volumes:
-      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./infra/nginx/proxy_headers.inc:/etc/nginx/conf.d/proxy_headers.inc:ro
+      # The directory, not single files: a file mount stays on the old inode when git or an
+      # editor replaces the file. nginx only includes conf.d/*.conf, so the rest is ignored.
+      - ./infra/nginx:/etc/nginx/conf.d:ro
 
   postgres:
     # Reachable from the host for migrations, tests and database tools, on localhost only.
