@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import get_settings
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.permissions import ensure_can_play
 from app.models import User, Video, VideoStatus
 
@@ -35,3 +35,10 @@ async def issue_playback(
         url=f"/hls/{exp}.{sig}/{video.id}/master.m3u8",
         expires_at=datetime.fromtimestamp(exp, UTC),
     )
+
+
+def authorize_media(scope: str, video_id: str, exp: str, sig: str) -> None:
+    """Checks one media request. The permission check already happened when the URL was
+    issued, so this is only the signature and expiry, with no database lookup per segment."""
+    if not security.verify_media(scope, video_id, exp, sig):
+        raise Forbidden("Invalid or expired playback token")

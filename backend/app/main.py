@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, auth, health, users, videos
+from app.api import admin, auth, health, internal, users, videos
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import install_error_handlers
@@ -23,6 +23,8 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     for module in (health, auth, users, admin, videos):
         app.include_router(module.router, prefix="/api")
+    # Outside /api on purpose: nginx proxies only /api/, so this has no public route.
+    app.include_router(internal.router)
     return app
 
 
