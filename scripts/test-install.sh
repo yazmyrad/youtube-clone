@@ -33,7 +33,7 @@ published="$("${DOCKER[@]}" ps --filter label=com.docker.compose.project=youtube
 [ "$published" = nginx ] || fail "published services should be only nginx, got: '$published'"
 printf 'ok    only nginx publishes a port\n'
 
-scripts/smoke.sh "http://127.0.0.1:${port}"
+scripts/smoke.sh "http://127.0.0.1:${port}" "${DOCKER[@]}" compose
 scripts/test-storage.sh "${DOCKER[@]}" compose
 
 secrets_before="$(sha256sum .env)"
@@ -47,5 +47,5 @@ trap 'psql "DROP TABLE IF EXISTS install_rerun_check;" || true' EXIT
 [ "$(psql 'SELECT marker FROM install_rerun_check;')" = "$marker" ] || fail "database data was lost on rerun"
 printf 'ok    rerun kept secrets and data\n'
 
-scripts/smoke.sh "http://127.0.0.1:${port}"
+scripts/smoke.sh "http://127.0.0.1:${port}" "${DOCKER[@]}" compose
 printf 'install test passed\n'
