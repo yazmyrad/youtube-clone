@@ -1,7 +1,6 @@
 """The viewing matrix from architecture.md section 4, as it applies to /playback.
 
-Rows for the private allowlist (step 11) and a moderator's open report (step 22) come with
-those features; until then a private video is its owner's alone.
+The row for a moderator's open report comes with that feature (step 22).
 """
 
 import re
@@ -16,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import MEDIA_SCOPE_HLS, verify_media
 from app.models import UserRole, Video, VideoStatus, VideoVisibility
-from tests.helpers import ApiUser, CreateUser, SetRole
+from tests.helpers import ApiUser, CreateUser, SetRole, create_ready_video
 
 ANON = "anonymous"
 STRANGER = "user"
@@ -40,28 +39,6 @@ CELLS = [
     for state, row in MATRIX.items()
     for actor, expected in zip(ACTORS, row, strict=True)
 ]
-
-
-async def _video(
-    api: httpx.AsyncClient, session: AsyncSession, owner: ApiUser, **values: Any
-) -> str:
-    """A video of `owner`, ready to play unless `values` say otherwise."""
-    created = await api.post("/api/videos", headers=owner.headers, json={"title": "Clip"})
-    assert created.status_code == 201, created.text
-    video_id = created.json()["video"]["id"]
-    ready = {
-        "status": VideoStatus.ready,
-        "hls_prefix": f"hls/{video_id}",
-        "thumbnail_key": f"thumbs/{video_id}.jpg",
-        "duration_seconds": 5,
-        "published_at": datetime.now(UTC),
-        "visibility": VideoVisibility.public,
-    }
-    await session.execute(
-        update(Video).where(Video.id == uuid.UUID(video_id)).values({**ready, **values})
-    )
-    await session.commit()
-    return video_id
 
 
 async def _play(
@@ -100,7 +77,7 @@ async def test_viewing_matrix(
         if state == "hidden"
         else {"visibility": VideoVisibility(state)}
     )
-    video_id = await _video(api, session, owner, **values)
+    video_id = await create_ready_video(api, session, owner, **values)
 
     response = await _play(api, video_id, await _actor(create_user, set_role, actor, owner))
 
@@ -110,7 +87,7 @@ async def test_viewing_matrix(
 async def test_returns_a_signed_url_for_this_video(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
 ) -> None:
-    video_id = await _video(api, session, await create_user())
+    video_id = await create_ready_video(api, session, await create_user())
 
     response = await _play(api, video_id)
 
@@ -130,7 +107,7 @@ async def test_a_video_that_is_not_ready_is_a_conflict_for_its_owner(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, status: VideoStatus
 ) -> None:
     owner = await create_user()
-    video_id = await _video(api, session, owner, status=status, published_at=None)
+    video_id = await create_ready_video(api, session, owner, status=status, published_at=None)
 
     assert (await _play(api, video_id, owner)).status_code == 409
 
@@ -138,7 +115,7 @@ async def test_a_video_that_is_not_ready_is_a_conflict_for_its_owner(
 async def test_a_video_that_is_not_ready_is_hidden_from_everyone_else(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, set_role: SetRole
 ) -> None:
-    video_id = await _video(
+    video_id = await create_ready_video(
         api, session, await create_user(), status=VideoStatus.processing, published_at=None
     )
     moderator = await create_user("mod")
@@ -153,7 +130,9 @@ async def test_a_stranger_cannot_tell_a_private_video_from_a_missing_one(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
 ) -> None:
     """D31, for /playback."""
-    video_id = await _video(api, session, await create_user(), visibility=VideoVisibility.private)
+    video_id = await create_ready_video(
+        api, session, await create_user(), visibility=VideoVisibility.private
+    )
     stranger = await create_user("bob")
 
     private = await _play(api, video_id, stranger)
@@ -167,7 +146,7 @@ async def test_a_deleted_video_is_gone_even_for_its_owner(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
 ) -> None:
     owner = await create_user()
-    video_id = await _video(api, session, owner, deleted_at=datetime.now(UTC))
+    video_id = await create_ready_video(api, session, owner, deleted_at=datetime.now(UTC))
 
     assert (await _play(api, video_id, owner)).status_code == 404
 
@@ -175,7 +154,7 @@ async def test_a_deleted_video_is_gone_even_for_its_owner(
 async def test_a_bad_token_is_not_treated_as_anonymous(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
 ) -> None:
-    video_id = await _video(api, session, await create_user())
+    video_id = await create_ready_video(api, session, await create_user())
 
     response = await api.post(
         f"/api/videos/{video_id}/playback", headers={"Authorization": "Bearer nonsense"}
@@ -191,9 +170,131 @@ async def test_a_disabled_user_is_refused_on_the_next_request(
     admin = await create_user("root")
     await set_role(admin, UserRole.admin)
     owner = await create_user()
-    video_id = await _video(api, session, owner)
+    video_id = await create_ready_video(api, session, owner)
     await api.patch(
         f"/api/admin/users/{owner.id}", headers=admin.headers, json={"is_active": False}
     )
 
     assert (await _play(api, video_id, owner)).status_code == 401
+
+
+async def _grant(api: httpx.AsyncClient, owner: ApiUser, video_id: str, username: str) -> None:
+    response = await api.put(f"/api/videos/{video_id}/access/{username}", headers=owner.headers)
+    assert response.status_code == 200, response.text
+
+
+async def _private_video(
+    api: httpx.AsyncClient, session: AsyncSession, owner: ApiUser, **values: Any
+) -> str:
+    return await create_ready_video(
+        api, session, owner, visibility=VideoVisibility.private, **values
+    )
+
+
+async def test_allowlisted_user_plays_until_revoked(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    """D32, step by step: nothing before the grant, and nothing after the revocation."""
+    owner = await create_user()
+    friend = await create_user("bobby")
+    video_id = await _private_video(api, session, owner)
+
+    assert (await _play(api, video_id, friend)).status_code == 404
+
+    await _grant(api, owner, video_id, friend.username)
+    assert (await _play(api, video_id, friend)).status_code == 200
+
+    revoked = await api.delete(
+        f"/api/videos/{video_id}/access/{friend.username}", headers=owner.headers
+    )
+    assert revoked.status_code == 204
+    assert (await _play(api, video_id, friend)).status_code == 404
+
+
+@pytest.mark.parametrize("role", [UserRole.moderator, UserRole.admin])
+async def test_allowlist_applies_to_staff_like_anyone(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+    role: UserRole,
+) -> None:
+    owner = await create_user()
+    staff = await create_user("staff")
+    await set_role(staff, role)
+    video_id = await _private_video(api, session, owner)
+
+    await _grant(api, owner, video_id, staff.username)
+
+    assert (await _play(api, video_id, staff)).status_code == 200
+
+
+async def test_an_entry_opens_only_its_own_video(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    owner = await create_user()
+    friend = await create_user("bobby")
+    shared = await _private_video(api, session, owner)
+    other = await _private_video(api, session, owner)
+
+    await _grant(api, owner, shared, friend.username)
+
+    assert (await _play(api, other, friend)).status_code == 404
+
+
+async def test_an_entry_does_not_help_anyone_else(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    owner = await create_user()
+    friend = await create_user("bobby")
+    video_id = await _private_video(api, session, owner)
+
+    await _grant(api, owner, video_id, friend.username)
+
+    assert (await _play(api, video_id)).status_code == 404
+    assert (await _play(api, video_id, await create_user("carol"))).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        pytest.param({"hidden_at": datetime.now(UTC)}, 404, id="hidden"),
+        pytest.param({"deleted_at": datetime.now(UTC)}, 404, id="deleted"),
+        pytest.param({"status": VideoStatus.processing, "published_at": None}, 404, id="not-ready"),
+    ],
+)
+async def test_an_entry_does_not_override_other_rules(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    values: dict[str, Any],
+    expected: int,
+) -> None:
+    owner = await create_user()
+    friend = await create_user("bobby")
+    video_id = await _private_video(api, session, owner)
+    await _grant(api, owner, video_id, friend.username)
+    assert (await _play(api, video_id, friend)).status_code == 200
+
+    await session.execute(update(Video).where(Video.id == uuid.UUID(video_id)).values(values))
+    await session.commit()
+
+    assert (await _play(api, video_id, friend)).status_code == expected
+
+
+async def test_making_a_video_private_uses_a_list_prepared_earlier(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    owner = await create_user()
+    friend = await create_user("bobby")
+    stranger = await create_user("carol")
+    video_id = await create_ready_video(api, session, owner)
+    await _grant(api, owner, video_id, friend.username)
+
+    edited = await api.patch(
+        f"/api/videos/{video_id}", headers=owner.headers, json={"visibility": "private"}
+    )
+
+    assert edited.status_code == 200
+    assert (await _play(api, video_id, friend)).status_code == 200
+    assert (await _play(api, video_id, stranger)).status_code == 404

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.core.db import get_session
 from app.core.errors import Forbidden, NotFound, Unauthorized
-from app.models import User, UserRole, Video, VideoStatus, VideoVisibility
+from app.models import User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
@@ -71,9 +71,10 @@ def ensure_video_owner(user: User, video: Video) -> None:
         raise NotFound("Video not found")
 
 
-def can_view(user: User | None, video: Video) -> bool:
-    """The viewing matrix (architecture.md, section 4). Fails closed for the rows whose
-    tables don't exist yet: the private allowlist and a moderator's open report."""
+async def can_view(session: AsyncSession, user: User | None, video: Video) -> bool:
+    """The viewing matrix (architecture.md, section 4). Fails closed for the row whose
+    table doesn't exist yet: a moderator's open report. The allowlist applies to any role:
+    it's the owner's own decision to share, not a moderator's power."""
     if video.deleted_at is not None:
         return False
     if user is not None and video.owner_id == user.id:
@@ -82,13 +83,17 @@ def can_view(user: User | None, video: Video) -> bool:
         return False
     if video.hidden_at is not None:
         return user is not None and user.role in (UserRole.moderator, UserRole.admin)
-    return video.visibility != VideoVisibility.private
+    if video.visibility != VideoVisibility.private:
+        return True
+    if user is None:
+        return False
+    return await session.get(VideoAccess, (video.id, user.id)) is not None
 
 
-def ensure_can_play(user: User | None, video: Video) -> None:
+async def ensure_can_play(session: AsyncSession, user: User | None, video: Video) -> None:
     """Viewing rights, and nobody plays a hidden video: its owner sees only the details.
     404 and not 403, so the response doesn't reveal that the video exists."""
-    if not can_view(user, video) or video.hidden_at is not None:
+    if video.hidden_at is not None or not await can_view(session, user, video):
         raise NotFound("Video not found")
 
 

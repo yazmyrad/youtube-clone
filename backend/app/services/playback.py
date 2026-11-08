@@ -25,7 +25,7 @@ async def issue_playback(
     video = await session.get(Video, video_id)
     if video is None:
         raise NotFound("Video not found")
-    ensure_can_play(user, video)
+    await ensure_can_play(session, user, video)
     if video.status != VideoStatus.ready:
         raise Conflict("The video isn't ready yet")
 
