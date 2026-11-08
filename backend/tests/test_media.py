@@ -233,3 +233,40 @@ async def test_the_decoder_refuses_frames_the_probe_did_not_see(
 
     with pytest.raises(JobError, match="converted"):
         await media.transcode(source, info, output)
+
+
+def _cover(tmp_path: Path) -> Path:
+    cover = tmp_path / "cover.jpg"
+    run_ffmpeg("-f", "lavfi", "-i", "color=s=64x64", "-frames:v", "1", str(cover))
+    return cover
+
+
+async def test_audio_with_cover_art_is_rejected(tmp_path: Path) -> None:
+    sound = make_clip(tmp_path / "sound.m4a", video=False, codecs=("-c:a", "aac"))
+    tagged = tmp_path / "tagged.mp4"
+    run_ffmpeg(
+        "-i", str(sound), "-i", str(_cover(tmp_path)), "-map", "0", "-map", "1", "-c", "copy",
+        "-disposition:v:0", "attached_pic", str(tagged),
+    )  # fmt: skip
+
+    with pytest.raises(JobError, match="no video"):
+        await media.probe(tagged)
+
+
+async def test_the_real_video_stream_is_used_wherever_it_sits(tmp_path: Path) -> None:
+    clip = make_clip(tmp_path / "clip.mp4", size="320x240")
+    tagged = tmp_path / "tagged.mp4"
+    run_ffmpeg(
+        "-i", str(clip), "-i", str(_cover(tmp_path)),
+        "-map", "0:a", "-map", "0:v", "-map", "1", "-c", "copy",
+        "-disposition:v:1", "attached_pic", str(tagged),
+    )  # fmt: skip
+    output = tmp_path / "out"
+    output.mkdir()
+
+    info = await media.probe(tagged)
+    result = await media.transcode(tagged, info, output)
+
+    assert info.video_stream == 1
+    assert (info.width, info.height) == (320, 240)
+    assert "RESOLUTION=320x240" in result.master.read_text()

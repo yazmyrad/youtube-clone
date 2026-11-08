@@ -44,6 +44,7 @@ class ToolFailed(Exception):
 @dataclass(frozen=True)
 class SourceInfo:
     input_format: str
+    video_stream: int
     duration: float
     # As displayed, so with any rotation applied.
     width: int
@@ -104,8 +105,8 @@ async def probe(path: Path) -> SourceInfo:
                 "-protocol_whitelist", "file",
                 "-format_whitelist", FORMAT_WHITELIST,
                 "-show_entries",
-                "format=format_name,duration:stream=codec_type,width,height"
-                ":stream_side_data=rotation",
+                "format=format_name,duration:stream=index,codec_type,width,height"
+                ":stream_disposition=attached_pic:stream_side_data=rotation",
                 "-of", "json",
                 str(path),
             ],
@@ -121,7 +122,15 @@ async def probe(path: Path) -> SourceInfo:
         raise JobError(UNSUPPORTED)
 
     streams = info.get("streams", [])
-    video = next((s for s in streams if s.get("codec_type") == "video"), None)
+    # Cover art is stored as a video stream, and can come before the real one.
+    video = next(
+        (
+            s
+            for s in streams
+            if s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic")
+        ),
+        None,
+    )
     if video is None or not video.get("width") or not video.get("height"):
         raise JobError("This file has no video in it")
 
@@ -142,6 +151,7 @@ async def probe(path: Path) -> SourceInfo:
         width, height = height, width
     return SourceInfo(
         input_format=input_format,
+        video_stream=video["index"],
         duration=duration,
         width=width,
         height=height,
@@ -236,7 +246,7 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
     hls_dir = output / "hls"
     outputs: list[str] = []
     splits = "".join(f"[s{i}]" for i in range(len(renditions)))
-    filters = [f"[0:v:0]split={len(renditions)}{splits}"]
+    filters = [f"[0:{info.video_stream}]split={len(renditions)}{splits}"]
     for i, rendition in enumerate(renditions):
         directory = hls_dir / rendition.name
         directory.mkdir(parents=True)
@@ -250,7 +260,7 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
         [
             "-ss", str(min(1.0, info.duration / 2)),
             *_input_args(source, info),
-            "-map", "0:v:0",
+            "-map", f"0:{info.video_stream}",
             "-frames:v", "1",
             "-vf", f"scale={smallest.width}:{smallest.height}",
             "-q:v", "3",
