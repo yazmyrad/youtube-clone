@@ -12,16 +12,21 @@ from app.services.jobs import ClaimedJob, MediaResult
 MEDIA = MediaResult(hls_prefix="hls/x", thumbnail_key="thumbs/x.jpg", duration_seconds=5)
 
 
-async def enqueue(
-    session: AsyncSession, raw_key: str | None = None, **job_fields: object
-) -> ProcessingJob:
+async def make_video(session: AsyncSession, **fields: object) -> Video:
     name = f"user_{uuid.uuid4().hex[:12]}"
     user = User(username=name, email=f"{name}@example.com", password_hash="x", display_name="A")
     session.add(user)
     await session.flush()
-    video = Video(owner_id=user.id, title="Clip", status=VideoStatus.processing, raw_key=raw_key)
+    video = Video(owner_id=user.id, title="Clip", **fields)
     session.add(video)
-    await session.flush()
+    await session.commit()
+    return video
+
+
+async def enqueue(
+    session: AsyncSession, raw_key: str | None = None, **job_fields: object
+) -> ProcessingJob:
+    video = await make_video(session, status=VideoStatus.processing, raw_key=raw_key)
     job = ProcessingJob(video_id=video.id, **job_fields)
     session.add(job)
     await session.commit()

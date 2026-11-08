@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.services import jobs
 from app.services.jobs import ClaimedJob, MediaResult
+from app.workers import sweeps
 from app.workers.processor import clear_scratch
 from app.workers.processor import process as default_process
 
@@ -104,10 +105,21 @@ async def run_forever(process: Processor, worker_id: str) -> None:
             await asyncio.sleep(poll_interval)
 
 
+async def sweep_forever() -> None:
+    """Its own task, so a long transcode doesn't hold up cleaning."""
+    interval = get_settings().sweep_interval.total_seconds()
+    while True:
+        try:
+            await sweeps.run_all()
+        except Exception:
+            logger.exception("Sweep error")
+        await asyncio.sleep(interval)
+
+
 async def _main() -> None:
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
     clear_scratch()
-    task = asyncio.ensure_future(run_forever(default_process, worker_id))
+    task = asyncio.gather(run_forever(default_process, worker_id), sweep_forever())
     loop = asyncio.get_running_loop()
     for stop_signal in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(stop_signal, task.cancel)

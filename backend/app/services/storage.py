@@ -113,3 +113,20 @@ def _put(bucket: str, key: str, source: Path, content_type: str) -> None:
 async def upload_media(key: str, source: Path, content_type: str) -> None:
     """A single PUT: it replaces the object atomically, and client timeouts bound it."""
     await asyncio.to_thread(_put, get_settings().media_bucket, key, source, content_type)
+
+
+async def delete_object(bucket: str, key: str) -> None:
+    """Deleting something that's already gone is not an error."""
+    await asyncio.to_thread(get_client().delete_object, Bucket=bucket, Key=key)
+
+
+def _delete_prefix(bucket: str, prefix: str) -> None:
+    client = get_client()
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+        objects = [{"Key": item["Key"]} for item in page.get("Contents", [])]
+        if objects:
+            client.delete_objects(Bucket=bucket, Delete={"Objects": objects, "Quiet": True})
+
+
+async def delete_prefix(bucket: str, prefix: str) -> None:
+    await asyncio.to_thread(_delete_prefix, bucket, prefix)

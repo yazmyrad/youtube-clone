@@ -42,6 +42,9 @@ class Settings(BaseSettings):
 
     ffmpeg_timeout: timedelta = timedelta(hours=6)
     ffmpeg_threads: int = 2
+    sweep_interval: timedelta = timedelta(seconds=60)
+    # Well past the upload form's own expiry.
+    abandoned_upload_age: timedelta = timedelta(hours=24)
     # Source files and output while a job runs.
     worker_scratch_dir: Path = Path(gettempdir())
 
