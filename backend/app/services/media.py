@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.core.config import get_settings
 from app.services.jobs import JobError
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,14 @@ PROBE_TIMEOUT_SECONDS = 60
 STDERR_TAIL_BYTES = 2000
 
 UNSUPPORTED = "This file isn't a supported video"
+TRANSCODE_FAILED = "This video couldn't be converted"
+
+SEGMENT_SECONDS = 6
+MAX_FPS = "30"
+# Rendition name (also the object path), height and video bitrate cap.
+LADDER = (("360p", 360, "1000k"), ("720p", 720, "3000k"))
+# Container overhead and bitrate peaks on top of the measured average, for the master playlist.
+BANDWIDTH_MARGIN = 1.2
 
 
 class ToolFailed(Exception):
@@ -38,6 +47,21 @@ class SourceInfo:
     width: int
     height: int
     has_audio: bool
+
+
+@dataclass(frozen=True)
+class Rendition:
+    name: str
+    width: int
+    height: int
+    max_rate: str
+
+
+@dataclass(frozen=True)
+class Transcoded:
+    hls_dir: Path
+    master: Path
+    thumbnail: Path
 
 
 async def _run(args: list[str], limit_seconds: float) -> bytes:
@@ -118,3 +142,118 @@ async def probe(path: Path) -> SourceInfo:
         height=height,
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
     )
+
+
+def _even(value: float) -> int:
+    return max(2, round(value / 2) * 2)
+
+
+def renditions_for(info: SourceInfo) -> list[Rendition]:
+    """360p, or the source's own height if lower, plus 720p for tall enough sources."""
+    result = []
+    for name, target, max_rate in LADDER:
+        if target > 360 and info.height < target:
+            continue
+        height = _even(min(target, info.height))
+        result.append(Rendition(name, _even(info.width * height / info.height), height, max_rate))
+    return result
+
+
+def _input_args(source: Path, info: SourceInfo) -> list[str]:
+    """The format is forced to the probed one, and only local files can be opened."""
+    return [
+        "-protocol_whitelist", "file",
+        "-f", info.input_format,
+        "-i", str(source),
+    ]  # fmt: skip
+
+
+def _output_args(rendition: Rendition, label: str, directory: Path) -> list[str]:
+    settings = get_settings()
+    return [
+        "-map", f"[{label}]",
+        "-map", "0:a:0?",  # The question mark: a source without audio is fine.
+        "-sn", "-dn",
+        "-threads", str(settings.ffmpeg_threads),
+        "-fpsmax", MAX_FPS,
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-profile:v", "main",
+        "-pix_fmt", "yuv420p",
+        "-maxrate", rendition.max_rate,
+        "-bufsize", rendition.max_rate,
+        # Keyframes at fixed times line the renditions up, so players can switch between them.
+        "-force_key_frames", f"expr:gte(t,n_forced*{SEGMENT_SECONDS})",
+        "-sc_threshold", "0",
+        "-c:a", "aac",
+        "-b:a", "96k",
+        "-ac", "2",
+        "-ar", "48000",
+        "-f", "hls",
+        "-hls_time", str(SEGMENT_SECONDS),
+        "-hls_playlist_type", "vod",
+        "-hls_flags", "independent_segments",
+        "-hls_segment_type", "mpegts",
+        "-hls_segment_filename", str(directory / "seg_%05d.ts"),
+        str(directory / "index.m3u8"),
+    ]  # fmt: skip
+
+
+async def _encode(args: list[str]) -> None:
+    command = ["ffmpeg", "-nostdin", "-v", "error", "-y", *args]
+    try:
+        await _run(command, get_settings().ffmpeg_timeout.total_seconds())
+    except ToolFailed as exc:
+        logger.warning("ffmpeg failed: %s", exc)
+        raise JobError(TRANSCODE_FAILED) from exc
+
+
+def _write_master(hls_dir: Path, renditions: list[Rendition], duration: float) -> Path:
+    lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-INDEPENDENT-SEGMENTS"]
+    for rendition in renditions:
+        size = sum(f.stat().st_size for f in (hls_dir / rendition.name).glob("seg_*.ts"))
+        bandwidth = max(1, round(size * 8 / duration * BANDWIDTH_MARGIN))
+        lines.append(
+            f"#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},"
+            f"RESOLUTION={rendition.width}x{rendition.height}"
+        )
+        lines.append(f"{rendition.name}/index.m3u8")
+    master = hls_dir / "master.m3u8"
+    master.write_text("\n".join(lines) + "\n")
+    return master
+
+
+async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
+    """Writes `hls/` and `thumbnail.jpg` under `output`. Cancelling kills ffmpeg."""
+    renditions = renditions_for(info)
+    hls_dir = output / "hls"
+    outputs: list[str] = []
+    splits = "".join(f"[s{i}]" for i in range(len(renditions)))
+    filters = [f"[0:v:0]split={len(renditions)}{splits}"]
+    for i, rendition in enumerate(renditions):
+        directory = hls_dir / rendition.name
+        directory.mkdir(parents=True)
+        filters.append(f"[s{i}]scale={rendition.width}:{rendition.height}[o{i}]")
+        outputs += _output_args(rendition, f"o{i}", directory)
+    await _encode([*_input_args(source, info), "-filter_complex", ";".join(filters), *outputs])
+
+    thumbnail = output / "thumbnail.jpg"
+    smallest = renditions[0]
+    await _encode(
+        [
+            "-ss", str(min(1.0, info.duration / 2)),
+            *_input_args(source, info),
+            "-map", "0:v:0",
+            "-frames:v", "1",
+            "-vf", f"scale={smallest.width}:{smallest.height}",
+            "-q:v", "3",
+            "-update", "1",
+            str(thumbnail),
+        ]
+    )  # fmt: skip
+    if not thumbnail.exists():
+        raise JobError(TRANSCODE_FAILED)
+
+    master = _write_master(hls_dir, renditions, info.duration)
+    return Transcoded(hls_dir=hls_dir, master=master, thumbnail=thumbnail)

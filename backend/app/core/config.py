@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Doubles after each failed attempt.
     job_retry_backoff: timedelta = timedelta(seconds=30)
 
+    ffmpeg_timeout: timedelta = timedelta(hours=6)
+    ffmpeg_threads: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:
