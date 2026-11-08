@@ -89,11 +89,19 @@ services:
   # Claims jobs from the Postgres queue. Both of its networks are internal: no internet egress.
   worker:
     <<: *hardening
-    build: backend
+    build:
+      context: backend
+      target: worker
     command: ["python", "-m", "app.workers.main"]
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      WORKER_SCRATCH_DIR: /var/lib/worker
     # Time to stop ffmpeg and hand the job back; see jobs.release.
     stop_grace_period: 30s
+    # Keeps transcoding from starving the site. 1 is the highest default that is safe:
+    # Docker refuses to start a container asking for more CPUs than the host has.
+    cpus: "${WORKER_CPUS:-1}"
+    mem_limit: 2g
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -105,6 +113,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # On disk rather than tmpfs: a 2 GB source must not sit in RAM.
+      - worker-scratch:/var/lib/worker
     cap_drop:
       - ALL
 
@@ -188,3 +199,4 @@ networks:
 volumes:
   postgres-data:
   minio-data:
+  worker-scratch:

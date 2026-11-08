@@ -53,3 +53,22 @@ def test_worker_has_time_to_hand_its_job_back() -> None:
     worker = yaml.safe_load(COMPOSE.read_text())["services"]["worker"]
 
     assert worker["stop_grace_period"] == "30s"
+
+
+def test_only_the_worker_image_has_ffmpeg() -> None:
+    services = yaml.safe_load(COMPOSE.read_text())["services"]
+
+    assert services["worker"]["build"]["target"] == "worker"
+    assert services["api"]["build"] == "backend"
+    dockerfile = (ROOT / "backend" / "Dockerfile").read_text()
+    assert install = dockerfile.index("--no-install-recommends ffmpeg")
+    assert dockerfile.index("AS worker") < install < dockerfile.index("AS api")
+
+
+def test_worker_files_are_on_a_volume_with_resource_limits() -> None:
+    worker = yaml.safe_load(COMPOSE.read_text())["services"]["worker"]
+    scratch = worker["environment"]["WORKER_SCRATCH_DIR"]
+
+    assert f"worker-scratch:{scratch}" in worker["volumes"]
+    assert worker["cpus"] == "${WORKER_CPUS:-1}"
+    assert worker["mem_limit"]
