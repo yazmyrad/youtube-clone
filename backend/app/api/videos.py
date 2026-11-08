@@ -13,6 +13,7 @@ from app.schemas.videos import (
     VideoAccessPage,
     VideoCreatedOut,
     VideoCreateIn,
+    VideoDetailsOut,
     VideoOwnerOut,
     VideoUpdateIn,
 )
@@ -43,6 +44,18 @@ async def create_video(
         video=VideoOwnerOut.model_validate(video),
         upload=PresignedUploadOut.model_validate(upload),
     )
+
+
+@router.get(
+    "/{video_id}",
+    response_model=VideoDetailsOut,
+    summary="Get a video's details",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorOut}},
+)
+async def get_video(
+    video_id: uuid.UUID, user: OptionalUser, session: SessionDep
+) -> VideoDetailsOut:
+    return VideoDetailsOut.model_validate(await videos_service.get_video(session, user, video_id))
 
 
 @router.post(

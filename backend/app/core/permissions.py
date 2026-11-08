@@ -90,6 +90,12 @@ async def can_view(session: AsyncSession, user: User | None, video: Video) -> bo
     return await session.get(VideoAccess, (video.id, user.id)) is not None
 
 
+async def ensure_can_view(session: AsyncSession, user: User | None, video: Video) -> None:
+    """404 and not 403, so the response doesn't reveal that the video exists."""
+    if not await can_view(session, user, video):
+        raise NotFound("Video not found")
+
+
 async def ensure_can_play(session: AsyncSession, user: User | None, video: Video) -> None:
     """Viewing rights, and nobody plays a hidden video: its owner sees only the details.
     404 and not 403, so the response doesn't reveal that the video exists."""

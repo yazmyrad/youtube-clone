@@ -48,6 +48,21 @@ class VideoOwnerOut(BaseModel):
     updated_at: datetime
 
 
+class VideoDetailsOut(BaseModel):
+    """What anyone allowed to view the video sees about it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    description: str
+    visibility: VideoVisibility
+    status: VideoStatus
+    duration_seconds: int | None
+    published_at: datetime | None
+    created_at: datetime
+
+
 class PresignedUploadOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
-from app.core.permissions import ensure_video_owner
+from app.core.permissions import ensure_can_view, ensure_video_owner
 from app.models import ProcessingJob, User, Video, VideoAccess, VideoStatus
 from app.schemas.videos import VideoCreateIn, VideoUpdateIn
 from app.services import storage
@@ -80,6 +80,14 @@ async def complete_upload(session: AsyncSession, user: User, video_id: uuid.UUID
     session.add(ProcessingJob(video_id=video.id))
     await session.commit()
     await session.refresh(video)
+    return video
+
+
+async def get_video(session: AsyncSession, user: User | None, video_id: uuid.UUID) -> Video:
+    video = await session.get(Video, video_id)
+    if video is None:
+        raise NotFound("Video not found")
+    await ensure_can_view(session, user, video)
     return video
 
 
