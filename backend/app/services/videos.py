@@ -1,12 +1,13 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import Row, Select, delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
 from app.core.permissions import ensure_video_owner
-from app.models import ProcessingJob, User, Video, VideoStatus
+from app.models import ProcessingJob, User, Video, VideoAccess, VideoStatus
 from app.schemas.videos import VideoCreateIn, VideoUpdateIn
 from app.services import storage
 from app.services.storage import PresignedUpload
@@ -95,3 +96,65 @@ async def update_video(
     await session.commit()
     await session.refresh(video)
     return video
+
+
+def _access_entries(video_id: uuid.UUID) -> Select:
+    return (
+        select(User.username, User.display_name, VideoAccess.created_at.label("granted_at"))
+        .join(VideoAccess, VideoAccess.user_id == User.id)
+        .where(VideoAccess.video_id == video_id)
+    )
+
+
+async def list_access(
+    session: AsyncSession, user: User, video_id: uuid.UUID, *, cursor: str | None, limit: int
+) -> tuple[list[Row], str | None]:
+    """The allowlist ordered by username, with keyset pagination on it."""
+    video = await session.get(Video, video_id)
+    if video is None:
+        raise NotFound("Video not found")
+    ensure_video_owner(user, video)
+
+    query = _access_entries(video_id).order_by(User.username).limit(limit + 1)
+    if cursor:
+        query = query.where(User.username > cursor)
+    rows = list(await session.execute(query))
+    if len(rows) > limit:
+        return rows[:limit], rows[limit - 1].username
+    return rows, None
+
+
+async def grant_access(
+    session: AsyncSession, user: User, video_id: uuid.UUID, username: str
+) -> Row:
+    """Safe to repeat. Allowed at any visibility, so a list can be ready before going private."""
+    video = await _get_owned_for_update(session, user, video_id)
+    target_id = await session.scalar(select(User.id).where(User.username == username))
+    if target_id is None:
+        raise NotFound("User not found")
+    if target_id == video.owner_id:
+        raise Conflict("You already have access to your own video")
+
+    await session.execute(
+        insert(VideoAccess).values(video_id=video_id, user_id=target_id).on_conflict_do_nothing()
+    )
+    # Read before committing: the row is a plain result, and can't be revoked in between.
+    entry = (await session.execute(_access_entries(video_id).where(User.id == target_id))).one()
+    await session.commit()
+    return entry
+
+
+async def revoke_access(
+    session: AsyncSession, user: User, video_id: uuid.UUID, username: str
+) -> None:
+    """Safe to repeat, and says nothing about whether the username exists."""
+    await _get_owned_for_update(session, user, video_id)
+    await session.execute(
+        delete(VideoAccess)
+        .where(
+            VideoAccess.video_id == video_id,
+            VideoAccess.user_id.in_(select(User.id).where(User.username == username)),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await session.commit()

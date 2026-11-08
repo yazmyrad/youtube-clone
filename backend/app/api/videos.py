@@ -1,12 +1,16 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Path, Query, status
 
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
+from app.models.user import USERNAME_PATTERN
 from app.schemas.errors import ErrorOut
 from app.schemas.videos import (
     PlaybackOut,
     PresignedUploadOut,
+    VideoAccessOut,
+    VideoAccessPage,
     VideoCreatedOut,
     VideoCreateIn,
     VideoOwnerOut,
@@ -14,6 +18,8 @@ from app.schemas.videos import (
 )
 from app.services import playback as playback_service
 from app.services import videos as videos_service
+
+Username = Annotated[str, Path(pattern=USERNAME_PATTERN)]
 
 router = APIRouter(
     prefix="/videos",
@@ -86,3 +92,53 @@ async def start_playback(
     return PlaybackOut.model_validate(
         await playback_service.issue_playback(session, user, video_id)
     )
+
+
+@router.get(
+    "/{video_id}/access",
+    response_model=VideoAccessPage,
+    summary="List who may watch this private video",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorOut}},
+)
+async def list_access(
+    video_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    cursor: Annotated[str | None, Query(pattern=USERNAME_PATTERN)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> VideoAccessPage:
+    rows, next_cursor = await videos_service.list_access(
+        session, user, video_id, cursor=cursor, limit=limit
+    )
+    return VideoAccessPage(
+        items=[VideoAccessOut.model_validate(row) for row in rows], next_cursor=next_cursor
+    )
+
+
+@router.put(
+    "/{video_id}/access/{username}",
+    response_model=VideoAccessOut,
+    summary="Let a user watch this private video (safe to repeat)",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorOut},
+        status.HTTP_409_CONFLICT: {"model": ErrorOut},
+    },
+)
+async def grant_access(
+    video_id: uuid.UUID, username: Username, user: CurrentUser, session: SessionDep
+) -> VideoAccessOut:
+    return VideoAccessOut.model_validate(
+        await videos_service.grant_access(session, user, video_id, username)
+    )
+
+
+@router.delete(
+    "/{video_id}/access/{username}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Stop a user from watching this private video (safe to repeat)",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorOut}},
+)
+async def revoke_access(
+    video_id: uuid.UUID, username: Username, user: CurrentUser, session: SessionDep
+) -> None:
+    await videos_service.revoke_access(session, user, video_id, username)

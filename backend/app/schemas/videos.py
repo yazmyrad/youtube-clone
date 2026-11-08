@@ -65,3 +65,16 @@ class PlaybackOut(BaseModel):
 
     url: str = Field(description="Relative URL of the HLS master playlist")
     expires_at: datetime = Field(description="Request a new URL before this time")
+
+
+class VideoAccessOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    username: str
+    display_name: str
+    granted_at: datetime
+
+
+class VideoAccessPage(BaseModel):
+    items: list[VideoAccessOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")

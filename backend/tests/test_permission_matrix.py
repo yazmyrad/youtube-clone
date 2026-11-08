@@ -76,6 +76,21 @@ async def _edit_others_video(ctx: Ctx) -> httpx.Response:
     return await ctx.api.patch(url, headers=ctx.headers, json={"title": "Mine now"})
 
 
+async def _list_others_access(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_video(ctx)}/access"
+    return await ctx.api.get(url, headers=ctx.headers)
+
+
+async def _grant_access_to_others_video(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_video(ctx)}/access/{ctx.other.username}"
+    return await ctx.api.put(url, headers=ctx.headers)
+
+
+async def _revoke_access_to_others_video(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_video(ctx)}/access/{ctx.other.username}"
+    return await ctx.api.delete(url, headers=ctx.headers)
+
+
 async def _list_users(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/admin/users", headers=ctx.headers)
 
@@ -100,6 +115,15 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
     "upload video": (_create_video, (NO_LOGIN, YES, YES, YES)),
     "confirm someone else's upload": (_complete_others_upload, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)),
     "edit someone else's video": (_edit_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)),
+    "list allowlist of someone else's video": (
+        _list_others_access, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)
+    ),
+    "grant access to someone else's video": (
+        _grant_access_to_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)
+    ),
+    "revoke access to someone else's video": (
+        _revoke_access_to_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)
+    ),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),
     "change roles": (_change_role, (NO_LOGIN, NO, NO, YES)),
     "disable users": (_disable_user, (NO_LOGIN, NO, NO, YES)),
