@@ -40,6 +40,8 @@ def fresh_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[
     """
     monkeypatch.setattr(config, "ENV_FILE", tmp_path / "absent.env")
     monkeypatch.setenv("JWT_SECRET", "test-secret-" + "x" * 32)
+    # No database either, unless a test asks for one through the `db` fixture.
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://unused:unused@database.invalid/unused")
     # Storage is unreachable unless a test asks for it, and never holds dev objects.
     monkeypatch.setenv("MINIO_ENDPOINT", "http://storage.invalid:9000")
     monkeypatch.setenv("MINIO_APP_ACCESS_KEY", "test-access-key")
