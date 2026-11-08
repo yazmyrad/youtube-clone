@@ -1,6 +1,7 @@
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
+from tempfile import gettempdir
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
     minio_app_access_key: str
     minio_app_secret_key: SecretStr
     uploads_bucket: str = "uploads"
+    media_bucket: str = "media"
     # Enforced by storage through the presigned POST policy.
     max_upload_bytes: int = 2 * 1024**3
     upload_url_ttl: timedelta = timedelta(hours=1)
@@ -40,6 +42,8 @@ class Settings(BaseSettings):
 
     ffmpeg_timeout: timedelta = timedelta(hours=6)
     ffmpeg_threads: int = 2
+    # Source files and output while a job runs.
+    worker_scratch_dir: Path = Path(gettempdir())
 
 
 @lru_cache

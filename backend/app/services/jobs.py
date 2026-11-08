@@ -67,6 +67,11 @@ async def _fail_permanently(
     await _update_video(session, job.video_id, status=VideoStatus.failed, failure_reason=reason)
 
 
+async def source_key(session: AsyncSession, video_id: uuid.UUID) -> str | None:
+    """Where the job's uploaded file is. None if it's gone."""
+    return await session.scalar(select(Video.raw_key).where(Video.id == video_id))
+
+
 async def claim_next(session: AsyncSession, worker_id: str) -> ClaimedJob | None:
     """Takes the oldest job that is due, or whose worker stopped renewing its lease."""
     settings = get_settings()

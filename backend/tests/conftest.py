@@ -22,6 +22,7 @@ from tests.helpers import PASSWORD, ApiUser
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 TEST_BUCKET = "uploads-test"
+TEST_MEDIA_BUCKET = "media-test"
 
 
 def _clear_caches() -> None:
@@ -44,6 +45,8 @@ def fresh_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[
     monkeypatch.setenv("MINIO_APP_ACCESS_KEY", "test-access-key")
     monkeypatch.setenv("MINIO_APP_SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("UPLOADS_BUCKET", TEST_BUCKET)
+    monkeypatch.setenv("MEDIA_BUCKET", TEST_MEDIA_BUCKET)
+    monkeypatch.setenv("WORKER_SCRATCH_DIR", str(tmp_path))
     _clear_caches()
     yield
     _clear_caches()
@@ -113,7 +116,7 @@ async def api(db: None, client: httpx.AsyncClient) -> httpx.AsyncClient:
 
 @pytest.fixture
 def minio(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    """Points the app at a real MinIO with an empty test bucket; yields the bucket's URL."""
+    """Points the app at a real MinIO with empty test buckets; yields the uploads bucket's URL."""
     endpoint = os.environ.get("TEST_MINIO_ENDPOINT")
     if not endpoint:
         pytest.skip("needs a real MinIO: set TEST_MINIO_ENDPOINT (make test and CI do)")
@@ -124,12 +127,14 @@ def minio(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     get_settings.cache_clear()
     storage.get_client.cache_clear()
     client = storage.get_client()
-    with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):
-        client.create_bucket(Bucket=TEST_BUCKET)
+    for bucket in (TEST_BUCKET, TEST_MEDIA_BUCKET):
+        with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):
+            client.create_bucket(Bucket=bucket)
     yield f"{endpoint}/{TEST_BUCKET}/"
-    for page in client.get_paginator("list_objects_v2").paginate(Bucket=TEST_BUCKET):
-        for item in page.get("Contents", []):
-            client.delete_object(Bucket=TEST_BUCKET, Key=item["Key"])
+    for bucket in (TEST_BUCKET, TEST_MEDIA_BUCKET):
+        for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+            for item in page.get("Contents", []):
+                client.delete_object(Bucket=bucket, Key=item["Key"])
 
 
 @pytest.fixture

@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.services import jobs
 from app.services.jobs import ClaimedJob, MediaResult
+from app.workers.processor import clear_scratch
 from app.workers.processor import process as default_process
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ async def run_forever(process: Processor, worker_id: str) -> None:
 
 async def _main() -> None:
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
+    clear_scratch()
     task = asyncio.ensure_future(run_forever(default_process, worker_id))
     loop = asyncio.get_running_loop()
     for stop_signal in (signal.SIGTERM, signal.SIGINT):

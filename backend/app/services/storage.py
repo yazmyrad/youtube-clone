@@ -5,9 +5,11 @@ import logging
 import uuid
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -54,6 +56,14 @@ def raw_key(video_id: uuid.UUID) -> str:
     return f"raw/{video_id}/source"
 
 
+def hls_prefix(video_id: uuid.UUID) -> str:
+    return f"hls/{video_id}"
+
+
+def thumbnail_key(video_id: uuid.UUID) -> str:
+    return f"thumbs/{video_id}.jpg"
+
+
 def presign_upload(key: str) -> PresignedUpload:
     """A form that can upload exactly `key`, up to the size limit, until it expires.
     Signing only computes an HMAC, so unlike the calls below it doesn't touch the network."""
@@ -82,3 +92,24 @@ async def uploaded_size(key: str) -> int | None:
         logger.exception("Storage is unreachable")
         raise ServiceUnavailable("Storage is unavailable, try again") from exc
     return head["ContentLength"]
+
+
+async def download(bucket: str, key: str, destination: Path) -> None:
+    """One stream is plenty on the internal network, and it's simpler to stop."""
+    await asyncio.to_thread(
+        get_client().download_file,
+        bucket,
+        key,
+        str(destination),
+        Config=TransferConfig(use_threads=False),
+    )
+
+
+def _put(bucket: str, key: str, source: Path, content_type: str) -> None:
+    with source.open("rb") as body:
+        get_client().put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
+
+
+async def upload_media(key: str, source: Path, content_type: str) -> None:
+    """A single PUT: it replaces the object atomically, and client timeouts bound it."""
+    await asyncio.to_thread(_put, get_settings().media_bucket, key, source, content_type)
