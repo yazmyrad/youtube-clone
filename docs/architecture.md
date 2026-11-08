@@ -635,7 +635,7 @@ One step is one commit (Conventional Commits), running `ruff` and `pytest` befor
 | 2 | 6 | `feat:` videos schema, MinIO buckets and scoped user | |
 | 3 | 7 | `feat:` presigned upload and `complete`, through nginx | D10–D13 |
 | 3 | 8 | `feat:` job queue and worker with lease and retries | D18–D21 |
-| 3 | 9 | `feat:` ffprobe validation, ffmpeg HLS, thumbnail | D14–D17 |
+| 3 | 9 | `feat:` ffprobe validation, ffmpeg HLS, thumbnail. Note: right after this step, add the worker sweeps for abandoned uploads and soft-deleted videos (section 2 and `videos`), since the worker then has storage access | D14–D17 |
 | 4 | 10 | `feat:` playback tokens, nginx `auth_request`, `smoke.sh` | D40–D45 |
 | 4 | 11 | `feat:` private allowlist | D31, D32 |
 | 4 | 12 | `feat:` feed, video details, search API | D33, D59 |
