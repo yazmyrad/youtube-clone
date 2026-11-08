@@ -201,3 +201,35 @@ async def test_cancelling_kills_the_process(tmp_path: Path) -> None:
 
     with pytest.raises(ProcessLookupError):
         os.kill(int(pid_file.read_text()), 0)
+
+
+async def test_an_oversized_frame_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clip = make_clip(tmp_path / "a.mp4", size="320x240")
+    monkeypatch.setattr(media, "MAX_FRAME_PIXELS", 320 * 240 - 1)
+
+    with pytest.raises(JobError, match="4K"):
+        await media.probe(clip)
+
+
+async def test_a_frame_at_the_limit_is_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clip = make_clip(tmp_path / "a.mp4", size="320x240")
+    monkeypatch.setattr(media, "MAX_FRAME_PIXELS", 320 * 240)
+
+    assert (await media.probe(clip)).height == 240
+
+
+async def test_the_decoder_refuses_frames_the_probe_did_not_see(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = make_clip(tmp_path / "a.mp4", size="320x240")
+    info = await media.probe(source)
+    output = tmp_path / "out"
+    output.mkdir()
+    monkeypatch.setattr(media, "MAX_FRAME_PIXELS", 320 * 240 - 1)
+
+    with pytest.raises(JobError, match="converted"):
+        await media.transcode(source, info, output)

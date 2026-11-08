@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 FORMATS = {"mov,mp4,m4a,3gp,3g2,mj2": "mov", "matroska,webm": "matroska", "avi": "avi"}
 FORMAT_WHITELIST = ",".join(FORMATS)
 MAX_DURATION_SECONDS = 2 * 60 * 60
+# 4K. A huge declared frame would otherwise get the worker killed for memory.
+MAX_FRAME_PIXELS = 4096 * 2160
 PROBE_TIMEOUT_SECONDS = 60
 STDERR_TAIL_BYTES = 2000
 
@@ -123,6 +125,9 @@ async def probe(path: Path) -> SourceInfo:
     if video is None or not video.get("width") or not video.get("height"):
         raise JobError("This file has no video in it")
 
+    if video["width"] * video["height"] > MAX_FRAME_PIXELS:
+        raise JobError("Videos can be at most 4K")
+
     try:
         duration = float(info["format"]["duration"])
     except (KeyError, ValueError) as exc:
@@ -163,6 +168,7 @@ def _input_args(source: Path, info: SourceInfo) -> list[str]:
     """The format is forced to the probed one, and only local files can be opened."""
     return [
         "-protocol_whitelist", "file",
+        "-max_pixels", str(MAX_FRAME_PIXELS),  # The probe saw one frame; a stream can change size.
         "-f", info.input_format,
         "-i", str(source),
     ]  # fmt: skip
