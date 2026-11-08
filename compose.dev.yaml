@@ -15,6 +15,11 @@ services:
     volumes:
       - ./backend/app:/srv/app:ro
 
+  worker:
+    command: ["watchfiles", "--filter", "python", "python -m app.workers.main", "app"]
+    volumes:
+      - ./backend/app:/srv/app:ro
+
   migrate:
     volumes:
       - ./backend/app:/srv/app:ro

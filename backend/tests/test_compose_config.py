@@ -25,3 +25,12 @@ def test_deploy_stack_has_no_host_bind_mounts() -> None:
     ]
 
     assert binds == []
+
+
+def test_worker_is_not_reachable_and_has_no_egress() -> None:
+    config = yaml.safe_load(COMPOSE.read_text())
+    worker = config["services"]["worker"]
+
+    assert "ports" not in worker
+    assert worker["networks"]
+    assert all(config["networks"][name]["internal"] is True for name in worker["networks"])

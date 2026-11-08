@@ -86,6 +86,26 @@ services:
       retries: 12
       start_period: 5s
 
+  # Claims jobs from the Postgres queue. Both of its networks are internal: no internet egress.
+  worker:
+    <<: *hardening
+    build: backend
+    command: ["python", "-m", "app.workers.main"]
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    networks:
+      - backend
+      - storage
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
   postgres:
     <<: *hardening
     image: postgres:16.15-alpine
@@ -159,7 +179,7 @@ networks:
   edge:
   backend:
     internal: true
-  # MinIO and the services that talk to it (worker joins when its step lands).
+  # MinIO and the services that talk to it.
   storage:
     internal: true
 
