@@ -29,6 +29,7 @@ jobs:
           --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+      JWT_SECRET: ci-only-throwaway-value-not-a-real-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
