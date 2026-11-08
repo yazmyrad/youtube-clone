@@ -34,6 +34,7 @@ published="$("${DOCKER[@]}" ps --filter label=com.docker.compose.project=youtube
 printf 'ok    only nginx publishes a port\n'
 
 scripts/smoke.sh "http://127.0.0.1:${port}"
+scripts/test-storage.sh "${DOCKER[@]}" compose
 
 secrets_before="$(sha256sum .env)"
 marker="$(date +%s%N)"

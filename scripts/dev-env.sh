@@ -27,6 +27,10 @@ EOF
 fi
 # Secrets added by later versions are appended, so existing ones are kept.
 grep -q '^JWT_SECRET=' .env.dev || echo "JWT_SECRET=$(random_hex)" >> .env.dev
+grep -q '^MINIO_ROOT_USER=' .env.dev || echo "MINIO_ROOT_USER=minio-root" >> .env.dev
+grep -q '^MINIO_ROOT_PASSWORD=' .env.dev || echo "MINIO_ROOT_PASSWORD=$(random_hex)" >> .env.dev
+grep -q '^MINIO_APP_ACCESS_KEY=' .env.dev || echo "MINIO_APP_ACCESS_KEY=app" >> .env.dev
+grep -q '^MINIO_APP_SECRET_KEY=' .env.dev || echo "MINIO_APP_SECRET_KEY=$(random_hex)" >> .env.dev
 
 set -a
 # shellcheck disable=SC1091

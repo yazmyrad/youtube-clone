@@ -62,6 +62,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
     networks:
       - backend
     read_only: true
@@ -97,10 +99,65 @@ services:
       timeout: 3s
       retries: 30
 
+  # Upstream MinIO images are no longer published; pgsty/minio is a maintained fork with the
+  # same server and `mc`. Pinned by digest, so a re-tagged image can't slip in.
+  minio:
+    <<: *hardening
+    image: &minio-image pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:?run ./install.sh}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?run ./install.sh}"
+      MINIO_BROWSER: "off"
+    volumes:
+      - minio-data:/data
+    networks:
+      - storage
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: buckets, anonymous read policy and the scoped app user. The only service
+  # with the MinIO root credentials.
+  storage-init:
+    <<: *hardening
+    restart: "no"
+    image: *minio-image
+    entrypoint: ["sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:?run ./install.sh}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?run ./install.sh}"
+      MINIO_APP_ACCESS_KEY: "${MINIO_APP_ACCESS_KEY:?run ./install.sh}"
+      MINIO_APP_SECRET_KEY: "${MINIO_APP_SECRET_KEY:?run ./install.sh}"
+      HOME: /tmp
+    volumes:
+      - ./infra/minio:/init:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - storage
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
 networks:
   edge:
   backend:
     internal: true
+  # MinIO and the services that talk to it (api, worker, nginx join as their steps land).
+  storage:
+    internal: true
 
 volumes:
   postgres-data:
+  minio-data:

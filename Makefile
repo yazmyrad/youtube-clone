@@ -11,7 +11,7 @@ IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
 .PHONY: help setup env venv dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
-	run-local test lint fix check
+	run-local test test-storage lint fix check
 
 help: ## Show this list
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) \
@@ -96,6 +96,9 @@ run-local: env ## Run the API on the host at :8000 with reload (uses the stack's
 # The app is pointed at the test database too, so no test can reach dev data.
 test: test-db ## Run tests; database tests use the dev stack's test database
 	$(IN_BACKEND) DATABASE_URL="$$TEST_DATABASE_URL" $(BIN)/pytest -q
+
+test-storage: env ## Check MinIO buckets and permissions on the running dev stack
+	@scripts/test-storage.sh $(DEV)
 
 lint: ## Check code with ruff
 	cd backend && $(BIN)/ruff check .
