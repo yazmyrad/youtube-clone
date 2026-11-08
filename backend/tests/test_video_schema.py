@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User, Video, VideoStatus, VideoVisibility
+from app.models import User, Video, VideoAccess, VideoStatus, VideoVisibility
 
 
 @pytest.fixture
@@ -93,3 +93,46 @@ async def test_owner_with_videos_cannot_be_deleted(session: AsyncSession, owner:
     await session.commit()
     with pytest.raises(IntegrityError, match="fk_videos_owner_id_users"):
         await session.execute(delete(User).where(User.id == owner.id))
+
+
+@pytest.fixture
+async def shared_video(session: AsyncSession, owner: User) -> tuple[Video, User]:
+    """A video and a user on its allowlist."""
+    video = _video(owner)
+    friend = User(username="bob", email="bob@example.com", password_hash="x", display_name="B")
+    session.add_all([video, friend])
+    await session.flush()
+    session.add(VideoAccess(video_id=video.id, user_id=friend.id))
+    await session.commit()
+    return video, friend
+
+
+async def _access_rows(session: AsyncSession) -> int:
+    return await session.scalar(select(func.count()).select_from(VideoAccess)) or 0
+
+
+async def test_access_entry_is_unique_per_video_and_user(
+    session: AsyncSession, shared_video: tuple[Video, User]
+) -> None:
+    video, friend = shared_video
+    video_id, friend_id = video.id, friend.id
+    session.expunge_all()
+    session.add(VideoAccess(video_id=video_id, user_id=friend_id))
+    with pytest.raises(IntegrityError, match="pk_video_access"):
+        await session.commit()
+
+
+async def test_access_entries_go_with_the_video(
+    session: AsyncSession, shared_video: tuple[Video, User]
+) -> None:
+    await session.execute(delete(Video).where(Video.id == shared_video[0].id))
+    await session.commit()
+    assert await _access_rows(session) == 0
+
+
+async def test_access_entries_go_with_the_user(
+    session: AsyncSession, shared_video: tuple[Video, User]
+) -> None:
+    await session.execute(delete(User).where(User.id == shared_video[1].id))
+    await session.commit()
+    assert await _access_rows(session) == 0

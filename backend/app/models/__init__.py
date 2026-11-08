@@ -2,7 +2,7 @@
 from app.models.base import Base
 from app.models.job import JobStatus, ProcessingJob
 from app.models.user import RefreshToken, User, UserRole
-from app.models.video import Video, VideoStatus, VideoVisibility
+from app.models.video import Video, VideoAccess, VideoStatus, VideoVisibility
 
 __all__ = [
     "Base",
@@ -12,6 +12,7 @@ __all__ = [
     "User",
     "UserRole",
     "Video",
+    "VideoAccess",
     "VideoStatus",
     "VideoVisibility",
 ]

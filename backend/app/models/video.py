@@ -127,3 +127,17 @@ class Video(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class VideoAccess(Base):
+    """The private video allowlist."""
+
+    __tablename__ = "video_access"
+
+    video_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
