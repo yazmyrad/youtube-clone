@@ -83,12 +83,12 @@ A presigned POST signature covers the policy rather than the host. The API can t
 
 ### Processing
 
-1. The worker claims one job with `FOR UPDATE SKIP LOCKED`, taking jobs that are `queued` and due, or `running` with an expired lease. Claiming increments `attempts` and sets `locked_until`. A heartbeat extends the lease during transcoding.
+1. The worker claims one job with `FOR UPDATE SKIP LOCKED`, taking jobs that are `queued` and due, or `running` with an expired lease. Claiming increments `attempts` and sets `locked_until`. A heartbeat extends the lease during transcoding. On a clean shutdown the worker stops the work and hands the job back: it returns to `queued` and `max_attempts` grows by one, so a restart costs no attempt while `attempts` stays unique as the fence. A crash still counts as an attempt.
 2. `ffprobe` validates the file: container must be on an allowlist (mp4/mov, webm, matroska, avi), at least one video stream, duration up to 2 hours. The file's extension and declared type are ignored.
-3. `ffmpeg` runs with the input format forced to the probed value, `-protocol_whitelist file`, a timeout, and CPU limits set in compose. It produces 6-second aligned segments at 360p, plus 720p only if the source is at least 720p tall (no upscaling), and a thumbnail. Videos with no audio are supported.
-4. Segments and media playlists upload first, `master.m3u8` last. Object names are deterministic, so a retry overwrites partial output.
+3. `ffmpeg` runs with the input format forced to the probed value, `-protocol_whitelist file`, a timeout, and CPU limits set in compose. It produces 6-second aligned segments at 360p, plus 720p only if the source is at least 720p tall (no upscaling), and a thumbnail. Videos with no audio are supported. Working files live on a dedicated volume rather than tmpfs, because a 2 GB source must not sit in RAM.
+4. Segments and media playlists upload first, `master.m3u8` last. Object names are deterministic, so a retry overwrites partial output. The lease is renewed right before `master.m3u8` is written, and a worker that lost it stops without publishing. A stale worker can at worst replace a segment with an equivalent one: the same source and settings give the same 6-second boundaries.
 5. The final update sets the video `ready` and the job `done` in one transaction, conditional on `status='running' AND attempts=:mine`. A stale worker that lost its lease changes nothing.
-6. On error, the job returns to `queued` with backoff. After 3 attempts the job and video become `failed` and a readable `failure_reason` is stored. The raw file is deleted once the job reaches a final state.
+6. On error, the job returns to `queued` with backoff. After 3 attempts the job and video become `failed` and a readable `failure_reason` is stored. The worker's sweep deletes the raw file once the video is `ready` or `failed`.
 
 ### Delivery and private videos: how HLS segments are protected
 
@@ -233,7 +233,7 @@ PK `(video_id, user_id)`. Index `(user_id)`.
 | `video_id` | uuid | NOT NULL, FK videos ON DELETE CASCADE |
 | `status` | job_status | NOT NULL, default `queued` |
 | `attempts` | smallint | NOT NULL, default 0; also the fencing value |
-| `max_attempts` | smallint | NOT NULL, default 3 |
+| `max_attempts` | smallint | NOT NULL, default 3; grows by one when a shutdown hands the job back |
 | `run_after` | timestamptz | NOT NULL, default now |
 | `locked_by` | text | nullable |
 | `locked_until` | timestamptz | nullable |
