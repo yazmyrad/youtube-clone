@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import os
 from pathlib import Path
 
@@ -270,3 +271,17 @@ async def test_the_real_video_stream_is_used_wherever_it_sits(tmp_path: Path) ->
     assert info.video_stream == 1
     assert (info.width, info.height) == (320, 240)
     assert "RESOLUTION=320x240" in result.master.read_text()
+
+
+async def test_output_stops_at_the_declared_duration(tmp_path: Path) -> None:
+    """The file holds 20 seconds but its header is taken to claim only 2."""
+    source = make_clip(tmp_path / "a.mp4", size="160x120", seconds=20)
+    info = dataclasses.replace(await media.probe(source), duration=2)
+    output = tmp_path / "out"
+    output.mkdir()
+
+    result = await media.transcode(source, info, output)
+
+    playlist = (result.hls_dir / "360p" / "index.m3u8").read_text().splitlines()
+    durations = [float(line[8:].rstrip(",")) for line in playlist if line.startswith("#EXTINF:")]
+    assert sum(durations) <= 2 + media.DURATION_MARGIN_SECONDS + 0.5

@@ -33,6 +33,9 @@ SEGMENT_SECONDS = 6
 MAX_FPS = "30"
 # Rendition name (also the object path), height and video bitrate cap.
 LADDER = (("360p", 360, "1000k"), ("720p", 720, "3000k"))
+# The header's duration is a claim. Output stops just past it, so a file holding far more than
+# it declares can't run for hours or fill the disk.
+DURATION_MARGIN_SECONDS = 1
 # Container overhead and bitrate peaks on top of the measured average, for the master playlist.
 BANDWIDTH_MARGIN = 1.2
 
@@ -184,12 +187,13 @@ def _input_args(source: Path, info: SourceInfo) -> list[str]:
     ]  # fmt: skip
 
 
-def _output_args(rendition: Rendition, label: str, directory: Path) -> list[str]:
+def _output_args(rendition: Rendition, label: str, directory: Path, duration: float) -> list[str]:
     settings = get_settings()
     return [
         "-map", f"[{label}]",
         "-map", "0:a:0?",  # The question mark: a source without audio is fine.
         "-sn", "-dn",
+        "-t", str(duration + DURATION_MARGIN_SECONDS),
         "-threads", str(settings.ffmpeg_threads),
         "-fpsmax", MAX_FPS,
         "-c:v", "libx264",
@@ -251,7 +255,7 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
         directory = hls_dir / rendition.name
         directory.mkdir(parents=True)
         filters.append(f"[s{i}]scale={rendition.width}:{rendition.height}[o{i}]")
-        outputs += _output_args(rendition, f"o{i}", directory)
+        outputs += _output_args(rendition, f"o{i}", directory, info.duration)
     await _encode([*_input_args(source, info), "-filter_complex", ";".join(filters), *outputs])
 
     thumbnail = output / "thumbnail.jpg"
