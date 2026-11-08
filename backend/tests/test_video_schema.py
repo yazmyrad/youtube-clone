@@ -56,6 +56,14 @@ async def test_ready_requires_media(session: AsyncSession, owner: User, missing:
         await session.commit()
 
 
+@pytest.mark.parametrize("status", [VideoStatus.processing, VideoStatus.failed])
+async def test_not_ready_may_lack_media(
+    session: AsyncSession, owner: User, status: VideoStatus
+) -> None:
+    session.add(_video(owner, status=status))
+    await session.commit()
+
+
 async def test_ready_with_media_is_accepted(session: AsyncSession, owner: User) -> None:
     session.add(_video(owner, status=VideoStatus.ready, **READY_MEDIA))
     await session.commit()

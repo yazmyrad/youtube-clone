@@ -2,6 +2,8 @@
 # Storage permission checks, run inside the storage network by scripts/test-storage.sh.
 # Uses only the scoped app user and anonymous requests, never the root account.
 set -u
+# This runs in the storage-init container, which also holds the root credentials.
+unset MINIO_ROOT_USER MINIO_ROOT_PASSWORD
 
 failures=0
 pass() { printf 'ok    %s\n' "$1"; }

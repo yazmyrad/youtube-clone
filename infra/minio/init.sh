@@ -6,7 +6,9 @@ set -eu
 : "${MINIO_ROOT_USER:?}" "${MINIO_ROOT_PASSWORD:?}" "${MINIO_APP_ACCESS_KEY:?}" "${MINIO_APP_SECRET_KEY:?}"
 
 here="$(dirname "$0")"
-# Credentials go through the environment, never into a config file or the process list.
+# Root credentials go through the environment, never into a config file or the process list.
+# `mc admin user add` takes the app secret as an argument; accepted, since this one-shot
+# container runs nothing else and is reachable only on the internal storage network.
 export MC_HOST_root="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000"
 
 mc mb --ignore-existing root/uploads root/media
