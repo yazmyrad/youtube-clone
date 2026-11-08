@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = Field(min_length=32)
     access_token_ttl: timedelta = timedelta(minutes=15)
     refresh_token_ttl: timedelta = timedelta(days=30)
+    # Signs HLS and thumbnail URLs. Its own secret, so it can't be used to forge a JWT.
+    playback_secret: SecretStr = Field(min_length=32)
+    playback_ttl: timedelta = timedelta(minutes=10)
     # Off by default: the IP-only deploy serves plain HTTP. `--domain` mode turns it on.
     cookie_secure: bool = False
 

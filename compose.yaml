@@ -11,6 +11,7 @@ x-hardening: &hardening
 x-backend-env: &backend-env
   DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:?run ./install.sh}:${POSTGRES_PASSWORD:?run ./install.sh}@postgres:5432/${POSTGRES_DB:?run ./install.sh}"
   JWT_SECRET: "${JWT_SECRET:?run ./install.sh}"
+  PLAYBACK_SECRET: "${PLAYBACK_SECRET:?run ./install.sh}"
   # Off in IP-only (plain HTTP) mode, where a Secure cookie would never be sent back.
   COOKIE_SECURE: "${COOKIE_SECURE:-false}"
   MINIO_APP_ACCESS_KEY: "${MINIO_APP_ACCESS_KEY:?run ./install.sh}"

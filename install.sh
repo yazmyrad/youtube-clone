@@ -89,6 +89,7 @@ add_secret() {
     grep -q "^$1=" .env || { echo "$1=$(random_hex)" >> .env; log "Added $1 to .env"; }
 }
 add_secret JWT_SECRET
+add_secret PLAYBACK_SECRET
 add_secret MINIO_ROOT_PASSWORD
 add_secret MINIO_APP_SECRET_KEY
 # Fixed names, not secrets; set the same way so an older .env gains them.

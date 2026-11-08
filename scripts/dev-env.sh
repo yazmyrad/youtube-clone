@@ -28,6 +28,7 @@ fi
 # Secrets added by later versions are appended, so existing ones are kept.
 grep -q '^DEV_MINIO_PORT=' .env.dev || echo "DEV_MINIO_PORT=59000" >> .env.dev
 grep -q '^JWT_SECRET=' .env.dev || echo "JWT_SECRET=$(random_hex)" >> .env.dev
+grep -q '^PLAYBACK_SECRET=' .env.dev || echo "PLAYBACK_SECRET=$(random_hex)" >> .env.dev
 grep -q '^MINIO_ROOT_USER=' .env.dev || echo "MINIO_ROOT_USER=minio-root" >> .env.dev
 grep -q '^MINIO_ROOT_PASSWORD=' .env.dev || echo "MINIO_ROOT_PASSWORD=$(random_hex)" >> .env.dev
 grep -q '^MINIO_APP_ACCESS_KEY=' .env.dev || echo "MINIO_APP_ACCESS_KEY=app" >> .env.dev
@@ -53,6 +54,7 @@ $MARKER
 DATABASE_URL=${db}/${POSTGRES_DB}
 TEST_DATABASE_URL=${db}/${POSTGRES_DB}_test
 JWT_SECRET=${JWT_SECRET}
+PLAYBACK_SECRET=${PLAYBACK_SECRET}
 MINIO_ENDPOINT=${minio}
 MINIO_APP_ACCESS_KEY=${MINIO_APP_ACCESS_KEY}
 MINIO_APP_SECRET_KEY=${MINIO_APP_SECRET_KEY}

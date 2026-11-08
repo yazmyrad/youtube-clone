@@ -30,6 +30,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
       JWT_SECRET: ci-only-throwaway-value-not-a-real-secret
+      PLAYBACK_SECRET: ci-only-throwaway-playback-value-not-real
       MINIO_APP_ACCESS_KEY: ci-only
       MINIO_APP_SECRET_KEY: ci-only-throwaway-value
       TEST_MINIO_ENDPOINT: http://127.0.0.1:9000

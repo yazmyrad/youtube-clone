@@ -2,7 +2,9 @@
 
 import asyncio
 import hashlib
+import hmac
 import secrets
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -13,6 +15,9 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from app.core.config import get_settings
 
 JWT_ALGORITHM = "HS256"
+MEDIA_SCOPE_HLS = "hls"
+MEDIA_SCOPE_THUMB = "thumb"
+_MEDIA_SCOPES = {MEDIA_SCOPE_HLS, MEDIA_SCOPE_THUMB}
 
 _hasher = PasswordHasher()
 # Verified against when the user doesn't exist, so an unknown email takes as long as a
@@ -65,3 +70,28 @@ def new_refresh_token() -> str:
 
 def hash_refresh_token(token: str) -> bytes:
     return hashlib.sha256(token.encode()).digest()
+
+
+def _media_signature(scope: str, video_id: str, exp: str) -> bytes:
+    secret = get_settings().playback_secret.get_secret_value().encode()
+    message = f"{scope}:{video_id}:{exp}".encode()
+    return hmac.new(secret, message, hashlib.sha256).hexdigest().encode()
+
+
+def sign_media(scope: str, video_id: uuid.UUID, exp: int) -> str:
+    """The signature for a media URL. It covers the scope, so an HLS token can't open a
+    thumbnail, and the video, so it can't be replayed against another one."""
+    return _media_signature(scope, str(video_id), str(exp)).decode()
+
+
+def verify_media(scope: str, video_id: str, exp: str, sig: str) -> bool:
+    """Checks untrusted strings from a media request. Needs no database, so it's cheap
+    enough to run per segment. Anything malformed is simply invalid."""
+    try:
+        if scope not in _MEDIA_SCOPES or str(uuid.UUID(video_id)) != video_id:
+            return False
+        if not (exp.isascii() and exp.isdecimal()) or int(exp) <= time.time():
+            return False
+        return hmac.compare_digest(_media_signature(scope, video_id, exp), sig.encode())
+    except ValueError:
+        return False
