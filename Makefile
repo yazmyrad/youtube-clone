@@ -9,7 +9,7 @@ BIN := .venv/bin
 # Runs a command in backend/ with the dev connection settings loaded.
 IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
-.PHONY: help setup env venv frontend-deps frontend-check dev up down rebuild logs ps shell nginx-reload \
+.PHONY: help setup env venv frontend-deps frontend-check api-types dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
 	run-local test test-storage test-upload smoke lint fix check
 
@@ -116,6 +116,10 @@ lint: ## Check code with ruff
 
 fix: ## Apply ruff's automatic fixes
 	cd backend && $(BIN)/ruff check --fix .
+
+api-types: ## Regenerate the frontend's API types from the backend's OpenAPI document
+	$(IN_BACKEND) $(BIN)/python ../scripts/export-openapi.py
+	cd frontend && npm run -s gen:api
 
 frontend-check: ## Typecheck, test and build the frontend
 	cd frontend && npm run -s typecheck && npm test -s && npm run -s build

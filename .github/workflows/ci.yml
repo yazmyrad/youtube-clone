@@ -66,6 +66,8 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci
+      - name: Generated API types match openapi.json
+        run: npm run gen:api && git diff --exit-code -- src/api/schema.d.ts
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
