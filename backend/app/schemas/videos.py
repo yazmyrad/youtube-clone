@@ -13,6 +13,9 @@ Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100, pattern=_NO_NUL)
 ]
 Description = Annotated[str, StringConstraints(max_length=5000, pattern=_NO_NUL)]
+SearchText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=2, max_length=100, pattern=_NO_NUL)
+]
 
 
 class VideoCreateIn(StrictModel):

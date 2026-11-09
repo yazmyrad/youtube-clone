@@ -95,6 +95,10 @@ async def _browse_feed(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/videos", headers=ctx.headers)
 
 
+async def _search(ctx: Ctx) -> httpx.Response:
+    return await ctx.api.get("/api/search/videos", params={"q": "clip"}, headers=ctx.headers)
+
+
 async def _list_users(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/admin/users", headers=ctx.headers)
 
@@ -129,6 +133,7 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
         _revoke_access_to_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)
     ),
     "browse feed": (_browse_feed, (YES, YES, YES, YES)),
+    "search": (_search, (YES, YES, YES, YES)),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),
     "change roles": (_change_role, (NO_LOGIN, NO, NO, YES)),
     "disable users": (_disable_user, (NO_LOGIN, NO, NO, YES)),

@@ -192,6 +192,15 @@ async def list_feed(
     return await _listed_page(session, cursor=cursor, limit=limit)
 
 
+async def search_videos(
+    session: AsyncSession, *, q: str, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    """Listed videos with `q` anywhere in the title, ignoring case. `%` and `_` are literal."""
+    return await _listed_page(
+        session, Video.title.icontains(q, autoescape=True), cursor=cursor, limit=limit
+    )
+
+
 async def update_video(
     session: AsyncSession, user: User, video_id: uuid.UUID, data: VideoUpdateIn
 ) -> Video:
