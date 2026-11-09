@@ -1,5 +1,6 @@
 """GET /videos/{id}: the viewing matrix from architecture.md section 4, and D31."""
 
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -8,6 +9,7 @@ import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import security
 from app.models import UserRole, VideoStatus, VideoVisibility
 from tests.helpers import ApiUser, CreateUser, SetRole, create_ready_video
 
@@ -101,7 +103,59 @@ async def test_returns_only_the_public_fields(
         "duration_seconds",
         "published_at",
         "created_at",
+        "channel",
+        "views_count",
+        "likes_count",
+        "dislikes_count",
+        "comments_count",
+        "thumbnail_url",
     }
+    assert body["channel"] == {"username": "alice", "display_name": "Alice"}
+    assert body["views_count"] == 0
+    assert body["likes_count"] == body["dislikes_count"] == body["comments_count"] == 0
+
+
+async def test_ready_video_has_a_signed_thumbnail(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    video_id = await create_ready_video(api, session, await create_user())
+
+    url = (await _get(api, video_id)).json()["thumbnail_url"]
+
+    match = re.fullmatch(rf"/thumbs/(\d+)\.([0-9a-f]{{64}})/{video_id}\.jpg", url)
+    assert match is not None, url
+    assert security.verify_media(
+        security.MEDIA_SCOPE_THUMB, video_id, match.group(1), match.group(2)
+    )
+
+
+async def test_no_thumbnail_while_processing(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    owner = await create_user()
+    video_id = await create_ready_video(api, session, owner, **STATES["processing"])
+
+    body = (await _get(api, video_id, owner)).json()
+
+    assert body["status"] == "processing"
+    assert body["thumbnail_url"] is None
+
+
+@pytest.mark.parametrize("actor", [OWNER, MODERATOR, ADMIN])
+async def test_no_thumbnail_on_a_hidden_video(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+    actor: str,
+) -> None:
+    owner = await create_user("owner")
+    video_id = await create_ready_video(api, session, owner, **STATES["hidden"])
+
+    response = await _get(api, video_id, await _actor(create_user, set_role, actor, owner))
+
+    assert response.status_code == 200, response.text
+    assert response.json()["thumbnail_url"] is None
 
 
 @pytest.mark.parametrize("logged_in", [True, False], ids=["stranger", "anonymous"])

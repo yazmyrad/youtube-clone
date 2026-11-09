@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -15,9 +16,12 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class VideoVisibility(enum.StrEnum):
@@ -127,6 +131,9 @@ class Video(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # Loaded only on request, so locking queries never join users and N+1s fail loudly.
+    owner: Mapped["User"] = relationship(lazy="raise")
 
 
 class VideoAccess(Base):

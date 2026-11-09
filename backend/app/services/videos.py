@@ -1,18 +1,46 @@
 import uuid
+from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import Row, Select, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
-from app.core.permissions import ensure_can_view, ensure_video_owner
-from app.models import ProcessingJob, User, Video, VideoAccess, VideoStatus
+from app.core.permissions import can_show_thumbnail, ensure_can_view, ensure_video_owner
+from app.models import (
+    ProcessingJob,
+    User,
+    Video,
+    VideoAccess,
+    VideoStatus,
+    VideoVisibility,
+)
 from app.schemas.videos import VideoCreateIn, VideoUpdateIn
-from app.services import storage
+from app.services import playback, storage
 from app.services.storage import PresignedUpload
 
 MAX_ACTIVE_UPLOADS = 3
+
+
+@dataclass(frozen=True)
+class VideoDetails:
+    id: uuid.UUID
+    title: str
+    description: str
+    visibility: VideoVisibility
+    status: VideoStatus
+    duration_seconds: int | None
+    published_at: datetime | None
+    created_at: datetime
+    channel: User
+    views_count: int
+    likes_count: int
+    dislikes_count: int
+    comments_count: int
+    thumbnail_url: str | None
 
 
 async def create_video(
@@ -83,12 +111,29 @@ async def complete_upload(session: AsyncSession, user: User, video_id: uuid.UUID
     return video
 
 
-async def get_video(session: AsyncSession, user: User | None, video_id: uuid.UUID) -> Video:
-    video = await session.get(Video, video_id)
+async def get_video(
+    session: AsyncSession, user: User | None, video_id: uuid.UUID
+) -> VideoDetails:
+    video = await session.get(Video, video_id, options=[joinedload(Video.owner, innerjoin=True)])
     if video is None:
         raise NotFound("Video not found")
     await ensure_can_view(session, user, video)
-    return video
+    return VideoDetails(
+        id=video.id,
+        title=video.title,
+        description=video.description,
+        visibility=video.visibility,
+        status=video.status,
+        duration_seconds=video.duration_seconds,
+        published_at=video.published_at,
+        created_at=video.created_at,
+        channel=video.owner,
+        views_count=video.views_count,
+        likes_count=video.likes_count,
+        dislikes_count=video.dislikes_count,
+        comments_count=video.comments_count,
+        thumbnail_url=playback.thumbnail_url(video.id) if can_show_thumbnail(video) else None,
+    )
 
 
 async def update_video(

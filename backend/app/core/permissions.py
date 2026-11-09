@@ -103,6 +103,12 @@ async def ensure_can_play(session: AsyncSession, user: User | None, video: Video
         raise NotFound("Video not found")
 
 
+def can_show_thumbnail(video: Video) -> bool:
+    """For a caller who already passed `can_view`. Follows playback: a hidden video shows
+    nobody its picture, and one that isn't ready has none."""
+    return video.status == VideoStatus.ready and video.hidden_at is None
+
+
 def ensure_can_manage_user(
     actor: User, target: User, *, role: UserRole | None, is_active: bool | None
 ) -> None:

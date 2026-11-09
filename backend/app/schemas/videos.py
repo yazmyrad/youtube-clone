@@ -48,6 +48,15 @@ class VideoOwnerOut(BaseModel):
     updated_at: datetime
 
 
+class ChannelBriefOut(BaseModel):
+    """The channel a video belongs to, as shown next to the video."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    username: str
+    display_name: str
+
+
 class VideoDetailsOut(BaseModel):
     """What anyone allowed to view the video sees about it."""
 
@@ -61,6 +70,12 @@ class VideoDetailsOut(BaseModel):
     duration_seconds: int | None
     published_at: datetime | None
     created_at: datetime
+    channel: ChannelBriefOut
+    views_count: int
+    likes_count: int
+    dislikes_count: int
+    comments_count: int
+    thumbnail_url: str | None = Field(description="Signed; null if not ready or hidden")
 
 
 class PresignedUploadOut(BaseModel):
