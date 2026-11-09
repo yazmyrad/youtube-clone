@@ -11,6 +11,20 @@ NGINX_DIR = ROOT / "infra" / "nginx"
 NGINX_CONF = NGINX_DIR / "default.conf"
 
 
+class _ComposeLoader(yaml.SafeLoader):
+    """Also reads compose's !override tag, which yaml.safe_load refuses."""
+
+
+_ComposeLoader.add_constructor(
+    "!override", lambda loader, node: loader.construct_sequence(node, deep=True)
+)
+
+
+def _dev_service(name: str) -> dict:
+    config = yaml.load(COMPOSE_DEV.read_text(), Loader=_ComposeLoader)  # noqa: S506 - a SafeLoader
+    return config["services"][name]
+
+
 def _is_host_path(volume: str | dict) -> bool:
     if isinstance(volume, dict):
         return volume["type"] == "bind"
@@ -113,7 +127,7 @@ def test_nginx_reload_validates_first() -> None:
 
 
 def test_deploy_image_serves_the_built_site() -> None:
-    """The dev stack stops at the config stage, so nothing else would catch a broken final one."""
+    """Reads the build definition only; scripts/smoke.sh proves the built site is served."""
     dockerfile = (NGINX_DIR / "Dockerfile").read_text()
     nginx = yaml.safe_load(COMPOSE.read_text())["services"]["nginx"]
 
@@ -125,17 +139,21 @@ def test_deploy_image_serves_the_built_site() -> None:
 
 
 def test_dev_nginx_gets_the_vite_location_from_a_directory_mount() -> None:
-    compose = COMPOSE_DEV.read_text()
+    nginx = _dev_service("nginx")
 
-    assert "- ./infra/nginx/spa-dev:/etc/nginx/spa:ro" in compose
-    assert "target: nginx-base" in compose
+    assert "./infra/nginx/spa-dev:/etc/nginx/spa:ro" in nginx["volumes"]
+    assert nginx["build"]["target"] == "nginx-base"
 
 
 def test_spa_csp_allows_no_inline_code() -> None:
-    """D57: scripts and styles come only from the site's own files."""
+    """D57: scripts and styles come only from the site's own files. The CSP must sit where
+    every page lands: unknown paths fall back to /index.html, and add_header is per location."""
     conf = (NGINX_DIR / "spa-prod" / "location.inc").read_text()
-    csp = re.search(r'add_header Content-Security-Policy "([^"]+)"', conf)
+    page_location = re.search(r"location = /index\.html \{(.*?)\n\}", conf, re.DOTALL)
 
+    assert "try_files $uri /index.html;" in conf
+    assert page_location
+    csp = re.search(r'add_header Content-Security-Policy "([^"]+)"', page_location[1])
     assert csp
     assert "script-src 'self';" in csp[1]
     assert "style-src 'self';" in csp[1]
