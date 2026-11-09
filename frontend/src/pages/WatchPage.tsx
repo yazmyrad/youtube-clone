@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 
+import { Comments } from "../components/Comments";
 import { ReactionButtons } from "../components/ReactionButtons";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { statusMessage, useVideo, VideoNotFound, type VideoDetails } from "../hooks/useVideo";
@@ -60,6 +61,7 @@ function Watch({ videoId }: { videoId: string }) {
         <VideoPlayer videoId={videoId} poster={video.data.thumbnail_url ?? undefined} />
       )}
       {video.data && <Details video={video.data} />}
+      {video.data?.status === "ready" && <Comments video={video.data} />}
     </div>
   );
 }
