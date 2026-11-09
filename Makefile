@@ -9,7 +9,7 @@ BIN := .venv/bin
 # Runs a command in backend/ with the dev connection settings loaded.
 IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
-.PHONY: help setup env venv dev up down rebuild logs ps shell nginx-reload \
+.PHONY: help setup env venv frontend-deps frontend-check dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
 	run-local test test-storage test-upload smoke lint fix check
 
@@ -19,7 +19,7 @@ help: ## Show this list
 
 # --- Setup -----------------------------------------------------------------
 
-setup: env venv ## First-time setup: env files and the Python virtualenv
+setup: env venv frontend-deps ## First-time setup: env files, Python virtualenv, frontend packages
 
 env: ## Create .env.dev and backend/.env (keeps existing secrets)
 	@scripts/dev-env.sh
@@ -28,6 +28,10 @@ venv: ## Create backend/.venv and install pinned dependencies
 	@test -d backend/.venv || python3 -m venv backend/.venv \
 		|| { echo "Creating the virtualenv failed. On Ubuntu: sudo apt install python3-venv" >&2; exit 1; }
 	@backend/$(BIN)/pip install -q --disable-pip-version-check -c backend/requirements.lock -e "backend[dev]"
+
+frontend-deps: ## Install the frontend's pinned packages
+	@command -v npm >/dev/null || { echo "npm is missing. Install Node.js 22 or newer." >&2; exit 1; }
+	cd frontend && npm ci --no-audit --no-fund
 
 # --- Dev stack -------------------------------------------------------------
 
@@ -113,4 +117,7 @@ lint: ## Check code with ruff
 fix: ## Apply ruff's automatic fixes
 	cd backend && $(BIN)/ruff check --fix .
 
-check: lint test ## Lint and test, as required before every commit
+frontend-check: ## Typecheck, test and build the frontend
+	cd frontend && npm run -s typecheck && npm test -s && npm run -s build
+
+check: lint test frontend-check ## Lint and test, as required before every commit

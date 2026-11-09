@@ -13,7 +13,7 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=youtube-clone
 fi
 
 tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude=.venv --exclude=__pycache__ --exclude='*.egg-info' \
-    --exclude=.pytest_cache --exclude=.ruff_cache -cf - . \
+    --exclude=.pytest_cache --exclude=.ruff_cache --exclude=node_modules --exclude=dist -cf - . \
     | docker run --rm -i --network host -v /var/run/docker.sock:/var/run/docker.sock \
         -e HTTP_PORT=18081 ubuntu:24.04 bash -c '
     set -euo pipefail
