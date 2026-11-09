@@ -190,6 +190,23 @@ upload_video; id_b="$video_id"
 wait_ready "$id_a"; url_a="$play_url"
 wait_ready "$id_b"; url_b="$play_url"
 
+# --- The main scenario (D02): like and comment on a video that plays ---------
+
+json_type=(-H 'Content-Type: application/json')
+
+expect "D02 the watch page is served" 200 "/watch?v=$id_a"
+body_has 'id="root"' && pass "D02 the watch page is the SPA" || fail "D02 the watch page isn't the SPA"
+
+expect "D02 like" 200 "/api/videos/$id_a/reaction" -X PUT "${auth[@]}" "${json_type[@]}" -d '{"reaction":"like"}'
+expect "D02 comment" 201 "/api/videos/$id_a/comments" -X POST "${auth[@]}" "${json_type[@]}" -d '{"body":"Smoke comment"}'
+
+expect "D02 the comment is listed" 200 "/api/videos/$id_a/comments" "${auth[@]}"
+body_has 'Smoke comment' && pass "D02 the list has the comment" || fail "D02 the list lacks the comment"
+
+expect "D02 details after like and comment" 200 "/api/videos/$id_a" "${auth[@]}"
+counts="$(json '(d["likes_count"], d["comments_count"], d["my_reaction"])' < "$work/body")"
+[ "$counts" = "(1, 1, 'like')" ] && pass "D02 the counters moved" || fail "D02 counters are $counts"
+
 token="${url_a#/hls/}"; token="${token%%/*}"
 exp="${token%%.*}"; sig="${token#*.}"
 hls="/hls/$token/$id_a"
