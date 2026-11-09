@@ -13,15 +13,29 @@ vi.mock("./hooks/useAuth", () => ({
   }),
 }));
 
-it("renders the upload form, whose leave guard needs a data router", () => {
-  const router = createMemoryRouter(appRoutes, { initialEntries: ["/upload"] });
-
-  const html = renderToString(
+function render(path: string) {
+  const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
+  return renderToString(
     <QueryClientProvider client={new QueryClient()}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+}
+
+it("renders the upload form, whose leave guard needs a data router", () => {
+  const html = render("/upload");
 
   expect(html).toContain("Upload video");
   expect(html).toContain("Drag and drop a video");
+});
+
+it("opens the watch page for a video id", () => {
+  const html = render("/watch?v=a7f3");
+
+  expect(html).toContain("aspect-video");
+  expect(html).not.toContain("The link may be broken");
+});
+
+it("has nothing to show on the watch page without a video id", () => {
+  expect(render("/watch")).toContain("The link may be broken");
 });

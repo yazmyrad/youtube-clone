@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import type { OwnerVideo } from "../api/upload";
 import { useDeleteVideo, useMyVideos } from "../hooks/useMyVideos";
 
@@ -60,7 +62,16 @@ export function MyVideos() {
         {items.map((video) => (
           <li key={video.id} className="flex items-center justify-between gap-4 py-3">
             <div className="min-w-0">
-              <p className="truncate font-medium">{video.title}</p>
+              {video.status === "ready" ? (
+                <Link
+                  to={`/watch?v=${video.id}`}
+                  className="block truncate font-medium hover:text-accent"
+                >
+                  {video.title}
+                </Link>
+              ) : (
+                <p className="truncate font-medium">{video.title}</p>
+              )}
               <p className="text-sm text-ink-muted">
                 {VISIBILITY[video.visibility]} · {new Date(video.created_at).toLocaleDateString()}
               </p>

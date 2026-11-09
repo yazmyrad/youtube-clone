@@ -11,6 +11,8 @@ export function Layout() {
   const [expanded, setExpanded] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { pathname } = useLocation();
+  // As on YouTube, the video gets the whole width and the guide is only a drawer here.
+  const drawerOnly = pathname === "/watch";
 
   useEffect(() => setDrawerOpen(false), [pathname]);
 
@@ -24,7 +26,7 @@ export function Layout() {
   }, [drawerOpen]);
 
   const toggleGuide = () => {
-    if (window.matchMedia(WIDE).matches) setExpanded((value) => !value);
+    if (!drawerOnly && window.matchMedia(WIDE).matches) setExpanded((value) => !value);
     else setDrawerOpen((value) => !value);
   };
 
@@ -32,12 +34,14 @@ export function Layout() {
     <>
       <Masthead onMenu={toggleGuide} />
 
-      <aside
-        className={`fixed top-14 bottom-0 left-0 hidden w-18 guide:block ${expanded ? "wide:hidden" : ""}`}
-      >
-        <MiniGuide />
-      </aside>
-      {expanded && (
+      {!drawerOnly && (
+        <aside
+          className={`fixed top-14 bottom-0 left-0 hidden w-18 guide:block ${expanded ? "wide:hidden" : ""}`}
+        >
+          <MiniGuide />
+        </aside>
+      )}
+      {!drawerOnly && expanded && (
         <aside className="fixed top-14 bottom-0 left-0 hidden w-60 overflow-y-auto wide:block">
           <FullGuide />
         </aside>
@@ -70,7 +74,7 @@ export function Layout() {
         </div>
       )}
 
-      <main className={`pt-14 guide:pl-18 ${expanded ? "wide:pl-60" : ""}`}>
+      <main className={drawerOnly ? "pt-14" : `pt-14 guide:pl-18 ${expanded ? "wide:pl-60" : ""}`}>
         <Outlet />
       </main>
     </>

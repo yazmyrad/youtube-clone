@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { UploadPage } from "./pages/UploadPage";
+import { WatchPage } from "./pages/WatchPage";
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/upload" element={<UploadPage />} />
+        <Route path="/watch" element={<WatchPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
