@@ -78,6 +78,25 @@ class VideoDetailsOut(BaseModel):
     thumbnail_url: str | None = Field(description="Signed; null if not ready or hidden")
 
 
+class VideoCardOut(BaseModel):
+    """One video in a listing such as the home feed."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    duration_seconds: int
+    views_count: int
+    published_at: datetime
+    thumbnail_url: str = Field(description="Signed; request the list again after it expires")
+    channel: ChannelBriefOut
+
+
+class VideoCardPage(BaseModel):
+    items: list[VideoCardOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
 class PresignedUploadOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

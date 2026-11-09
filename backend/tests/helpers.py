@@ -12,6 +12,15 @@ from app.models import UserRole, Video, VideoStatus, VideoVisibility
 
 PASSWORD = "correct horse battery"
 
+# Column values that keep a video out of every public listing (D33).
+NOT_LISTED: dict[str, dict[str, Any]] = {
+    "unlisted": {"visibility": VideoVisibility.unlisted},
+    "private": {"visibility": VideoVisibility.private},
+    "hidden": {"hidden_at": datetime.now(UTC)},
+    "processing": {"status": VideoStatus.processing, "published_at": None},
+    "deleted": {"deleted_at": datetime.now(UTC)},
+}
+
 
 @dataclass
 class ApiUser:
@@ -49,3 +58,19 @@ async def create_ready_video(
     )
     await session.commit()
     return video_id
+
+
+async def collect_pages(api: httpx.AsyncClient, url: str, **params: Any) -> list[list[str]]:
+    """Follows `next_cursor` to the end; returns the video ids on each page."""
+    pages: list[list[str]] = []
+    cursor = None
+    for _ in range(50):
+        query = params | ({"cursor": cursor} if cursor else {})
+        response = await api.get(url, params=query)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        pages.append([item["id"] for item in body["items"]])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            return pages
+    raise AssertionError("pagination never ended")

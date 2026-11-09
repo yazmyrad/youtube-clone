@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
+from app.core.pagination import DEFAULT_VIDEO_PAGE, VideoCursor, VideoPageLimit
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
 from app.models.user import USERNAME_PATTERN
 from app.schemas.errors import ErrorOut
@@ -11,6 +12,8 @@ from app.schemas.videos import (
     PresignedUploadOut,
     VideoAccessOut,
     VideoAccessPage,
+    VideoCardOut,
+    VideoCardPage,
     VideoCreatedOut,
     VideoCreateIn,
     VideoDetailsOut,
@@ -43,6 +46,16 @@ async def create_video(
     return VideoCreatedOut(
         video=VideoOwnerOut.model_validate(video),
         upload=PresignedUploadOut.model_validate(upload),
+    )
+
+
+@router.get("", response_model=VideoCardPage, summary="List public videos, newest first")
+async def list_feed(
+    session: SessionDep, cursor: VideoCursor = None, limit: VideoPageLimit = DEFAULT_VIDEO_PAGE
+) -> VideoCardPage:
+    cards, next_cursor = await videos_service.list_feed(session, cursor=cursor, limit=limit)
+    return VideoCardPage(
+        items=[VideoCardOut.model_validate(card) for card in cards], next_cursor=next_cursor
     )
 
 

@@ -8,12 +8,14 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import TextClause
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.db import get_session
 from app.core.errors import Forbidden, NotFound, Unauthorized
 from app.models import User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
+from app.models.video import LISTED
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
@@ -101,6 +103,12 @@ async def ensure_can_play(session: AsyncSession, user: User | None, video: Video
     404 and not 403, so the response doesn't reveal that the video exists."""
     if video.hidden_at is not None or not await can_view(session, user, video):
         raise NotFound("Video not found")
+
+
+def listed_videos() -> TextClause:
+    """Which videos the feed and search may show, to anyone at all. The same literal SQL as
+    the partial indexes, because Postgres can't match bound parameters to their predicates."""
+    return LISTED
 
 
 def can_show_thumbnail(video: Video) -> bool:

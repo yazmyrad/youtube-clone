@@ -2,14 +2,20 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Row, Select, delete, func, select
+from sqlalchemy import ColumnElement, Row, Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
-from app.core.permissions import can_show_thumbnail, ensure_can_view, ensure_video_owner
+from app.core.pagination import decode_video_cursor, encode_video_cursor
+from app.core.permissions import (
+    can_show_thumbnail,
+    ensure_can_view,
+    ensure_video_owner,
+    listed_videos,
+)
 from app.models import (
     ProcessingJob,
     User,
@@ -41,6 +47,17 @@ class VideoDetails:
     dislikes_count: int
     comments_count: int
     thumbnail_url: str | None
+
+
+@dataclass(frozen=True)
+class VideoCard:
+    id: uuid.UUID
+    title: str
+    duration_seconds: int
+    views_count: int
+    published_at: datetime
+    thumbnail_url: str
+    channel: User
 
 
 async def create_video(
@@ -134,6 +151,45 @@ async def get_video(
         comments_count=video.comments_count,
         thumbnail_url=playback.thumbnail_url(video.id) if can_show_thumbnail(video) else None,
     )
+
+
+async def _listed_page(
+    session: AsyncSession, *criteria: ColumnElement[bool], cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    """Listed videos matching `criteria`, newest first, with keyset pagination."""
+    query = (
+        select(Video)
+        .options(joinedload(Video.owner, innerjoin=True))
+        .where(listed_videos(), *criteria)
+        .order_by(Video.published_at.desc(), Video.id.desc())
+        .limit(limit + 1)
+    )
+    if cursor:
+        query = query.where(tuple_(Video.published_at, Video.id) < decode_video_cursor(cursor))
+    videos = list(await session.scalars(query))
+    next_cursor = None
+    if len(videos) > limit:
+        videos = videos[:limit]
+        next_cursor = encode_video_cursor(videos[-1].published_at, videos[-1].id)
+    cards = [
+        VideoCard(
+            id=video.id,
+            title=video.title,
+            duration_seconds=video.duration_seconds,
+            views_count=video.views_count,
+            published_at=video.published_at,
+            thumbnail_url=playback.thumbnail_url(video.id),
+            channel=video.owner,
+        )
+        for video in videos
+    ]
+    return cards, next_cursor
+
+
+async def list_feed(
+    session: AsyncSession, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    return await _listed_page(session, cursor=cursor, limit=limit)
 
 
 async def update_video(
