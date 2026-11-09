@@ -29,9 +29,11 @@ venv: ## Create backend/.venv and install pinned dependencies
 		|| { echo "Creating the virtualenv failed. On Ubuntu: sudo apt install python3-venv" >&2; exit 1; }
 	@backend/$(BIN)/pip install -q --disable-pip-version-check -c backend/requirements.lock -e "backend[dev]"
 
-frontend-deps: ## Install the frontend's pinned packages
+frontend-deps: env ## Install the frontend's pinned packages, here and in the running dev stack
 	@command -v npm >/dev/null || { echo "npm is missing. Install Node.js 22 or newer." >&2; exit 1; }
 	cd frontend && npm ci --no-audit --no-fund
+	@# The container has its own node_modules, which only its start command fills.
+	@if [ -n "$$($(DEV) ps -q --status running frontend 2>/dev/null)" ]; then $(DEV) restart frontend; fi
 
 # --- Dev stack -------------------------------------------------------------
 
