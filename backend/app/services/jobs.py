@@ -17,6 +17,7 @@ from app.models import JobStatus, ProcessingJob, Video, VideoStatus
 
 GENERIC_FAILURE = "Processing failed"
 CRASH_FAILURE = "Processing kept stopping unexpectedly"
+VIDEO_DELETED = "The video was deleted before processing"
 MAX_ERROR_LENGTH = 2000
 
 
@@ -91,6 +92,13 @@ async def claim_next(session: AsyncSession, worker_id: str) -> ClaimedJob | None
         if job is None:
             await session.rollback()
             return None
+
+        deleted_at = await session.scalar(select(Video.deleted_at).where(Video.id == job.video_id))
+        if deleted_at is not None:
+            # Nobody can see the result, and an active job would hold back the purge.
+            await _fail_permanently(session, job, VIDEO_DELETED, VIDEO_DELETED)
+            await session.commit()
+            continue
 
         if job.attempts >= job.max_attempts:
             # The worker died on the last attempt. Running it again would let a file
