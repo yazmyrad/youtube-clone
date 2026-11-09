@@ -118,6 +118,16 @@ if [ -z "${SMOKE_DEV:-}" ]; then
         fail "D57 the SPA serves a strict CSP"
     fi
     if has_header 'cache-control: no-cache'; then pass "index.html is revalidated"; else fail "index.html is revalidated"; fi
+    if has_header 'x-content-type-options: nosniff'; then pass "index.html is nosniff"; else fail "index.html is nosniff"; fi
+    # The page is only as good as the script it points at.
+    script="$(grep -aoE '/assets/[^"]+\.js' "$work/body" | head -n 1)"
+    if [ -n "$script" ]; then
+        expect "the page's script is served" 200 "$script"
+        if has_header 'content-type: (text|application)/javascript'; then pass "the script has a JavaScript type"; else fail "the script has a JavaScript type"; fi
+        if has_header 'cache-control: public, max-age=31536000, immutable'; then pass "the script is cached for good"; else fail "the script is cached for good"; fi
+    else
+        fail "the page points at a built script"
+    fi
     expect "a missing asset is a real 404" 404 "/assets/does-not-exist.js"
     if body_has 'id="root"'; then fail "a missing asset returned the SPA's page"; else pass "a missing asset returned no page"; fi
 fi
