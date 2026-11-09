@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 
+import { ReactionButtons } from "../components/ReactionButtons";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { statusMessage, useVideo, VideoNotFound, type VideoDetails } from "../hooks/useVideo";
 import { NotFoundPage } from "./NotFoundPage";
@@ -9,17 +10,20 @@ function Details({ video }: { video: VideoDetails }) {
   return (
     <>
       <h1 className="mt-3 text-xl font-semibold wrap-anywhere">{video.title}</h1>
-      <div className="mt-3 flex items-center gap-3">
-        <span
-          aria-hidden
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-accent font-medium text-white"
-        >
-          {video.channel.display_name.charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate font-medium">{video.channel.display_name}</p>
-          <p className="truncate text-xs text-ink-muted">@{video.channel.username}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-accent font-medium text-white"
+          >
+            {video.channel.display_name.charAt(0).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{video.channel.display_name}</p>
+            <p className="truncate text-xs text-ink-muted">@{video.channel.username}</p>
+          </div>
         </div>
+        {video.status === "ready" && <ReactionButtons video={video} />}
       </div>
       <div className="mt-3 rounded-xl bg-hover p-3 text-sm">
         <p className="font-medium">
