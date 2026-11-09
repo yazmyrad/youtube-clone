@@ -4,6 +4,7 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.models.engagement import ReactionType
 from app.models.video import VideoStatus, VideoVisibility
 from app.schemas.auth import StrictModel
 
@@ -79,6 +80,7 @@ class VideoDetailsOut(BaseModel):
     dislikes_count: int
     comments_count: int
     thumbnail_url: str | None = Field(description="Signed; null if not ready or hidden")
+    my_reaction: ReactionType | None = Field(description="Null if none, or not logged in")
 
 
 class VideoCardOut(BaseModel):
@@ -98,6 +100,18 @@ class VideoCardOut(BaseModel):
 class VideoCardPage(BaseModel):
     items: list[VideoCardOut]
     next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
+class ReactionIn(StrictModel):
+    reaction: ReactionType
+
+
+class ReactionStateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    my_reaction: ReactionType | None
+    likes_count: int
+    dislikes_count: int
 
 
 class PresignedUploadOut(BaseModel):

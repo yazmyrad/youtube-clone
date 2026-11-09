@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, Row, Select, delete, func, select, tuple_
+from sqlalchemy import ColumnElement, Row, Select, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -12,15 +12,18 @@ from app.core.errors import Conflict, NotFound
 from app.core.pagination import decode_video_cursor, encode_video_cursor
 from app.core.permissions import (
     can_show_thumbnail,
+    ensure_can_engage,
     ensure_can_view,
     ensure_video_owner,
     listed_videos,
 )
 from app.models import (
     ProcessingJob,
+    ReactionType,
     User,
     Video,
     VideoAccess,
+    VideoReaction,
     VideoStatus,
     VideoVisibility,
 )
@@ -47,6 +50,7 @@ class VideoDetails:
     dislikes_count: int
     comments_count: int
     thumbnail_url: str | None
+    my_reaction: ReactionType | None
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,7 @@ async def get_video(
     if video is None:
         raise NotFound("Video not found")
     await ensure_can_view(session, user, video)
+    reaction = await session.get(VideoReaction, (user.id, video.id)) if user else None
     return VideoDetails(
         id=video.id,
         title=video.title,
@@ -150,6 +155,33 @@ async def get_video(
         dislikes_count=video.dislikes_count,
         comments_count=video.comments_count,
         thumbnail_url=playback.thumbnail_url(video.id) if can_show_thumbnail(video) else None,
+        my_reaction=reaction.reaction if reaction else None,
+    )
+
+
+async def get_engageable_for_update(
+    session: AsyncSession, user: User, video_id: uuid.UUID
+) -> Video:
+    """A video the user may like or comment on, row locked. Counter updates need that lock
+    anyway, and holding it from the start means the check can't race a moderator's hide."""
+    video = await session.scalar(
+        select(Video).where(Video.id == video_id).with_for_update(key_share=True)
+    )
+    if video is None:
+        raise NotFound("Video not found")
+    await ensure_can_engage(session, user, video)
+    return video
+
+
+async def adjust_counters(session: AsyncSession, video_id: uuid.UUID, **deltas: int) -> None:
+    """Atomically changes denormalized counters, in the caller's transaction. Keeps
+    `updated_at` as it is: a like isn't an edit of the video."""
+    values = {name: getattr(Video, name) + delta for name, delta in deltas.items()}
+    await session.execute(
+        update(Video)
+        .where(Video.id == video_id)
+        .values(updated_at=Video.updated_at, **values)
+        .execution_options(synchronize_session=False)
     )
 
 

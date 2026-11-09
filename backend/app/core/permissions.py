@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.db import get_session
-from app.core.errors import Forbidden, NotFound, Unauthorized
+from app.core.errors import Conflict, Forbidden, NotFound, Unauthorized
 from app.models import User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
 from app.models.video import LISTED
 
@@ -103,6 +103,14 @@ async def ensure_can_play(session: AsyncSession, user: User | None, video: Video
     404 and not 403, so the response doesn't reveal that the video exists."""
     if video.hidden_at is not None or not await can_view(session, user, video):
         raise NotFound("Video not found")
+
+
+async def ensure_can_engage(session: AsyncSession, user: User | None, video: Video) -> None:
+    """Liking and commenting. Unavailable on a hidden video even to those who may still open
+    its details, and on a video that isn't ready, which only its owner can see."""
+    await ensure_can_play(session, user, video)
+    if video.status != VideoStatus.ready:
+        raise Conflict("The video isn't ready yet")
 
 
 def listed_videos() -> TextClause:

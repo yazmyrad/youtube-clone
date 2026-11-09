@@ -10,9 +10,10 @@ from dataclasses import dataclass
 
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UserRole
-from tests.helpers import PASSWORD, ApiUser, CreateUser, SetRole
+from tests.helpers import PASSWORD, ApiUser, CreateUser, SetRole, create_ready_video
 
 ANON = "anonymous"
 ACTORS = (ANON, UserRole.user, UserRole.moderator, UserRole.admin)
@@ -29,6 +30,7 @@ class Ctx:
     api: httpx.AsyncClient
     actor: ApiUser | None
     other: ApiUser  # some other user, as a target
+    session: AsyncSession
 
     @property
     def headers(self) -> dict[str, str]:
@@ -91,6 +93,20 @@ async def _revoke_access_to_others_video(ctx: Ctx) -> httpx.Response:
     return await ctx.api.delete(url, headers=ctx.headers)
 
 
+async def _others_public_video(ctx: Ctx) -> str:
+    return await create_ready_video(ctx.api, ctx.session, ctx.other)
+
+
+async def _react(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_public_video(ctx)}/reaction"
+    return await ctx.api.put(url, headers=ctx.headers, json={"reaction": "like"})
+
+
+async def _remove_reaction(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_public_video(ctx)}/reaction"
+    return await ctx.api.delete(url, headers=ctx.headers)
+
+
 async def _browse_feed(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/videos", headers=ctx.headers)
 
@@ -132,6 +148,8 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
     "revoke access to someone else's video": (
         _revoke_access_to_others_video, (NO_LOGIN, HIDDEN, HIDDEN, HIDDEN)
     ),
+    "like, dislike": (_react, (NO_LOGIN, YES, YES, YES)),
+    "remove a reaction": (_remove_reaction, (NO_LOGIN, YES, YES, YES)),
     "browse feed": (_browse_feed, (YES, YES, YES, YES)),
     "search": (_search, (YES, YES, YES, YES)),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),
@@ -158,13 +176,14 @@ async def _actor(create_user: CreateUser, set_role: SetRole, actor: str) -> ApiU
 @pytest.mark.parametrize(("name", "actor", "expected"), CELLS)
 async def test_action_matrix(
     api: httpx.AsyncClient,
+    session: AsyncSession,
     create_user: CreateUser,
     set_role: SetRole,
     name: str,
     actor: str,
     expected: str | int,
 ) -> None:
-    ctx = Ctx(api, await _actor(create_user, set_role, actor), await create_user("other"))
+    ctx = Ctx(api, await _actor(create_user, set_role, actor), await create_user("other"), session)
 
     response = await MATRIX[name][0](ctx)
 
@@ -176,7 +195,11 @@ async def test_action_matrix(
 
 @pytest.mark.parametrize("name", [n for n, (_, row) in MATRIX.items() if row[0] == NO_LOGIN])
 async def test_disabled_user_is_treated_as_logged_out(
-    api: httpx.AsyncClient, create_user: CreateUser, set_role: SetRole, name: str
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+    name: str,
 ) -> None:
     """A disabled account's still-valid JWT opens nothing that needs a login (D38)."""
     admin = await create_user("root")
@@ -185,6 +208,6 @@ async def test_disabled_user_is_treated_as_logged_out(
     await api.patch(f"/api/admin/users/{actor.id}", headers=admin.headers,
                     json={"is_active": False})  # fmt: skip
 
-    response = await MATRIX[name][0](Ctx(api, actor, admin))
+    response = await MATRIX[name][0](Ctx(api, actor, admin, session))
 
     assert response.status_code == 401
