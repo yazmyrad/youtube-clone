@@ -102,6 +102,26 @@ else
     fail "could not read response headers"
 fi
 
+# --- The site --------------------------------------------------------------
+
+expect "a deep link is served by the SPA" 200 "/some/deep/link"
+if body_has 'id="root"'; then pass "a deep link gets the SPA's page"; else fail "a deep link gets the SPA's page"; fi
+expect "an API miss isn't answered by the SPA" 404 "/api/does-not-exist"
+if body_has 'id="root"'; then fail "an API miss returned the SPA's page"; else pass "an API miss returned no page"; fi
+
+# The dev stack serves the site from Vite, which has no CSP and answers any path itself.
+if [ -z "${SMOKE_DEV:-}" ]; then
+    expect "D57 the SPA is served" 200 /
+    if has_header "content-security-policy: default-src 'self'; script-src 'self';"; then
+        pass "D57 the SPA serves a strict CSP"
+    else
+        fail "D57 the SPA serves a strict CSP"
+    fi
+    if has_header 'cache-control: no-cache'; then pass "index.html is revalidated"; else fail "index.html is revalidated"; fi
+    expect "a missing asset is a real 404" 404 "/assets/does-not-exist.js"
+    if body_has 'id="root"'; then fail "a missing asset returned the SPA's page"; else pass "a missing asset returned no page"; fi
+fi
+
 # --- Two real videos -------------------------------------------------------
 
 register_body="{\"username\":\"$name\",\"email\":\"$name@example.com\",\"password\":\"correct horse battery\",\"display_name\":\"Smoke\"}"

@@ -109,7 +109,7 @@ test-upload: env ## Check uploads through nginx on the running dev stack (LARGE=
 	@LARGE="$(LARGE)" scripts/test-upload.sh $(DEV)
 
 smoke: env ## Check the running dev stack from outside, through nginx
-	@. ./.env.dev && scripts/smoke.sh "http://127.0.0.1:$$HTTP_PORT" $(DEV)
+	@. ./.env.dev && SMOKE_DEV=1 scripts/smoke.sh "http://127.0.0.1:$$HTTP_PORT" $(DEV)
 
 lint: ## Check code with ruff
 	cd backend && $(BIN)/ruff check .

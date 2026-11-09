@@ -26,7 +26,29 @@ services:
       - ./backend/alembic:/srv/alembic:ro
       - ./backend/alembic.ini:/srv/alembic.ini:ro
 
+  # Hot reload for the site, reached through nginx. Publishes no port.
+  frontend:
+    image: node:22.22.1-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && exec npx vite --host 0.0.0.0 --port 5173 --strictPort"]
+    volumes:
+      - ./frontend:/app
+      # Its own copy: packages built for this image's libc must not replace the host's.
+      - frontend-node-modules:/app/node_modules
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 180s
+
   nginx:
+    # The config stage only: this stack doesn't need the production site built.
+    build:
+      target: nginx-base
     # Replaces the deploy's port, so the dev site is reachable from this machine only.
     ports: !override
       - "127.0.0.1:${HTTP_PORT:-8080}:8080"
@@ -34,6 +56,7 @@ services:
       # The directory, not single files: a file mount stays on the old inode when git or an
       # editor replaces the file. nginx only includes conf.d/*.conf, so the rest is ignored.
       - ./infra/nginx:/etc/nginx/conf.d:ro
+      - ./infra/nginx/spa-dev:/etc/nginx/spa:ro
 
   postgres:
     # Reachable from the host for migrations, tests and database tools, on localhost only.
@@ -56,3 +79,6 @@ services:
 
 networks:
   dev-host:
+
+volumes:
+  frontend-node-modules:

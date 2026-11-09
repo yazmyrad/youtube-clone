@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / "compose.yaml"
 COMPOSE_DEV = ROOT / "compose.dev.yaml"
 MAKEFILE = ROOT / "Makefile"
-NGINX_CONF = ROOT / "infra" / "nginx" / "default.conf"
+NGINX_DIR = ROOT / "infra" / "nginx"
+NGINX_CONF = NGINX_DIR / "default.conf"
 
 
 def _is_host_path(volume: str | dict) -> bool:
@@ -46,6 +47,7 @@ def test_nginx_resolves_upstreams_per_request() -> None:
     conf = NGINX_CONF.read_text()
 
     assert "resolver 127.0.0.11" in conf
+    conf += (NGINX_DIR / "spa-dev" / "location.inc").read_text()
     targets = re.findall(r"^\s*proxy_pass\s+([^;]+);", conf, re.MULTILINE)
     assert targets
     assert all(target.startswith("$") for target in targets)
@@ -108,3 +110,34 @@ def test_nginx_reload_validates_first() -> None:
     recipe = MAKEFILE.read_text().split("nginx-reload:", 1)[1]
 
     assert recipe.index("nginx nginx -t") < recipe.index("nginx nginx -s reload")
+
+
+def test_deploy_image_serves_the_built_site() -> None:
+    """The dev stack stops at the config stage, so nothing else would catch a broken final one."""
+    dockerfile = (NGINX_DIR / "Dockerfile").read_text()
+    nginx = yaml.safe_load(COMPOSE.read_text())["services"]["nginx"]
+
+    assert "target" not in nginx["build"]
+    assert nginx["build"]["additional_contexts"]["frontend"] == "./frontend"
+    final_stage = dockerfile.rsplit("FROM ", 1)[1]
+    assert "spa-prod/location.inc /etc/nginx/spa/location.inc" in final_stage
+    assert "--from=spa /app/dist/ /usr/share/nginx/html/" in final_stage
+
+
+def test_dev_nginx_gets_the_vite_location_from_a_directory_mount() -> None:
+    compose = COMPOSE_DEV.read_text()
+
+    assert "- ./infra/nginx/spa-dev:/etc/nginx/spa:ro" in compose
+    assert "target: nginx-base" in compose
+
+
+def test_spa_csp_allows_no_inline_code() -> None:
+    """D57: scripts and styles come only from the site's own files."""
+    conf = (NGINX_DIR / "spa-prod" / "location.inc").read_text()
+    csp = re.search(r'add_header Content-Security-Policy "([^"]+)"', conf)
+
+    assert csp
+    assert "script-src 'self';" in csp[1]
+    assert "style-src 'self';" in csp[1]
+    assert "frame-ancestors 'none'" in csp[1]
+    assert "unsafe" not in csp[1]

@@ -20,7 +20,10 @@ x-backend-env: &backend-env
 services:
   nginx:
     <<: *hardening
-    build: infra/nginx
+    build:
+      context: infra/nginx
+      additional_contexts:
+        frontend: ./frontend
     depends_on:
       api:
         condition: service_healthy
