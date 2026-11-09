@@ -16,7 +16,8 @@ export type Api = ReturnType<typeof createApi>;
 // The refresh cookie authenticates these. A 401 from them is the answer, not an expired token.
 const isAuthRoute = (request: Request) => new URL(request.url).pathname.startsWith("/api/auth/");
 
-/** Sends the access token. On a 401, replaces the token and retries the request once. */
+/** Sends the access token. On a 401, replaces the token and retries the request once, never
+ * as a different user. */
 export function authMiddleware(session: Session, fetchFn: FetchFn = browserFetch): Middleware {
   const replayable = new WeakMap<Request, Request>();
   const sentTokens = new WeakMap<Request, string>();

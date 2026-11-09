@@ -29,10 +29,13 @@ export interface Session {
   restore: () => Promise<void>;
   /** Rotates the refresh cookie. Concurrent calls share one request. */
   refresh: () => Promise<string | null>;
-  /** A token to replace `usedToken`, refreshing only if nobody has replaced it already. */
+  /** A token to replace `usedToken`, refreshing only if nobody has replaced it already.
+   * Null if there's none, or if it belongs to someone else. */
   replace: (usedToken: string) => Promise<string | null>;
   /** Calls `listener` when a signed-in session ends without the user asking. */
   onLost: (listener: () => void) => () => void;
+  /** Calls `listener` when a refresh comes back as another user, after a login in another tab. */
+  onAccountChanged: (listener: () => void) => () => void;
 }
 
 interface Lease {
@@ -48,10 +51,21 @@ function readLease(storage: LeaseStorage): Lease | null {
   }
 }
 
+/** The user a token belongs to. Not verified, which is the server's job on every request. */
+function subjectOf(accessToken: string): string | null {
+  try {
+    const payload = accessToken.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    return (JSON.parse(atob(payload)) as { sub?: string }).sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function createSession(deps: SessionDeps): Session {
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)));
-  const listeners = new Set<() => void>();
+  const lostListeners = new Set<() => void>();
+  const accountListeners = new Set<() => void>();
   let token: string | null = null;
   let inFlight: Promise<string | null> | null = null;
   let restored: Promise<unknown> | null = null;
@@ -92,7 +106,7 @@ export function createSession(deps: SessionDeps): Session {
 
   async function runRefresh(): Promise<string | null> {
     const startedAt = epoch;
-    const hadToken = token !== null;
+    const previous = token;
     const release = await acquireLease();
     if (!release) return null;
     let fresh: string | null;
@@ -105,7 +119,12 @@ export function createSession(deps: SessionDeps): Session {
     }
     if (epoch !== startedAt) return token;
     token = fresh;
-    if (fresh === null && hadToken) listeners.forEach((listener) => listener());
+    if (previous !== null) {
+      if (fresh === null) lostListeners.forEach((listener) => listener());
+      else if (subjectOf(fresh) !== subjectOf(previous)) {
+        accountListeners.forEach((listener) => listener());
+      }
+    }
     return fresh;
   }
 
@@ -131,10 +150,17 @@ export function createSession(deps: SessionDeps): Session {
       await restored;
     },
     refresh,
-    replace: async (usedToken) => (token !== null && token !== usedToken ? token : refresh()),
+    async replace(usedToken) {
+      const next = token !== null && token !== usedToken ? token : await refresh();
+      return next !== null && subjectOf(next) === subjectOf(usedToken) ? next : null;
+    },
     onLost(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+      lostListeners.add(listener);
+      return () => lostListeners.delete(listener);
+    },
+    onAccountChanged(listener) {
+      accountListeners.add(listener);
+      return () => accountListeners.delete(listener);
     },
   };
 }

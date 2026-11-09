@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
 import { api, authApi, session } from "../api/client";
@@ -20,6 +20,12 @@ interface Auth {
 const ME_KEY = ["me"];
 const AuthContext = createContext<Auth | null>(null);
 
+// One account's data must not be shown to the next. Not queryClient.clear(), which would
+// leave AuthProvider watching a query that's no longer in the cache.
+function dropAccountData(queryClient: QueryClient) {
+  queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] });
+}
+
 async function fetchMe(): Promise<Me | null> {
   await session.restore();
   if (session.getToken() === null) return null;
@@ -39,16 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const value = useMemo<Auth>(() => {
-    // One account's data must not be shown to the next. Not queryClient.clear(), which
-    // would leave this provider watching a query that's no longer in the cache.
-    const dropAccountData = () =>
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] });
-
     async function login(credentials: LoginIn) {
       const { data: tokens, error } = await authApi.POST("/api/auth/login", { body: credentials });
       if (!tokens) throw new Error(errorMessage(error));
       session.setToken(tokens.access_token);
-      dropAccountData();
+      dropAccountData(queryClient);
       await queryClient.invalidateQueries({ queryKey: ME_KEY });
     }
 
@@ -68,21 +69,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await authApi.POST("/api/auth/logout");
         } finally {
           session.clear();
-          dropAccountData();
+          dropAccountData(queryClient);
           queryClient.setQueryData(ME_KEY, null);
         }
       },
     };
   }, [data, isPending, queryClient]);
 
-  useEffect(
-    () =>
-      session.onLost(() => {
-        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== ME_KEY[0] });
-        queryClient.setQueryData(ME_KEY, null);
-      }),
-    [queryClient],
-  );
+  useEffect(() => {
+    const stopLost = session.onLost(() => {
+      dropAccountData(queryClient);
+      queryClient.setQueryData(ME_KEY, null);
+    });
+    const stopChanged = session.onAccountChanged(() => {
+      dropAccountData(queryClient);
+      void queryClient.invalidateQueries({ queryKey: ME_KEY });
+    });
+    return () => {
+      stopLost();
+      stopChanged();
+    };
+  }, [queryClient]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

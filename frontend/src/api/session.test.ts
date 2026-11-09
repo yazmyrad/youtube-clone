@@ -235,6 +235,45 @@ describe("authMiddleware", () => {
     ]);
   });
 
+  const jwt = (sub: string, serial: number) =>
+    `header.${btoa(JSON.stringify({ sub, serial })).replace(/=+$/, "")}.signature`;
+
+  function accountSetup(refreshed: string) {
+    const session = world().tab(async () => refreshed);
+    const old = jwt("user-x", 1);
+    const fetchFn = vi.fn(async (request: Request) =>
+      json(request.headers.get("Authorization") === `Bearer ${old}` ? 401 : 200),
+    );
+    const api = createApi("http://test", fetchFn);
+    api.use(authMiddleware(session, fetchFn));
+    const changed = vi.fn();
+    session.onAccountChanged(changed);
+    session.setToken(old);
+    return { api, session, fetchFn, changed };
+  }
+
+  it("never replays a request as the user another tab logged in", async () => {
+    const other = jwt("user-y", 2);
+    const { api, session, fetchFn, changed } = accountSetup(other);
+
+    const { response } = await api.PATCH("/api/users/me", { body: { display_name: "Ana" } });
+
+    expect(response.status).toBe(401);
+    expect(fetchFn).toHaveBeenCalledOnce();
+    expect(changed).toHaveBeenCalledOnce();
+    expect(session.getToken()).toBe(other);
+  });
+
+  it("retries as usual when the refresh returns the same user", async () => {
+    const { api, fetchFn, changed } = accountSetup(jwt("user-x", 2));
+
+    const { response } = await api.GET("/api/users/me");
+
+    expect(response.status).toBe(200);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
   it("resends the request body on the retry", async () => {
     const bodies: string[] = [];
     const { tab } = world();
