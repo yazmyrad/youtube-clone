@@ -9,8 +9,9 @@ export type PlaybackGrant = components["schemas"]["PlaybackOut"];
 export type PlayerFailure = "unavailable" | "unsupported" | "error";
 
 export const RENEW_BEFORE_MS = 60_000;
-/** Keeps a very short token lifetime from turning renewal into a busy loop. */
-export const MIN_RENEW_DELAY_MS = 5_000;
+/** `expires_at` is compared with the viewer's clock, which may be wrong by any amount. However
+ * wrong, renewal must not turn into a busy loop. */
+export const MIN_RENEW_DELAY_MS = 30_000;
 export const RETRY_MS = 10_000;
 export const MAX_FORBIDDEN_ROUNDS = 3;
 
@@ -78,8 +79,9 @@ export function createTokenRenewal(options: RenewalOptions): TokenRenewal {
   }
 
   function scheduleBeforeExpiry(grant: PlaybackGrant) {
-    const remaining = Date.parse(grant.expires_at) - Date.now();
-    schedule(Math.max(MIN_RENEW_DELAY_MS, remaining - RENEW_BEFORE_MS));
+    const delay = Date.parse(grant.expires_at) - Date.now() - RENEW_BEFORE_MS;
+    // Not Math.max, which would pass on the NaN of an unreadable date.
+    schedule(delay > MIN_RENEW_DELAY_MS ? delay : MIN_RENEW_DELAY_MS);
   }
 
   // A paused tab shouldn't ask for tokens forever. Stopped loading still needs one, though.

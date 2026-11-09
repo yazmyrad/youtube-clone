@@ -107,6 +107,26 @@ describe("token renewal", () => {
     expect(fetchGrant).toHaveBeenCalledTimes(3);
   });
 
+  it("doesn't spin when the viewer's clock is past every expiry", async () => {
+    const { renewal, fetchGrant } = setup();
+    fetchGrant.mockImplementation(async () => grant("new", -TEN_MINUTES));
+    renewal.start(grant("old", -TEN_MINUTES));
+
+    await vi.advanceTimersByTimeAsync(MIN_RENEW_DELAY_MS - 1);
+    expect(fetchGrant).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchGrant).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't spin on an unreadable expiry", async () => {
+    const { renewal, fetchGrant } = setup();
+    renewal.start({ url: "/hls/old/v1/master.m3u8", expires_at: "not a date" });
+
+    await vi.advanceTimersByTimeAsync(MIN_RENEW_DELAY_MS - 1);
+    expect(fetchGrant).not.toHaveBeenCalled();
+  });
+
   it("waits for play while the video is paused", async () => {
     const { renewal, fetchGrant, state } = setup(true);
     renewal.start(grant());
