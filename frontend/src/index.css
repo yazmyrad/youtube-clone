@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+/* Roboto first for visitors who have it. The CSP blocks font CDNs, by design. */
+@theme {
+  --font-sans: Roboto, "Helvetica Neue", Arial, sans-serif;
+  --breakpoint-guide: 792px;
+  --breakpoint-wide: 1312px;
+  --color-page: #ffffff;
+  --color-ink: #0f0f0f;
+  --color-ink-muted: #606060;
+  --color-hover: #f2f2f2;
+  --color-hover-strong: #e5e5e5;
+  --color-line: #d3d3d3;
+  --color-accent: #065fd4;
+  --color-accent-soft: #def1ff;
+  --color-brand: #ff0033;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+  }
+}
