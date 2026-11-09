@@ -12,7 +12,8 @@ const POLL_MS = 100;
 type LeaseStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export interface SessionDeps {
-  /** Returns a new access token, or null if the refresh cookie was refused. */
+  /** Returns a new access token, or null if the refresh cookie was refused. Throws if the
+   * server couldn't give an answer, which says nothing about the session. */
   refreshRequest: (signal: AbortSignal) => Promise<string | null>;
   /** A function, because merely reading window.localStorage can throw. */
   storage: () => LeaseStorage;
@@ -90,15 +91,14 @@ export function createSession(deps: SessionDeps): Session {
     const startedAt = epoch;
     const hadToken = token !== null;
     const release = await acquireLease();
-    let fresh: string | null = null;
-    if (release) {
-      try {
-        fresh = await deps.refreshRequest(AbortSignal.timeout(REFRESH_TIMEOUT_MS));
-      } catch {
-        fresh = null;
-      } finally {
-        release();
-      }
+    if (!release) return null;
+    let fresh: string | null;
+    try {
+      fresh = await deps.refreshRequest(AbortSignal.timeout(REFRESH_TIMEOUT_MS));
+    } catch {
+      return null; // A temporary failure: the cookie is still good, so keep the session.
+    } finally {
+      release();
     }
     if (epoch !== startedAt) return token;
     token = fresh;

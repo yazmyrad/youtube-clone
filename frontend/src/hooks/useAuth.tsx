@@ -29,9 +29,10 @@ async function fetchMe(): Promise<Me | null> {
   await restoreSession();
   if (session.getToken() === null) return null;
   const { data, response } = await api.GET("/api/users/me");
-  if (response.status === 401) return null;
-  if (!data) throw new Error(`Could not load your account (${response.status})`);
-  return data;
+  if (data) return data;
+  // A token that's still held means the refresh failed for now. Throwing keeps the last result.
+  if (session.getToken() === null) return null;
+  throw new Error(`Could not load your account (${response.status})`);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

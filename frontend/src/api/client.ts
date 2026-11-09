@@ -45,14 +45,19 @@ export function authMiddleware(session: Session, fetchFn: FetchFn = browserFetch
   };
 }
 
+/** Only a 401 means the session is over. Anything else is the server failing to answer. */
+export async function requestRefresh(client: Api, signal: AbortSignal): Promise<string | null> {
+  const { data, response } = await client.POST("/api/auth/refresh", { signal });
+  if (data) return data.access_token;
+  if (response.status === 401) return null;
+  throw new Error(`Refresh failed (${response.status})`);
+}
+
 const unauthenticated = createApi();
 
 export const session = createSession({
   storage: () => window.localStorage,
-  refreshRequest: async (signal) => {
-    const { data } = await unauthenticated.POST("/api/auth/refresh", { signal });
-    return data?.access_token ?? null;
-  },
+  refreshRequest: (signal) => requestRefresh(unauthenticated, signal),
 });
 
 export const api = createApi();

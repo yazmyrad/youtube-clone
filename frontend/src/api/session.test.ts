@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { authMiddleware, createApi } from "./client";
+import { authMiddleware, createApi, requestRefresh } from "./client";
 import { createSession, type SessionDeps } from "./session";
 
 const yieldToOthers = () => new Promise<void>((done) => setTimeout(done, 0));
@@ -85,9 +85,16 @@ describe("session refresh", () => {
     const lease = { id: "other", expires: now() + 10 ** 9 };
     storage.setItem("auth.refresh.lease", JSON.stringify(lease));
 
-    await expect(tab().refresh()).resolves.toBeNull();
+    const session = tab();
+    const lost = vi.fn();
+    session.onLost(lost);
+    session.setToken("still-good");
+
+    await expect(session.refresh()).resolves.toBeNull();
 
     expect(stats.calls).toBe(0);
+    expect(session.getToken()).toBe("still-good");
+    expect(lost).not.toHaveBeenCalled();
   });
 
   it("still refreshes when storage is unavailable", async () => {
@@ -115,10 +122,17 @@ describe("session refresh", () => {
     expect(lost).toHaveBeenCalledOnce();
   });
 
-  it("treats a network failure as a failed refresh", async () => {
+  it("keeps the session when the server can't answer", async () => {
     const { tab } = world();
+    const session = tab(() => Promise.reject(new Error("offline")));
+    const lost = vi.fn();
+    session.onLost(lost);
+    session.setToken("still-good");
 
-    await expect(tab(() => Promise.reject(new Error("offline"))).refresh()).resolves.toBeNull();
+    await expect(session.refresh()).resolves.toBeNull();
+
+    expect(session.getToken()).toBe("still-good");
+    expect(lost).not.toHaveBeenCalled();
   });
 
   it("doesn't report a lost session for a visitor who never had one", async () => {
@@ -142,6 +156,29 @@ describe("session refresh", () => {
     await refreshing;
 
     expect(session.getToken()).toBeNull();
+  });
+});
+
+describe("requestRefresh", () => {
+  const respondWith = (status: number, body = "{}") =>
+    createApi(
+      "http://test",
+      async () => new Response(body, { status, headers: { "Content-Type": "application/json" } }),
+    );
+  const signal = new AbortController().signal;
+
+  it("returns the new token", async () => {
+    const client = respondWith(200, '{"access_token":"new","expires_in":900}');
+
+    await expect(requestRefresh(client, signal)).resolves.toBe("new");
+  });
+
+  it("reports a refused cookie as null", async () => {
+    await expect(requestRefresh(respondWith(401), signal)).resolves.toBeNull();
+  });
+
+  it.each([403, 500, 502, 503])("throws on %i, which doesn't end the session", async (status) => {
+    await expect(requestRefresh(respondWith(status), signal)).rejects.toThrow();
   });
 });
 
