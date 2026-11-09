@@ -11,7 +11,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "gen:api": "openapi-typescript openapi.json -o src/api/schema.d.ts",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "5.107.1",
