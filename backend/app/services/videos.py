@@ -224,6 +224,26 @@ async def list_feed(
     return await _listed_page(session, cursor=cursor, limit=limit)
 
 
+async def list_my_videos(
+    session: AsyncSession, user: User, *, cursor: str | None, limit: int
+) -> tuple[list[Video], str | None]:
+    """The user's own videos in any status, newest first."""
+    query = (
+        select(Video)
+        .where(Video.owner_id == user.id, Video.deleted_at.is_(None))
+        .order_by(Video.created_at.desc(), Video.id.desc())
+        .limit(limit + 1)
+    )
+    if cursor:
+        query = query.where(tuple_(Video.created_at, Video.id) < decode_cursor(cursor))
+    videos = list(await session.scalars(query))
+    next_cursor = None
+    if len(videos) > limit:
+        videos = videos[:limit]
+        next_cursor = encode_cursor(videos[-1].created_at, videos[-1].id)
+    return videos, next_cursor
+
+
 async def search_videos(
     session: AsyncSession, *, q: str, cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:

@@ -55,6 +55,11 @@ class VideoOwnerOut(BaseModel):
     updated_at: datetime
 
 
+class VideoOwnerPage(BaseModel):
+    items: list[VideoOwnerOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
 class ChannelBriefOut(BaseModel):
     """The channel a video belongs to, as shown next to the video."""
 
