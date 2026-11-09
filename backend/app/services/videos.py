@@ -268,6 +268,13 @@ async def update_video(
     return video
 
 
+async def delete_video(session: AsyncSession, user: User, video_id: uuid.UUID) -> None:
+    """Gone for the API at once. The worker removes the files and then the row."""
+    video = await _get_owned_for_update(session, user, video_id)
+    video.deleted_at = func.now()
+    await session.commit()
+
+
 def _access_entries(video_id: uuid.UUID) -> Select:
     return (
         select(User.username, User.display_name, VideoAccess.created_at.label("granted_at"))

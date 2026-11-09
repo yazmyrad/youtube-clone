@@ -103,6 +103,16 @@ async def update_video(
     )
 
 
+@router.delete(
+    "/{video_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete your video",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorOut}},
+)
+async def delete_video(video_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> None:
+    await videos_service.delete_video(session, user, video_id)
+
+
 @router.post(
     "/{video_id}/playback",
     response_model=PlaybackOut,

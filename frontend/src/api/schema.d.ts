@@ -224,7 +224,8 @@ export interface paths {
         get: operations["get_video_api_videos__video_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete your video */
+        delete: operations["delete_video_api_videos__video_id__delete"];
         options?: never;
         head?: never;
         /** Edit title, description or visibility */
@@ -1400,6 +1401,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VideoDetailsOut"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_video_api_videos__video_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Unauthorized */
             401: {
