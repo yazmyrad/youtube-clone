@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { errorMessage } from "../api/errors";
+import { failureMessage } from "../api/errors";
 import { Logo } from "./icons";
 
 export function AuthCard({
@@ -66,9 +66,7 @@ export function AuthForm({
     try {
       await onSubmit(new FormData(event.currentTarget));
     } catch (failure) {
-      // A TypeError is fetch failing to reach the server; its text isn't for visitors.
-      const isReadable = failure instanceof Error && !(failure instanceof TypeError);
-      setError(isReadable ? failure.message : errorMessage(null));
+      setError(failureMessage(failure));
     } finally {
       setPending(false);
     }

@@ -32,6 +32,18 @@ export const AccountIcon = () => (
   </Icon>
 );
 
+export const PlusIcon = () => (
+  <Icon>
+    <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
+  </Icon>
+);
+
+export const UploadIcon = () => (
+  <Icon width="48" height="48">
+    <path d="M11 16V7.8L8.4 10.4 7 9l5-5 5 5-1.4 1.4L13 7.8V16zM5 18h14v2H5z" />
+  </Icon>
+);
+
 export function Logo() {
   return (
     <span className="flex items-center gap-1.5">

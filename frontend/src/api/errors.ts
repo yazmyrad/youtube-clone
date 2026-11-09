@@ -13,3 +13,10 @@ export function errorMessage(error: unknown, fallback = FALLBACK): string {
   }
   return fallback;
 }
+
+/** Text to show for something thrown. A TypeError is fetch failing to reach the server, and
+ * its text isn't for visitors. */
+export function failureMessage(failure: unknown): string {
+  const isReadable = failure instanceof Error && !(failure instanceof TypeError);
+  return isReadable ? failure.message : FALLBACK;
+}

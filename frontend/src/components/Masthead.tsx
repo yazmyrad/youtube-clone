@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
-import { AccountIcon, Logo, MenuIcon, SearchIcon } from "./icons";
+import { AccountIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
 import { UserMenu } from "./UserMenu";
 
 export function Masthead({ onMenu }: { onMenu: () => void }) {
@@ -47,7 +47,17 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
         </button>
       </form>
 
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center gap-3">
+        {user && (
+          <Link
+            to="/upload"
+            aria-label="Create"
+            className="flex h-9 items-center gap-1 rounded-full bg-hover px-2 text-sm font-medium hover:bg-hover-strong sm:pr-4"
+          >
+            <PlusIcon />
+            <span className="hidden sm:inline">Create</span>
+          </Link>
+        )}
         {user && <UserMenu user={user} onLogout={logout} />}
         {!user && !isLoading && (
           <Link

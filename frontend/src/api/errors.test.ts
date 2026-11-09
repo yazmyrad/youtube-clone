@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { errorMessage } from "./errors";
+import { errorMessage, failureMessage } from "./errors";
+
+describe("failureMessage", () => {
+  it("shows an error written for the user", () => {
+    expect(failureMessage(new Error("Name taken"))).toBe("Name taken");
+  });
+
+  it.each([new TypeError("Failed to fetch"), "text", null])("hides %s", (failure) => {
+    expect(failureMessage(failure)).toBe(errorMessage(null));
+  });
+});
 
 describe("errorMessage", () => {
   it("returns a plain detail", () => {
