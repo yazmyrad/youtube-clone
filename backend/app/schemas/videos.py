@@ -14,6 +14,9 @@ Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100, pattern=_NO_NUL)
 ]
 Description = Annotated[str, StringConstraints(max_length=5000, pattern=_NO_NUL)]
+CommentBody = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000, pattern=_NO_NUL)
+]
 SearchText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=2, max_length=100, pattern=_NO_NUL)
 ]
@@ -112,6 +115,24 @@ class ReactionStateOut(BaseModel):
     my_reaction: ReactionType | None
     likes_count: int
     dislikes_count: int
+
+
+class CommentIn(StrictModel):
+    body: CommentBody
+
+
+class CommentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    body: str
+    created_at: datetime
+    author: ChannelBriefOut
+
+
+class CommentPage(BaseModel):
+    items: list[CommentOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
 
 
 class PresignedUploadOut(BaseModel):

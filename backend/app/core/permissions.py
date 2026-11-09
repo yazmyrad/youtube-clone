@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.core.db import get_session
 from app.core.errors import Conflict, Forbidden, NotFound, Unauthorized
-from app.models import User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
+from app.models import Comment, User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
 from app.models.video import LISTED
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
@@ -111,6 +111,23 @@ async def ensure_can_engage(session: AsyncSession, user: User | None, video: Vid
     await ensure_can_play(session, user, video)
     if video.status != VideoStatus.ready:
         raise Conflict("The video isn't ready yet")
+
+
+async def ensure_can_delete_comment(
+    session: AsyncSession, user: User, comment: Comment, video: Video
+) -> None:
+    """The author, the video's owner, moderators and admins, even on a hidden video so it
+    can still be cleaned up. A caller who can't see the video gets the same 404 as for a
+    comment that doesn't exist."""
+    if video.deleted_at is not None:
+        raise NotFound("Comment not found")
+    if user.id in (comment.author_id, video.owner_id):
+        return
+    if user.role in (UserRole.moderator, UserRole.admin):
+        return
+    if not await can_view(session, user, video):
+        raise NotFound("Comment not found")
+    raise Forbidden("You can't delete this comment")
 
 
 def listed_videos() -> TextClause:

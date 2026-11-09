@@ -107,6 +107,22 @@ async def _remove_reaction(ctx: Ctx) -> httpx.Response:
     return await ctx.api.delete(url, headers=ctx.headers)
 
 
+async def _read_comments(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_public_video(ctx)}/comments"
+    return await ctx.api.get(url, headers=ctx.headers)
+
+
+async def _write_comment(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_public_video(ctx)}/comments"
+    return await ctx.api.post(url, headers=ctx.headers, json={"body": "Nice"})
+
+
+async def _delete_others_comment(ctx: Ctx) -> httpx.Response:
+    url = f"/api/videos/{await _others_public_video(ctx)}/comments"
+    created = await ctx.api.post(url, headers=ctx.other.headers, json={"body": "Mine"})
+    return await ctx.api.delete(f"/api/comments/{created.json()['id']}", headers=ctx.headers)
+
+
 async def _browse_feed(ctx: Ctx) -> httpx.Response:
     return await ctx.api.get("/api/videos", headers=ctx.headers)
 
@@ -150,6 +166,9 @@ MATRIX: dict[str, tuple[Action, tuple[str | int, ...]]] = {
     ),
     "like, dislike": (_react, (NO_LOGIN, YES, YES, YES)),
     "remove a reaction": (_remove_reaction, (NO_LOGIN, YES, YES, YES)),
+    "read comments": (_read_comments, (YES, YES, YES, YES)),
+    "write a comment": (_write_comment, (NO_LOGIN, YES, YES, YES)),
+    "delete someone else's comment": (_delete_others_comment, (NO_LOGIN, NO, YES, YES)),
     "browse feed": (_browse_feed, (YES, YES, YES, YES)),
     "search": (_search, (YES, YES, YES, YES)),
     "list users": (_list_users, (NO_LOGIN, NO, NO, YES)),

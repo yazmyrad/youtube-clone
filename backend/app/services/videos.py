@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
-from app.core.pagination import decode_video_cursor, encode_video_cursor
+from app.core.pagination import decode_cursor, encode_cursor
 from app.core.permissions import (
     can_show_thumbnail,
     ensure_can_engage,
@@ -197,12 +197,12 @@ async def _listed_page(
         .limit(limit + 1)
     )
     if cursor:
-        query = query.where(tuple_(Video.published_at, Video.id) < decode_video_cursor(cursor))
+        query = query.where(tuple_(Video.published_at, Video.id) < decode_cursor(cursor))
     videos = list(await session.scalars(query))
     next_cursor = None
     if len(videos) > limit:
         videos = videos[:limit]
-        next_cursor = encode_video_cursor(videos[-1].published_at, videos[-1].id)
+        next_cursor = encode_cursor(videos[-1].published_at, videos[-1].id)
     cards = [
         VideoCard(
             id=video.id,
