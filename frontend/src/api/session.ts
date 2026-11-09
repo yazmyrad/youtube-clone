@@ -1,10 +1,13 @@
 /** The signed-in session. The access token lives only in this module's memory. */
 
 const LEASE_KEY = "auth.refresh.lease";
-/** Longer than a refresh can last, so a live holder never loses its lease. */
+/** How long a closed tab can block the others. A live holder keeps renewing its lease. */
 const LEASE_MS = 10_000;
-const REFRESH_TIMEOUT_MS = 8_000;
-const MAX_LEASE_WAIT_MS = 3 * LEASE_MS;
+const LEASE_RENEW_MS = 3_000;
+/** After nginx's own 60 s limit. Giving up first would lose a rotated cookie still on its
+ * way, and the next refresh would look like token theft and end the session. */
+const REFRESH_TIMEOUT_MS = 65_000;
+const MAX_LEASE_WAIT_MS = REFRESH_TIMEOUT_MS + LEASE_MS;
 /** Two tabs can write at once. The one whose write survives this pause holds the lease. */
 const SETTLE_MS = 60;
 const POLL_MS = 100;
@@ -93,8 +96,23 @@ export function createSession(deps: SessionDeps): Session {
         storage.setItem(LEASE_KEY, JSON.stringify({ id, expires: now() + LEASE_MS }));
         await sleep(SETTLE_MS);
         if (readLease(storage)?.id === id) {
+          const write = () => {
+            storage.setItem(LEASE_KEY, JSON.stringify({ id, expires: now() + LEASE_MS }));
+          };
+          const renewal = setInterval(() => {
+            try {
+              if (readLease(storage)?.id === id) write();
+            } catch {
+              // Storage went away. The lease just runs out.
+            }
+          }, LEASE_RENEW_MS);
           return () => {
-            if (readLease(storage)?.id === id) storage.removeItem(LEASE_KEY);
+            clearInterval(renewal);
+            try {
+              if (readLease(storage)?.id === id) storage.removeItem(LEASE_KEY);
+            } catch {
+              // As above.
+            }
           };
         }
       }
@@ -110,11 +128,14 @@ export function createSession(deps: SessionDeps): Session {
     const release = await acquireLease();
     if (!release) return null;
     let fresh: string | null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
     try {
-      fresh = await deps.refreshRequest(AbortSignal.timeout(REFRESH_TIMEOUT_MS));
+      fresh = await deps.refreshRequest(controller.signal);
     } catch {
       return null; // A temporary failure: the cookie is still good, so keep the session.
     } finally {
+      clearTimeout(timeout);
       release();
     }
     if (epoch !== startedAt) return token;

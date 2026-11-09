@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authMiddleware, createApi, requestRefresh } from "./client";
 import { createSession, type SessionDeps } from "./session";
@@ -156,6 +156,64 @@ describe("session refresh", () => {
     await refreshing;
 
     expect(session.getToken()).toBeNull();
+  });
+});
+
+describe("a slow refresh", () => {
+  beforeEach(() => void vi.useFakeTimers());
+  afterEach(() => void vi.useRealTimers());
+
+  function slowTab(storage: ReturnType<typeof memoryStorage>) {
+    const signals: AbortSignal[] = [];
+    let finish: (token: string) => void = () => {};
+    const session = createSession({
+      storage: () => storage,
+      refreshRequest: (signal) => {
+        signals.push(signal);
+        return new Promise<string>((resolve) => (finish = resolve));
+      },
+    });
+    return { session, signals, finish: (token: string) => finish(token) };
+  }
+
+  it("isn't abandoned before nginx answers, and keeps other tabs waiting", async () => {
+    const storage = memoryStorage();
+    const first = slowTab(storage);
+    const secondRequest = vi.fn(async () => "second");
+    const second = createSession({ storage: () => storage, refreshRequest: secondRequest });
+
+    const firstResult = first.session.refresh();
+    await vi.advanceTimersByTimeAsync(100);
+    const secondResult = second.refresh();
+    await vi.advanceTimersByTimeAsync(59_000);
+
+    expect(first.signals[0]?.aborted).toBe(false);
+    expect(secondRequest).not.toHaveBeenCalled();
+
+    first.finish("first");
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await expect(firstResult).resolves.toBe("first");
+    await expect(secondResult).resolves.toBe("second");
+  });
+
+  it("gives up after the timeout and keeps the session", async () => {
+    const storage = memoryStorage();
+    const session = createSession({
+      storage: () => storage,
+      refreshRequest: (signal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    });
+    session.setToken("still-good");
+
+    const result = session.refresh();
+    await vi.advanceTimersByTimeAsync(66_000);
+
+    await expect(result).resolves.toBeNull();
+    expect(session.getToken()).toBe("still-good");
+    expect(storage.items.size).toBe(0);
   });
 });
 
