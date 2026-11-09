@@ -1,10 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 
+import { useAuth } from "../hooks/useAuth";
 import { AccountIcon, Logo, MenuIcon, SearchIcon } from "./icons";
+import { UserMenu } from "./UserMenu";
 
 export function Masthead({ onMenu }: { onMenu: () => void }) {
   const { pathname, search } = useLocation();
   const next = encodeURIComponent(pathname + search);
+  const { user, isLoading, logout } = useAuth();
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between gap-4 bg-page px-4">
@@ -45,13 +48,16 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
       </form>
 
       <div className="flex shrink-0 items-center">
-        <Link
-          to={`/login?next=${next}`}
-          className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-medium text-accent hover:bg-accent-soft"
-        >
-          <AccountIcon />
-          Sign in
-        </Link>
+        {user && <UserMenu user={user} onLogout={() => void logout()} />}
+        {!user && !isLoading && (
+          <Link
+            to={`/login?next=${next}`}
+            className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-medium text-accent hover:bg-accent-soft"
+          >
+            <AccountIcon />
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   );
