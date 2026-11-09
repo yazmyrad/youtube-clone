@@ -4,6 +4,11 @@ location / {
     try_files $uri /index.html;
 }
 
+# The icon is /favicon.svg. Without this, the fallback would answer with the page.
+location = /favicon.ico {
+    return 404;
+}
+
 # Revalidated on every load, so a deploy reaches browsers at once.
 location = /index.html {
     root /usr/share/nginx/html;

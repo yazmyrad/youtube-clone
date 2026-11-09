@@ -11,6 +11,7 @@ COPY --from=frontend package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY --from=frontend index.html vite.config.ts tsconfig.json ./
 COPY --from=frontend src ./src
+COPY --from=frontend public ./public
 RUN npm run build
 
 FROM nginx-base

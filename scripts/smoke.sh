@@ -109,6 +109,9 @@ if body_has 'id="root"'; then pass "a deep link gets the SPA's page"; else fail 
 expect "an API miss isn't answered by the SPA" 404 "/api/does-not-exist"
 if body_has 'id="root"'; then fail "an API miss returned the SPA's page"; else pass "an API miss returned no page"; fi
 
+expect "/redoc isn't answered by the SPA" 404 "/redoc"
+expect "a path under /docs isn't answered by the SPA" 404 "/docs/x"
+
 # The dev stack serves the site from Vite, which has no CSP and answers any path itself.
 if [ -z "${SMOKE_DEV:-}" ]; then
     expect "D57 the SPA is served" 200 /
@@ -128,6 +131,8 @@ if [ -z "${SMOKE_DEV:-}" ]; then
     else
         fail "the page points at a built script"
     fi
+    expect "the site icon is served" 200 "/favicon.svg"
+    expect "/favicon.ico isn't answered by the SPA" 404 "/favicon.ico"
     expect "a missing asset is a real 404" 404 "/assets/does-not-exist.js"
     if body_has 'id="root"'; then fail "a missing asset returned the SPA's page"; else pass "a missing asset returned no page"; fi
 fi
