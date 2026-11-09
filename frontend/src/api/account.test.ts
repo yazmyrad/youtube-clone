@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { signOut } from "./account";
+import { registerAndSignIn, signOut } from "./account";
 import { createApi } from "./client";
 import { createSession } from "./session";
 
@@ -9,6 +9,50 @@ function signedIn() {
   session.setToken("token");
   return session;
 }
+
+describe("registerAndSignIn", () => {
+  const account = {
+    username: "ana",
+    email: "ana@example.com",
+    password: "correct horse",
+    display_name: "Ana",
+  };
+  const respond = (status: number, body: string) =>
+    vi.fn(
+      async () => new Response(body, { status, headers: { "Content-Type": "application/json" } }),
+    );
+
+  it("signs in with the new account's credentials", async () => {
+    const fetchFn = respond(201, '{"id":"1"}');
+    const login = vi.fn(async () => {});
+
+    await registerAndSignIn(createApi("http://test", fetchFn), account, login);
+
+    expect(login).toHaveBeenCalledWith({ email: account.email, password: account.password });
+  });
+
+  it("says the account exists when only the sign-in failed", async () => {
+    const fetchFn = respond(201, '{"id":"1"}');
+    const login = vi.fn(() => Promise.reject(new Error("Service unavailable")));
+
+    await expect(
+      registerAndSignIn(createApi("http://test", fetchFn), account, login),
+    ).rejects.toThrow("Your account was created");
+
+    expect(fetchFn).toHaveBeenCalledOnce();
+  });
+
+  it("shows the server's reason when registering failed, without signing in", async () => {
+    const fetchFn = respond(409, '{"detail":"Username is taken"}');
+    const login = vi.fn(async () => {});
+
+    await expect(
+      registerAndSignIn(createApi("http://test", fetchFn), account, login),
+    ).rejects.toThrow("Username is taken");
+
+    expect(login).not.toHaveBeenCalled();
+  });
+});
 
 describe("signOut", () => {
   it("ends the session once the server has revoked it", async () => {

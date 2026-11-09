@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
-import { signOut } from "../api/account";
+import { registerAndSignIn, signOut } from "../api/account";
 import { api, authApi, session } from "../api/client";
 import { errorMessage } from "../api/errors";
 import type { components } from "../api/schema";
@@ -58,13 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: data ?? null,
       isLoading: isPending,
       login,
-      async register(account) {
-        const { data: created, error } = await authApi.POST("/api/auth/register", {
-          body: account,
-        });
-        if (!created) throw new Error(errorMessage(error));
-        await login({ email: account.email, password: account.password });
-      },
+      register: (account) => registerAndSignIn(authApi, account, login),
       async logout() {
         await signOut(authApi, session);
         dropAccountData(queryClient);
