@@ -276,12 +276,54 @@ describe("authMiddleware", () => {
     expect(seen).toEqual([{ url: "/api/auth/login", authorization: null }]);
   });
 
-  it("doesn't refresh for a visitor with no token", async () => {
-    const { api, stats, seen } = setup(() => json(401));
+  it("tries one restore for a visitor with no session, and doesn't retry their 401s", async () => {
+    const refreshRequest = vi.fn(async () => null);
+    const session = world().tab(refreshRequest);
+    const fetchFn = vi.fn(async () => json(401));
+    const api = createApi("http://test", fetchFn);
+    api.use(authMiddleware(session, fetchFn));
 
+    await Promise.all([api.GET("/api/users/me"), api.GET("/api/users/me")]);
     await api.GET("/api/users/me");
 
-    expect(stats.calls).toBe(0);
-    expect(seen).toHaveLength(1);
+    expect(refreshRequest).toHaveBeenCalledOnce();
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("holds a page's first request until the session is restored", async () => {
+    let finishRestore: (token: string) => void = () => {};
+    const refreshRequest = vi.fn(
+      () => new Promise<string>((resolve) => (finishRestore = resolve)),
+    );
+    const session = world().tab(refreshRequest);
+    const authorizations: (string | null)[] = [];
+    const fetchFn = async (request: Request) => {
+      authorizations.push(request.headers.get("Authorization"));
+      return json(200);
+    };
+    const api = createApi("http://test", fetchFn);
+    api.use(authMiddleware(session, fetchFn));
+
+    const fetching = api.GET("/api/users/me");
+    await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalled());
+    expect(authorizations).toEqual([]);
+
+    finishRestore("restored");
+    await fetching;
+
+    expect(authorizations).toEqual(["Bearer restored"]);
+  });
+
+  it("doesn't wait for a restore on auth routes", async () => {
+    const refreshRequest = vi.fn(() => new Promise<string>(() => {}));
+    const session = world().tab(refreshRequest);
+    const fetchFn = vi.fn(async () => json(401));
+    const api = createApi("http://test", fetchFn);
+    api.use(authMiddleware(session, fetchFn));
+
+    await api.POST("/api/auth/login", { body: { email: "a@b.co", password: "wrong-pass" } });
+
+    expect(refreshRequest).not.toHaveBeenCalled();
+    expect(fetchFn).toHaveBeenCalledOnce();
   });
 });

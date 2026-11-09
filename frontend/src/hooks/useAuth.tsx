@@ -20,13 +20,8 @@ interface Auth {
 const ME_KEY = ["me"];
 const AuthContext = createContext<Auth | null>(null);
 
-// Once per page load, outside React: StrictMode runs effects twice, and a second refresh
-// from one page load must not happen.
-let restored: Promise<unknown> | undefined;
-const restoreSession = () => (restored ??= session.refresh());
-
 async function fetchMe(): Promise<Me | null> {
-  await restoreSession();
+  await session.restore();
   if (session.getToken() === null) return null;
   const { data, response } = await api.GET("/api/users/me");
   if (data) return data;

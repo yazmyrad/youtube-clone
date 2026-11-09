@@ -25,6 +25,8 @@ export interface Session {
   getToken: () => string | null;
   setToken: (token: string) => void;
   clear: () => void;
+  /** Brings back the session after a page load, once. Skipped if already signed in. */
+  restore: () => Promise<void>;
   /** Rotates the refresh cookie. Concurrent calls share one request. */
   refresh: () => Promise<string | null>;
   /** A token to replace `usedToken`, refreshing only if nobody has replaced it already. */
@@ -52,6 +54,7 @@ export function createSession(deps: SessionDeps): Session {
   const listeners = new Set<() => void>();
   let token: string | null = null;
   let inFlight: Promise<string | null> | null = null;
+  let restored: Promise<unknown> | null = null;
   // Bumped by login and logout, so a refresh that started earlier can't overwrite them.
   let epoch = 0;
 
@@ -122,6 +125,10 @@ export function createSession(deps: SessionDeps): Session {
     clear() {
       epoch += 1;
       token = null;
+    },
+    async restore() {
+      restored ??= token === null ? refresh() : Promise.resolve();
+      await restored;
     },
     refresh,
     replace: async (usedToken) => (token !== null && token !== usedToken ? token : refresh()),

@@ -22,9 +22,12 @@ export function authMiddleware(session: Session, fetchFn: FetchFn = browserFetch
   const sentTokens = new WeakMap<Request, string>();
 
   return {
-    onRequest({ request }) {
+    async onRequest({ request }) {
+      if (isAuthRoute(request)) return undefined;
+      // Otherwise a page's first requests go out anonymous and cache the anonymous answer.
+      await session.restore();
       const token = session.getToken();
-      if (token === null || isAuthRoute(request)) return undefined;
+      if (token === null) return undefined;
       request.headers.set("Authorization", `Bearer ${token}`);
       sentTokens.set(request, token);
       // Sending a request uses up its body, so the retry needs a copy made beforehand.
