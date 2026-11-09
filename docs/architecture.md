@@ -648,7 +648,7 @@ One step is one commit (Conventional Commits), running `ruff` and `pytest` befor
 | 7 | 19 | `feat:` channel page, subscriptions, subscriptions feed | D53 |
 | 7 | 20 | `feat:` playlists | D34 |
 | 7 | 21 | `feat:` view counts and watch history | D52 |
-| 8 | 22 | `feat:` reports, moderation API and UI, admin users | D35, D46, D55, D56 |
+| 8 | 22 | `feat:` reports, moderation API and UI, admin users. Note: a disabled user's videos also leave the feed and search, through a filter on `users.is_active` (no schema change), and return if the user is enabled again | D35, D46, D55, D56 |
 | 8 | 23 | `feat:` rate limits, headers, fixes from `security-auditor` | D58, D61–D63 |
 | 8 | 24 | `feat:` `--domain` HTTPS | |
 | 9 | 25 | `feat:` YouTube-like visual polish | |
