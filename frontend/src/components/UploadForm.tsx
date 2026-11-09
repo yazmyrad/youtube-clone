@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useBlocker } from "react-router-dom";
 
 import { api } from "../api/client";
 import { failureMessage } from "../api/errors";
@@ -26,6 +27,7 @@ const CONTROL =
 const PRIMARY =
   "h-10 rounded-full bg-accent px-6 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50";
 const SECONDARY = "h-10 rounded-full px-4 text-sm font-medium hover:bg-hover";
+const LEAVE_WARNING = "Leave this page? Your upload will be cancelled.";
 
 export function UploadForm({ onUploaded }: { onUploaded?: (video: OwnerVideo) => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -40,7 +42,8 @@ export function UploadForm({ onUploaded }: { onUploaded?: (video: OwnerVideo) =>
   const [unfinishedId, setUnfinishedId] = useState<string | null>(null);
   const running = useRef<AbortController | null>(null);
 
-  // Leaving the page cancels the upload: nothing here could confirm it afterwards.
+  // Leaving cancels the upload, since nothing here could confirm it afterwards. The guards
+  // below ask first.
   useEffect(() => () => running.current?.abort(), []);
 
   const busy = progress !== null;
@@ -50,6 +53,14 @@ export function UploadForm({ onUploaded }: { onUploaded?: (video: OwnerVideo) =>
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [busy]);
+
+  const sending = progress?.stage === "sending";
+  const blocker = useBlocker(sending);
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    if (window.confirm(LEAVE_WARNING)) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   function choose(chosen: File | undefined) {
     if (!chosen) return;
