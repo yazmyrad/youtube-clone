@@ -48,7 +48,7 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
       </form>
 
       <div className="flex shrink-0 items-center">
-        {user && <UserMenu user={user} onLogout={() => void logout()} />}
+        {user && <UserMenu user={user} onLogout={logout} />}
         {!user && !isLoading && (
           <Link
             to={`/login?next=${next}`}

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
+import { signOut } from "../api/account";
 import { api, authApi, session } from "../api/client";
 import { errorMessage } from "../api/errors";
 import type { components } from "../api/schema";
@@ -65,13 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await login({ email: account.email, password: account.password });
       },
       async logout() {
-        try {
-          await authApi.POST("/api/auth/logout");
-        } finally {
-          session.clear();
-          dropAccountData(queryClient);
-          queryClient.setQueryData(ME_KEY, null);
-        }
+        await signOut(authApi, session);
+        dropAccountData(queryClient);
+        queryClient.setQueryData(ME_KEY, null);
       },
     };
   }, [data, isPending, queryClient]);
