@@ -97,3 +97,9 @@ export const PlayIcon = () => (
     <path d="M8 5v14l11-7z" />
   </Icon>
 );
+
+export const FlagIcon = () => (
+  <Icon width="20" height="20">
+    <path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z" />
+  </Icon>
+);

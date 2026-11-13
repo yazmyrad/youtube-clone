@@ -1,8 +1,11 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Comments } from "../components/Comments";
+import { HiddenNotice } from "../components/HiddenNotice";
+import { HideButton } from "../components/HideButton";
 import { nextInPlaylist, PlaylistPanel } from "../components/PlaylistPanel";
 import { ReactionButtons } from "../components/ReactionButtons";
+import { ReportButton } from "../components/ReportButton";
 import { SaveButton } from "../components/SaveButton";
 import { SubscribeButton } from "../components/SubscribeButton";
 import { channelPath, formatSubscribers, watchPath } from "../components/format";
@@ -46,6 +49,11 @@ function ChannelRow({ video }: { video: VideoDetails }) {
   );
 }
 
+/** Ready and not hidden: what can be played, liked, saved, reported and commented on. */
+function playable(video: VideoDetails): boolean {
+  return video.status === "ready" && !video.hidden_at;
+}
+
 function Details({ video }: { video: VideoDetails }) {
   const published = video.published_at ?? video.created_at;
   return (
@@ -53,10 +61,12 @@ function Details({ video }: { video: VideoDetails }) {
       <h1 className="mt-3 text-xl font-semibold wrap-anywhere">{video.title}</h1>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <ChannelRow video={video} />
-        {video.status === "ready" && (
-          <div className="flex items-start gap-2">
+        {playable(video) && (
+          <div className="flex flex-wrap items-start gap-2">
             <ReactionButtons video={video} />
             <SaveButton videoId={video.id} />
+            <ReportButton videoId={video.id} owner={video.channel.username} />
+            <HideButton videoId={video.id} />
           </div>
         )}
       </div>
@@ -93,12 +103,13 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   const main = (
     <div className="min-w-0 flex-1">
       {video.isPending && <div className="aspect-video w-full rounded-xl bg-hover" />}
-      {message !== null && (
+      {video.data?.hidden_at && <HiddenNotice video={video.data} />}
+      {message !== null && !video.data?.hidden_at && (
         <div className="grid aspect-video w-full place-items-center rounded-xl bg-black p-6 text-center text-white">
           {message}
         </div>
       )}
-      {video.data?.status === "ready" && (
+      {video.data && playable(video.data) && (
         <VideoPlayer
           videoId={videoId}
           poster={video.data.thumbnail_url ?? undefined}
@@ -106,7 +117,7 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
         />
       )}
       {video.data && <Details video={video.data} />}
-      {video.data?.status === "ready" && <Comments video={video.data} />}
+      {video.data && playable(video.data) && <Comments video={video.data} />}
     </div>
   );
   if (!playlist) return <div className="mx-auto max-w-5xl px-4 py-6">{main}</div>;
