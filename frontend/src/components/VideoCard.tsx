@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 import type { components } from "../api/schema";
-import { formatAge, formatDuration, formatViews } from "./format";
+import { channelPath, formatAge, formatDuration, formatViews } from "./format";
 
 export type VideoCardData = components["schemas"]["VideoCardOut"];
 
@@ -9,6 +9,13 @@ interface CardProps {
   video: VideoCardData;
   /** Called when the image fails, usually because its signed URL expired. */
   onThumbnailError?: () => void;
+}
+
+interface GridCardProps extends CardProps {
+  /** Off on the channel's own page, where every card is from that channel. */
+  showChannel?: boolean;
+  /** A note under the meta line, such as "Private". */
+  badge?: string;
 }
 
 function Thumbnail({ video, onThumbnailError }: CardProps) {
@@ -47,8 +54,21 @@ function Meta({ video }: { video: VideoCardData }) {
   );
 }
 
+function ChannelLink({ video }: { video: VideoCardData }) {
+  return (
+    <Link to={channelPath(video.channel.username)} className="hover:text-ink">
+      {video.channel.display_name}
+    </Link>
+  );
+}
+
 /** A card in the home grid: thumbnail on top, then avatar, title and channel. */
-export function VideoGridCard({ video, onThumbnailError }: CardProps) {
+export function VideoGridCard({
+  video,
+  onThumbnailError,
+  showChannel = true,
+  badge,
+}: GridCardProps) {
   const href = `/watch?v=${video.id}`;
   return (
     <article>
@@ -56,15 +76,28 @@ export function VideoGridCard({ video, onThumbnailError }: CardProps) {
         <Thumbnail video={video} onThumbnailError={onThumbnailError} />
       </Link>
       <div className="mt-3 flex gap-3">
-        <Avatar name={video.channel.display_name} />
+        {showChannel && (
+          <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
+            <Avatar name={video.channel.display_name} />
+          </Link>
+        )}
         <div className="min-w-0">
           <h2 className="line-clamp-2 leading-snug font-medium">
             <Link to={href} title={video.title}>
               {video.title}
             </Link>
           </h2>
-          <p className="mt-1 truncate text-sm text-ink-muted">{video.channel.display_name}</p>
+          {showChannel && (
+            <p className="mt-1 truncate text-sm text-ink-muted">
+              <ChannelLink video={video} />
+            </p>
+          )}
           <Meta video={video} />
+          {badge && (
+            <p className="mt-1 inline-block rounded bg-hover px-1.5 text-xs font-medium text-ink-muted">
+              {badge}
+            </p>
+          )}
         </div>
       </div>
     </article>
@@ -87,8 +120,12 @@ export function VideoRowCard({ video, onThumbnailError }: CardProps) {
         </h2>
         <Meta video={video} />
         <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
-          <Avatar name={video.channel.display_name} />
-          <span className="truncate">{video.channel.display_name}</span>
+          <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
+            <Avatar name={video.channel.display_name} />
+          </Link>
+          <span className="truncate">
+            <ChannelLink video={video} />
+          </span>
         </p>
       </div>
     </article>

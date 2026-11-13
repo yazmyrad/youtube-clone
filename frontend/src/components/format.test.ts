@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatAge, formatDuration, formatViews } from "./format";
+import { channelPath, formatAge, formatDuration, formatSubscribers, formatViews } from "./format";
 
 describe("formatDuration", () => {
   it.each([
@@ -42,5 +42,21 @@ describe("formatAge", () => {
 
   it("does not go negative when the viewer's clock is behind", () => {
     expect(formatAge("2026-06-15T12:05:00Z", now)).toBe("just now");
+  });
+});
+
+describe("formatSubscribers", () => {
+  it.each([
+    [0, "0 subscribers"],
+    [1, "1 subscriber"],
+    [1234, "1.2K subscribers"],
+  ])("%d is %s", (count, text) => {
+    expect(formatSubscribers(count)).toBe(text);
+  });
+});
+
+describe("channelPath", () => {
+  it("puts an @ before the username", () => {
+    expect(channelPath("ana_dev")).toBe("/@ana_dev");
   });
 });

@@ -36,3 +36,13 @@ export function formatAge(iso: string, now: Date = new Date()): string {
   }
   return "just now";
 }
+
+export function formatSubscribers(count: number): string {
+  if (count === 1) return "1 subscriber";
+  return `${compact.format(count)} subscribers`;
+}
+
+/** A channel's page, YouTube style: "/@username". */
+export function channelPath(username: string): string {
+  return `/@${encodeURIComponent(username)}`;
+}

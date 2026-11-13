@@ -36,3 +36,18 @@ it("shows the title's markup as plain text", () => {
   expect(html).toContain("&lt;b&gt;Cats&lt;/b&gt;");
   expect(html).not.toContain("<b>Cats");
 });
+
+it.each([
+  ["grid", VideoGridCard],
+  ["row", VideoRowCard],
+])("the %s card links the channel name to the channel page", (_, Card) => {
+  expect(render(<Card video={video} />)).toContain('href="/@ana"');
+});
+
+it("leaves the channel out on the channel's own page, and shows a badge", () => {
+  const html = render(<VideoGridCard video={video} showChannel={false} badge="Private" />);
+
+  expect(html).not.toContain('href="/@ana"');
+  expect(html).not.toContain("Ana");
+  expect(html).toContain("Private");
+});

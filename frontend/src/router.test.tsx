@@ -39,3 +39,13 @@ it("opens the watch page for a video id", () => {
 it("has nothing to show on the watch page without a video id", () => {
   expect(render("/watch")).toContain("The link may be broken");
 });
+
+it("opens a channel page at /@username", () => {
+  const html = render("/@ana");
+
+  expect(html).not.toContain("The link may be broken");
+});
+
+it("has no channel page without the @", () => {
+  expect(render("/ana")).toContain("The link may be broken");
+});
