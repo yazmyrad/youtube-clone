@@ -96,6 +96,33 @@ async def test_concurrent_subscribes_count_once(
     assert await _stored_count(session, "alice") == await _recount(session, "alice") == 1
 
 
+async def test_concurrent_unsubscribes_count_once(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    await create_user("alice")
+    bob, carol = await create_user("bob"), await create_user("carol")
+    await _subscribe(api, bob, "alice")
+    await _subscribe(api, carol, "alice")
+
+    responses = await asyncio.gather(*(_unsubscribe(api, bob, "alice") for _ in range(5)))
+
+    assert all(response.status_code == 200 for response in responses)
+    assert await _stored_count(session, "alice") == await _recount(session, "alice") == 1
+
+
+async def test_mixed_concurrent_calls_keep_the_count_right(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    await create_user("alice")
+    bob = await create_user("bob")
+
+    calls = [_subscribe, _unsubscribe] * 5
+    await asyncio.gather(*(call(api, bob, "alice") for call in calls))
+
+    assert await _stored_count(session, "alice") == await _recount(session, "alice")
+    assert await _recount(session, "alice") in (0, 1)
+
+
 async def test_counts_many_subscribers(
     api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
 ) -> None:
