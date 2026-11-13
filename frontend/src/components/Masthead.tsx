@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 
 import { useAuth } from "../hooks/useAuth";
 import { MAX_QUERY } from "../hooks/useSearch";
-import { AccountIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
+import { AccountIcon, BackIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
 import { UserMenu } from "./UserMenu";
 
 export function Masthead({ onMenu }: { onMenu: () => void }) {
@@ -14,6 +14,8 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
   const [params] = useSearchParams();
   const current = pathname === "/results" ? (params.get("search_query") ?? "") : "";
   const [query, setQuery] = useState(current);
+  // Below the sm breakpoint the search box takes over the whole masthead, as on YouTube.
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Show the search that is on screen, also after Back and Forward.
   useEffect(() => setQuery(current), [current]);
@@ -21,7 +23,9 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     const text = query.trim();
-    if (text) navigate(`/results?search_query=${encodeURIComponent(text)}`);
+    if (!text) return;
+    setSearchOpen(false);
+    navigate(`/results?search_query=${encodeURIComponent(text)}`);
   }
 
   return (
@@ -44,8 +48,22 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
         role="search"
         action="/results"
         onSubmit={submitSearch}
-        className="hidden h-10 max-w-160 flex-1 sm:flex"
+        className={`h-10 max-w-160 flex-1 items-center sm:flex ${
+          searchOpen
+            ? "absolute inset-x-0 top-2 z-10 flex gap-2 bg-page px-4 sm:static sm:p-0"
+            : "hidden"
+        }`}
       >
+        {searchOpen && (
+          <button
+            type="button"
+            onClick={() => setSearchOpen(false)}
+            aria-label="Close search"
+            className="grid size-10 shrink-0 place-items-center rounded-full hover:bg-hover sm:hidden"
+          >
+            <BackIcon />
+          </button>
+        )}
         <input
           type="search"
           name="search_query"
@@ -54,18 +72,27 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
           maxLength={MAX_QUERY}
           placeholder="Search"
           aria-label="Search"
-          className="min-w-0 flex-1 rounded-l-full border border-line px-4 outline-none focus:border-accent"
+          autoFocus={searchOpen}
+          className="h-full min-w-0 flex-1 rounded-l-full border border-line px-4 outline-none focus:border-accent"
         />
         <button
           type="submit"
           aria-label="Search"
-          className="grid w-16 place-items-center rounded-r-full border border-l-0 border-line bg-hover hover:bg-hover-strong"
+          className="grid h-full w-16 place-items-center rounded-r-full border border-l-0 border-line bg-hover hover:bg-hover-strong"
         >
           <SearchIcon />
         </button>
       </form>
 
       <div className="flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Open search"
+          className="grid size-10 place-items-center rounded-full hover:bg-hover sm:hidden"
+        >
+          <SearchIcon />
+        </button>
         {user && (
           <Link
             to="/upload"

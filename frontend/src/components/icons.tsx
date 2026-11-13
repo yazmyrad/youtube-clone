@@ -20,6 +20,12 @@ export const SearchIcon = () => (
   </Icon>
 );
 
+export const BackIcon = () => (
+  <Icon>
+    <path d="M21 11H6.8l5.6-5.6L11 4l-8 8 8 8 1.4-1.4L6.8 13H21z" />
+  </Icon>
+);
+
 export const HomeIcon = () => (
   <Icon>
     <path d="M12 3 3 10.5V21h6v-6h6v6h6V10.5z" />

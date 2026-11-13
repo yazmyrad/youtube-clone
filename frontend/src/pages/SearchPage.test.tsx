@@ -129,3 +129,22 @@ it("reports a failed search", async () => {
   await shows("Couldn't search right now");
   expect(container.querySelector('[role="alert"]')).not.toBeNull();
 });
+
+it("opens a full-width search on phones and closes it after searching", async () => {
+  get.mockResolvedValue({ data: { items: [], next_cursor: null } });
+  await render("/");
+  const form = () => input().form!;
+  const button = (label: string) =>
+    container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+
+  // Below sm the form is hidden until the search button opens it.
+  expect(form().className).toMatch(/(^|\s)hidden(\s|$)/);
+  await act(async () => button("Open search")!.click());
+  expect(form().className).not.toMatch(/(^|\s)hidden(\s|$)/);
+  expect(button("Close search")).not.toBeNull();
+
+  await search("cats");
+
+  expect(location).toBe("/results?search_query=cats");
+  expect(form().className).toMatch(/(^|\s)hidden(\s|$)/);
+});
