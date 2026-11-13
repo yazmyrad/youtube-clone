@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
+import { useViewHeartbeat } from "../hooks/useViewHeartbeat";
 import {
   PlaybackUnavailable,
   createHlsErrorHandler,
@@ -117,6 +118,7 @@ export function VideoPlayer({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failure, setFailure] = useState<PlayerFailure | null>(null);
+  useViewHeartbeat(videoRef, videoId);
 
   useEffect(() => {
     const video = videoRef.current;
