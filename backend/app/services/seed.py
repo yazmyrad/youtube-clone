@@ -7,6 +7,7 @@ They move the counters through `adjust_counters` in the same transaction, so cou
 rows. All names are made up; none belongs to a real creator.
 """
 
+import contextlib
 import random
 import secrets
 import uuid
@@ -15,11 +16,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
-from app.models import Comment, ReactionType, User, UserRole, VideoReaction, VideoVisibility
+from app.core.config import get_settings
+from app.models import (
+    Comment,
+    ReactionType,
+    User,
+    UserRole,
+    Video,
+    VideoReaction,
+    VideoVisibility,
+)
 from app.schemas.videos import VideoCreateIn
 from app.services import storage, videos
 from app.services.media import TitleCard
@@ -233,6 +243,21 @@ async def seed(
         raise PartiallySeeded(f"Some demo accounts already exist: {', '.join(sorted(existing))}")
 
     credentials, users = await _create_accounts(session, accounts)
+    # Read now: after the rollback below, the objects are expired and can't load lazily.
+    user_ids = [user.id for user in users.values()]
+    try:
+        await _add_videos(session, users, make_clip, workdir)
+    except BaseException:
+        # The passwords die with this run, so its accounts must too: otherwise a rerun would
+        # find them, do nothing, and leave demo accounts nobody can log in to.
+        await _undo(session, user_ids)
+        raise
+    return credentials
+
+
+async def _add_videos(
+    session: AsyncSession, users: dict[str, User], make_clip: ClipMaker, workdir: Path
+) -> None:
     viewers = [users[v.username] for v in VIEWERS]
     now = datetime.now(UTC)
     rng = random.Random(0)  # noqa: S311 - demo data, not security; fixed for repeatability
@@ -251,7 +276,23 @@ async def seed(
             video_id = await _add_video(session, owner, demo, card, now, make_clip, workdir)
             await _engage(session, rng, viewers, video_id, demo.days_ago, now)
             index += 1
-    return credentials
+
+
+async def _undo(session: AsyncSession, user_ids: list[uuid.UUID]) -> None:
+    """Removes a failed run's accounts, their videos and stored files. Deleting a video
+    cascades to its job, reactions and comments; a worker already on its job loses the fence."""
+    await session.rollback()
+    video_ids = list(await session.scalars(select(Video.id).where(Video.owner_id.in_(user_ids))))
+    await session.execute(delete(Video).where(Video.owner_id.in_(user_ids)))
+    await session.execute(delete(User).where(User.id.in_(user_ids)))
+    await session.commit()
+    settings = get_settings()
+    for video_id in video_ids:
+        # Best effort: a leftover object costs disk space, never correctness.
+        with contextlib.suppress(Exception):
+            await storage.delete_object(settings.uploads_bucket, storage.raw_key(video_id))
+            await storage.delete_prefix(settings.media_bucket, storage.hls_prefix(video_id))
+            await storage.delete_object(settings.media_bucket, storage.thumbnail_key(video_id))
 
 
 async def _create_accounts(

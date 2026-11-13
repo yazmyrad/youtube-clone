@@ -7,6 +7,7 @@ import math
 import os
 import subprocess
 import tempfile
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -282,6 +283,9 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
 # Demo clips. Installed with ffmpeg on Debian and Ubuntu, through fontconfig's dependencies.
 FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
 TITLE_CARD_TIMEOUT_SECONDS = 120
+# DejaVu Sans Bold at 72 px averages about 45 px a character; 1280 px less the margins.
+TITLE_LINE_CHARS = 24
+TITLE_LINE_HEIGHT = 92
 
 
 @dataclass(frozen=True)
@@ -294,29 +298,44 @@ class TitleCard:
     seconds: int
 
 
+def _title_lines(title: str) -> list[str]:
+    """Breaks a title so each line fits the frame at the title's font size."""
+    return textwrap.wrap(title, TITLE_LINE_CHARS) or [""]
+
+
 async def render_title_card(card: TitleCard, path: Path) -> None:
     """Writes a 720p H.264/AAC clip: the title on a solid color, the channel and a topic tag.
 
-    Text goes through files, so no title can break out of the filter syntax."""
-    texts = {"title": card.title, "channel": card.channel, "tag": card.tag}
-    for name, value in texts.items():
-        path.with_suffix(f".{name}.txt").write_text(value)
+    Text goes through files with expansion off, so no title can break out of the filter
+    syntax or run drawtext's %{...} functions."""
+    lines = _title_lines(card.title)
+    texts = {f"title{i}": line for i, line in enumerate(lines)}
+    texts |= {"channel": card.channel, "tag": card.tag}
     bold, regular, mono = (
         FONT_DIR / f"DejaVu{face}.ttf" for face in ("Sans-Bold", "Sans", "SansMono-Bold")
     )
 
     def text(name: str, font: Path, style: str) -> str:
-        return f"drawtext=fontfile={font}:textfile={path.with_suffix(f'.{name}.txt')}:{style}"
+        file = path.with_suffix(f".{name}.txt")
+        return f"drawtext=fontfile={font}:textfile={file}:expansion=none:{style}"
 
+    # One drawtext per line, each centered: this ffmpeg can't center lines within a block.
+    top = (720 - len(lines) * TITLE_LINE_HEIGHT) // 2
+    titles = [
+        text(name, bold, f"fontcolor=white:fontsize=72:x=(w-tw)/2:y={top + i * TITLE_LINE_HEIGHT}")
+        for i, name in enumerate(n for n in texts if n.startswith("title"))
+    ]
     video = ",".join(
         (
-            text("title", bold, "fontcolor=white:fontsize=72:x=(w-tw)/2:y=(h-th)/2"),
+            *titles,
             text("channel", regular, "fontcolor=white@0.85:fontsize=36:x=64:y=h-100"),
             text("tag", mono, "fontcolor=white@0.7:fontsize=32:x=64:y=64"),
         )
     )
     seconds = str(card.seconds)
     try:
+        for name, value in texts.items():
+            path.with_suffix(f".{name}.txt").write_text(value, encoding="utf-8")
         await _run(
             [
                 "ffmpeg", "-nostdin", "-v", "error", "-y",

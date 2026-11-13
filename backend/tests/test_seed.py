@@ -186,3 +186,36 @@ async def test_the_title_card_is_a_video_the_worker_accepts(tmp_path: Path) -> N
     assert info.has_audio
     assert 1.5 < info.duration < 3
     assert _files(tmp_path) == ["card.mp4"]
+
+
+async def test_a_failed_run_leaves_nothing_so_the_next_run_starts_over(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    calls = 0
+
+    async def failing_clip(card: TitleCard, path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise RuntimeError("ffmpeg crashed")
+        await fake_clip(card, path)
+
+    with pytest.raises(RuntimeError, match="ffmpeg crashed"):
+        await seed.seed(session, failing_clip, tmp_path)
+
+    assert await session.scalar(select(func.count()).select_from(User)) == 0
+    assert await session.scalar(select(func.count()).select_from(Video)) == 0
+    assert storage.get_client().list_objects_v2(Bucket=TEST_BUCKET).get("KeyCount") == 0
+
+    credentials = await run_seed(session, tmp_path)
+
+    assert credentials is not None
+    assert await session.scalar(select(func.count()).select_from(Video)) == len(ALL_VIDEOS)
+
+
+def test_every_demo_title_fits_the_frame() -> None:
+    for demo in ALL_VIDEOS:
+        lines = media._title_lines(demo.title)
+        assert " ".join(lines) == demo.title
+        assert all(len(line) <= media.TITLE_LINE_CHARS for line in lines), demo.title
+        assert len(lines) <= 3, demo.title
