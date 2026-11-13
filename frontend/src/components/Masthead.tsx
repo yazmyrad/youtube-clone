@@ -1,6 +1,8 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
+import { MAX_QUERY } from "../hooks/useSearch";
 import { AccountIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
 import { UserMenu } from "./UserMenu";
 
@@ -8,6 +10,19 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
   const { pathname, search } = useLocation();
   const next = encodeURIComponent(pathname + search);
   const { user, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const current = pathname === "/results" ? (params.get("search_query") ?? "") : "";
+  const [query, setQuery] = useState(current);
+
+  // Show the search that is on screen, also after Back and Forward.
+  useEffect(() => setQuery(current), [current]);
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    const text = query.trim();
+    if (text) navigate(`/results?search_query=${encodeURIComponent(text)}`);
+  }
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between gap-4 bg-page px-4">
@@ -25,15 +40,18 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
         </Link>
       </div>
 
-      {/* Search results arrive in step 17. */}
       <form
         role="search"
-        onSubmit={(event) => event.preventDefault()}
+        action="/results"
+        onSubmit={submitSearch}
         className="hidden h-10 max-w-160 flex-1 sm:flex"
       >
         <input
           type="search"
           name="search_query"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          maxLength={MAX_QUERY}
           placeholder="Search"
           aria-label="Search"
           className="min-w-0 flex-1 rounded-l-full border border-line px-4 outline-none focus:border-accent"
