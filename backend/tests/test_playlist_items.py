@@ -316,3 +316,32 @@ async def test_my_playlists_say_which_hold_the_video(
 
 async def test_my_playlists_need_sign_in(api: httpx.AsyncClient) -> None:
     assert (await api.get("/api/users/me/playlists")).status_code == 401
+
+
+@pytest.mark.parametrize("state", ["processing", "hidden"])
+async def test_your_own_unplayable_video_cant_be_added(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, state: str
+) -> None:
+    """It would take a slot and never show."""
+    alice = await create_user("alice")
+    video = await create_ready_video(api, session, alice, **NOT_LISTED[state])
+    playlist = await _create(api, alice)
+
+    response = await _add(api, alice, playlist, video)
+
+    assert response.status_code == {"processing": 409, "hidden": 404}[state]
+    assert await _positions(session, playlist) == []
+
+
+async def test_a_moderator_cant_add_a_hidden_video(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+) -> None:
+    carol, mod = await create_user("carol"), await create_user("mod")
+    await set_role(mod, UserRole.moderator)
+    video = await create_ready_video(api, session, carol, **NOT_LISTED["hidden"])
+    playlist = await _create(api, mod)
+
+    assert (await _add(api, mod, playlist, video)).status_code == 404

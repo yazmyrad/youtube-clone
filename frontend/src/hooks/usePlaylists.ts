@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { api } from "../api/client";
 import type { Api } from "../api/client";
@@ -100,6 +101,9 @@ export function usePlaylistItems(playlistId: string) {
         predicate: (query) => query.queryKey[1] !== "one",
       });
     },
+    // A 409 means the list on screen is stale: show the current one, so a retry can work.
+    onError: () =>
+      queryClient.invalidateQueries({ queryKey: playlistKey(playlistId, user?.username ?? null) }),
   });
 }
 
@@ -112,10 +116,13 @@ export function useDeletePlaylist(playlistId: string) {
       });
       if (!response.ok) throw new Error(errorMessage(error));
     },
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: [PLAYLISTS_KEY, "one", playlistId] });
-      void queryClient.invalidateQueries({ queryKey: [PLAYLISTS_KEY] });
-    },
+    // Not the playlist itself: the page still shows it until it navigates away, and a
+    // refetch would flash a not-found page. Its entry is dropped once nobody watches it.
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: [PLAYLISTS_KEY],
+        predicate: (query) => query.queryKey[1] !== "one",
+      }),
   });
 }
 
@@ -158,18 +165,23 @@ export async function setSaved(
   return data;
 }
 
-/** A new playlist that starts with the video in it. */
+/** A new playlist that starts with the video in it. `created` holds the playlist once it
+ * exists, so a retry after the add failed doesn't create a second one. */
 export async function createWithVideo(
   client: Api,
   title: string,
   visibility: Visibility,
   videoId: string,
+  created: { id: string | null },
 ): Promise<Playlist> {
-  const { data, error } = await client.POST("/api/playlists", {
-    body: { title, visibility, description: "" },
-  });
-  if (!data) throw new Error(errorMessage(error));
-  return setSaved(client, data.id, videoId, true);
+  if (created.id === null) {
+    const { data, error } = await client.POST("/api/playlists", {
+      body: { title, visibility, description: "" },
+    });
+    if (!data) throw new Error(errorMessage(error));
+    created.id = data.id;
+  }
+  return setSaved(client, created.id, videoId, true);
 }
 
 export function useSaveToPlaylist(videoId: string) {
@@ -180,9 +192,10 @@ export function useSaveToPlaylist(videoId: string) {
       setSaved(api, playlistId, videoId, saved),
     onSettled: refresh,
   });
+  const created = useRef<{ id: string | null }>({ id: null });
   const create = useMutation({
     mutationFn: ({ title, visibility }: { title: string; visibility: Visibility }) =>
-      createWithVideo(api, title, visibility, videoId),
+      createWithVideo(api, title, visibility, videoId, created.current),
     onSettled: refresh,
   });
   return { toggle, create };

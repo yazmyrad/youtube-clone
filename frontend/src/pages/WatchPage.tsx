@@ -8,6 +8,7 @@ import { SubscribeButton } from "../components/SubscribeButton";
 import { channelPath, formatSubscribers, watchPath } from "../components/format";
 import { useChannel } from "../hooks/useChannel";
 import { usePlaylist } from "../hooks/usePlaylists";
+import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { statusMessage, useVideo, VideoNotFound, type VideoDetails } from "../hooks/useVideo";
 import { NotFoundPage } from "./NotFoundPage";
@@ -73,7 +74,9 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   const video = useVideo(videoId);
   const navigate = useNavigate();
   // A playlist the caller can't see, or a broken link, just plays the video alone.
-  const playlist = usePlaylist(playlistId).data ?? null;
+  const playlistQuery = usePlaylist(playlistId);
+  const playlist = playlistQuery.data ?? null;
+  const renewPlaylist = useRenewThumbnails(playlistQuery);
   const next = playlist ? nextInPlaylist(playlist, videoId) : null;
   const playNext = next && playlist ? () => void navigate(watchPath(next, playlist.id)) : undefined;
 
@@ -110,7 +113,7 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start">
       {main}
-      <PlaylistPanel playlist={playlist} videoId={videoId} />
+      <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
     </div>
   );
 }

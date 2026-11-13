@@ -24,10 +24,11 @@ function Header({ playlist, own }: { playlist: Playlist; own: boolean }) {
   const remove = useDeletePlaylist(playlist.id);
   const first = playlist.items[0];
 
-  async function deletePlaylist() {
+  function deletePlaylist() {
     if (!window.confirm(`Delete "${playlist.title}"? Its videos stay.`)) return;
-    await remove.mutateAsync();
-    void navigate(`${channelPath(playlist.channel.username)}/playlists`);
+    remove.mutate(undefined, {
+      onSuccess: () => void navigate(`${channelPath(playlist.channel.username)}/playlists`),
+    });
   }
 
   return (
@@ -63,7 +64,7 @@ function Header({ playlist, own }: { playlist: Playlist; own: boolean }) {
         {own && (
           <button
             type="button"
-            onClick={() => void deletePlaylist()}
+            onClick={deletePlaylist}
             disabled={remove.isPending}
             className="h-9 rounded-full bg-page px-4 text-sm font-medium hover:bg-hover-strong"
           >

@@ -14,7 +14,7 @@ from app.core.errors import Conflict, NotFound
 from app.core.pagination import decode_cursor, encode_cursor
 from app.core.permissions import (
     channel_playlists,
-    ensure_can_view,
+    ensure_can_engage,
     ensure_can_view_playlist,
     ensure_playlist_owner,
     playable_videos,
@@ -50,8 +50,9 @@ class PlaylistDetails(PlaylistSummary):
 async def _get(session: AsyncSession, playlist_id: uuid.UUID, *, lock: bool = False) -> Playlist:
     query = select(Playlist).options(joinedload(Playlist.owner, innerjoin=True))
     if lock:
-        # Only the playlist row: one owner's concurrent edits take turns.
-        query = query.with_for_update(of=Playlist)
+        # Only the playlist row: one owner's concurrent edits take turns. Refreshes a copy
+        # already loaded, which may predate the lock.
+        query = query.with_for_update(of=Playlist).execution_options(populate_existing=True)
     playlist = await session.scalar(query.where(Playlist.id == playlist_id))
     if playlist is None:
         raise NotFound("Playlist not found")
@@ -61,9 +62,9 @@ async def _get(session: AsyncSession, playlist_id: uuid.UUID, *, lock: bool = Fa
 async def get_owned_for_update(
     session: AsyncSession, user: User, playlist_id: uuid.UUID
 ) -> Playlist:
-    playlist = await _get(session, playlist_id, lock=True)
-    ensure_playlist_owner(user, playlist)
-    return playlist
+    """Checks ownership before locking, so nobody else can hold up the owner's playlist."""
+    ensure_playlist_owner(user, await _get(session, playlist_id))
+    return await _get(session, playlist_id, lock=True)
 
 
 async def _summaries(
@@ -261,7 +262,9 @@ async def add_item(
     video = await session.get(Video, video_id)
     if video is None:
         raise NotFound("Video not found")
-    await ensure_can_view(session, user, video)
+    # What a playlist can show: a video that isn't ready or is hidden would take a slot and
+    # never appear.
+    await ensure_can_engage(session, user, video)
     if await session.get(PlaylistItem, (playlist.id, video.id)) is None:
         count = await session.scalar(
             select(func.count())

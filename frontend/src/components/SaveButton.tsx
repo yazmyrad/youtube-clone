@@ -12,14 +12,13 @@ function NewPlaylist({ videoId, onDone }: { videoId: string; onDone: () => void 
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("private");
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    await create.mutateAsync({ title: title.trim(), visibility });
-    onDone();
+    create.mutate({ title: title.trim(), visibility }, { onSuccess: onDone });
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="space-y-3 px-4 pb-4">
+    <form onSubmit={submit} className="space-y-3 px-4 pb-4">
       <label className="block text-sm">
         <span className="text-ink-muted">Title</span>
         <input

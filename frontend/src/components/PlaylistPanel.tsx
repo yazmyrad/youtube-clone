@@ -11,7 +11,16 @@ export function nextInPlaylist(playlist: Playlist, videoId: string): string | nu
 }
 
 /** The list beside the player while watching a playlist, as on YouTube. */
-export function PlaylistPanel({ playlist, videoId }: { playlist: Playlist; videoId: string }) {
+export function PlaylistPanel({
+  playlist,
+  videoId,
+  onThumbnailError,
+}: {
+  playlist: Playlist;
+  videoId: string;
+  /** Called when an image fails, usually because its signed URL expired. */
+  onThumbnailError?: () => void;
+}) {
   const index = playlist.items.findIndex((video) => video.id === videoId);
   return (
     <section
@@ -47,6 +56,7 @@ export function PlaylistPanel({ playlist, videoId }: { playlist: Playlist; video
                     src={video.thumbnail_url}
                     alt=""
                     loading="lazy"
+                    onError={onThumbnailError}
                     className="size-full object-cover"
                   />
                   <span className="absolute right-0.5 bottom-0.5 rounded bg-black/80 px-0.5 text-[10px] font-medium text-white">
