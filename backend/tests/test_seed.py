@@ -13,6 +13,7 @@ from app.models import (
     Comment,
     ProcessingJob,
     ReactionType,
+    Subscription,
     User,
     UserRole,
     Video,
@@ -219,3 +220,25 @@ def test_every_demo_title_fits_the_frame() -> None:
         assert " ".join(lines) == demo.title
         assert all(len(line) <= media.TITLE_LINE_CHARS for line in lines), demo.title
         assert len(lines) <= 3, demo.title
+
+
+async def test_viewers_subscribe_and_the_counts_match(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    await run_seed(session, tmp_path)
+
+    for channel in seed.CHANNELS:
+        user = await session.scalar(select(User).where(User.username == channel.username))
+        assert user is not None
+        recount = await session.scalar(
+            select(func.count()).select_from(Subscription).where(Subscription.channel_id == user.id)
+        )
+        assert user.subscribers_count == recount == len(seed.VIEWERS) - 1, channel.username
+    for viewer in seed.VIEWERS:
+        follows = await session.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .join(User, User.id == Subscription.subscriber_id)
+            .where(User.username == viewer.username)
+        )
+        assert follows == len(seed.CHANNELS) - 1, viewer.username

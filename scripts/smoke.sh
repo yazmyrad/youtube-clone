@@ -29,7 +29,7 @@ cleanup() {
             true' "$id" 2>/dev/null
     done
     "${compose[@]}" exec -T postgres sh -c \
-        'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM videos WHERE owner_id IN (SELECT id FROM users WHERE username = '"'"'$0'"'"'); DELETE FROM users WHERE username = '"'"'$0'"'"'"' \
+        'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM videos WHERE owner_id IN (SELECT id FROM users WHERE username = '"'"'$0'"'"'); DELETE FROM users WHERE username IN ('"'"'$0'"'"', '"'"'${0}f'"'"')"' \
         "$name" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -219,8 +219,8 @@ for page in / "/results?search_query=$name"; do
     body_has 'id="root"' && pass "D02 $page is the SPA" || fail "D02 $page isn't the SPA"
 done
 
-listed() { # path; prints the listed video ids, one per line
-    expect "$2" 200 "$1"
+listed() { # path, description, extra curl arguments...; prints the listed ids, one per line
+    expect "$2" 200 "$1" "${@:3}"
     json '"\n".join(v["id"] for v in d["items"])' < "$work/body" > "$work/listed"
 }
 listed "/api/videos?limit=50" "D02 the home feed, anonymously"
@@ -234,6 +234,39 @@ thumb_url="$(json 'next(v["thumbnail_url"] for v in d["items"] if v["id"] == "'"
 listed "/api/search/videos?q=$name" "D02 search by part of the title, anonymously"
 [ "$(cat "$work/listed")" = "$id_a" ] && pass "D02 search finds only the public video" \
     || fail "D02 search found: $(tr '\n' ' ' < "$work/listed")"
+
+# --- Channel page and subscriptions (D53) ----------------------------------
+
+expect "the channel page is served" 200 "/@$name"
+body_has 'id="root"' && pass "the channel page is the SPA" || fail "the channel page isn't the SPA"
+listed "/api/channels/$name/videos" "the channel's videos, anonymously"
+[ "$(cat "$work/listed")" = "$id_a" ] && pass "D33 the channel lists only the public video" \
+    || fail "D33 the channel listed: $(tr '\n' ' ' < "$work/listed")"
+
+fan="${name}f"
+curl -fsS --max-time 20 -o /dev/null "${json_type[@]}" -d "{\"username\":\"$fan\",\"email\":\"$fan@example.com\",\"password\":\"correct horse battery\",\"display_name\":\"Fan\"}" \
+    "$base/api/auth/register" || die "could not register a second user"
+curl -fsS --max-time 20 -o "$work/login" "${json_type[@]}" \
+    -d "{\"email\":\"$fan@example.com\",\"password\":\"correct horse battery\"}" \
+    "$base/api/auth/login" || die "could not log in as the second user"
+fan_auth=(-H "Authorization: Bearer $(json 'd["access_token"]' < "$work/login")")
+
+subscription="/api/channels/$name/subscription"
+expect "D53 subscribing to yourself is refused" 403 "$subscription" -X PUT "${auth[@]}"
+expect "D53 subscribe" 200 "$subscription" -X PUT "${fan_auth[@]}"
+expect "D53 subscribe again" 200 "$subscription" -X PUT "${fan_auth[@]}"
+expect "D53 the channel after subscribing twice" 200 "/api/channels/$name" "${fan_auth[@]}"
+state="$(json '(d["subscribers_count"], d["is_subscribed"])' < "$work/body")"
+[ "$state" = "(1, True)" ] && pass "D53 subscribing twice counts once" || fail "D53 the channel shows $state"
+
+listed "/api/feed/subscriptions" "the subscriptions feed" "${fan_auth[@]}"
+[ "$(cat "$work/listed")" = "$id_a" ] && pass "D33 the subscriptions feed has only the public video" \
+    || fail "D33 the subscriptions feed has: $(tr '\n' ' ' < "$work/listed")"
+expect "the subscriptions page is served" 200 "/feed/subscriptions"
+
+expect "unsubscribe" 200 "$subscription" -X DELETE "${fan_auth[@]}"
+state="$(json '(d["subscribers_count"], d["is_subscribed"])' < "$work/body")"
+[ "$state" = "(0, False)" ] && pass "unsubscribing counts down" || fail "after unsubscribing: $state"
 
 if [ -n "$thumb_url" ]; then
     expect "D02 the home card's thumbnail loads" 200 "$thumb_url"

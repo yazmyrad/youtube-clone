@@ -68,7 +68,7 @@ async def list_channel_videos(
     return await videos.list_channel_videos(session, viewer, channel, cursor=cursor, limit=limit)
 
 
-async def _adjust_subscribers(session: AsyncSession, channel_id: uuid.UUID, delta: int) -> int:
+async def adjust_subscribers(session: AsyncSession, channel_id: uuid.UUID, delta: int) -> int:
     """Atomic, in the caller's transaction. Keeps `updated_at`: a new subscriber isn't an
     edit of the profile."""
     count = await session.scalar(
@@ -97,7 +97,7 @@ async def subscribe(session: AsyncSession, user: User, username: str) -> Subscri
         .returning(Subscription.channel_id)
     )
     if inserted is not None:
-        count = await _adjust_subscribers(session, channel.id, 1)
+        count = await adjust_subscribers(session, channel.id, 1)
     else:
         count = await _current_count(session, channel.id)
     await session.commit()
@@ -113,7 +113,7 @@ async def unsubscribe(session: AsyncSession, user: User, username: str) -> Subsc
         .returning(Subscription.channel_id)
     )
     if deleted is not None:
-        count = await _adjust_subscribers(session, channel.id, -1)
+        count = await adjust_subscribers(session, channel.id, -1)
     else:
         count = await _current_count(session, channel.id)
     await session.commit()

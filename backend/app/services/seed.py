@@ -24,6 +24,7 @@ from app.core.config import get_settings
 from app.models import (
     Comment,
     ReactionType,
+    Subscription,
     User,
     UserRole,
     Video,
@@ -31,6 +32,7 @@ from app.models import (
     VideoVisibility,
 )
 from app.schemas.videos import VideoCreateIn
+from app.services import channels as channels_service
 from app.services import storage, videos
 from app.services.media import TitleCard
 
@@ -247,6 +249,7 @@ async def seed(
     user_ids = [user.id for user in users.values()]
     try:
         await _add_videos(session, users, make_clip, workdir)
+        await _subscribe_viewers(session, users)
     except BaseException:
         # The passwords die with this run, so its accounts must too: otherwise a rerun would
         # find them, do nothing, and leave demo accounts nobody can log in to.
@@ -276,6 +279,22 @@ async def _add_videos(
             video_id = await _add_video(session, owner, demo, card, now, make_clip, workdir)
             await _engage(session, rng, viewers, video_id, demo.days_ago, now)
             index += 1
+
+
+async def _subscribe_viewers(session: AsyncSession, users: dict[str, User]) -> None:
+    """Each viewer follows all channels but one, a different one each, so every channel has
+    subscribers and every viewer's subscriptions feed differs."""
+    for i, viewer in enumerate(VIEWERS):
+        for j, channel in enumerate(CHANNELS):
+            if (i + j) % len(CHANNELS) == len(CHANNELS) - 1:
+                continue
+            channel_id = users[channel.username].id
+            session.add(
+                Subscription(subscriber_id=users[viewer.username].id, channel_id=channel_id)
+            )
+            await session.flush()
+            await channels_service.adjust_subscribers(session, channel_id, 1)
+    await session.commit()
 
 
 async def _undo(session: AsyncSession, user_ids: list[uuid.UUID]) -> None:
