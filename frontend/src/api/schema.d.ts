@@ -126,6 +126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{username}/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A channel's playlists, newest first; the owner also sees private and unlisted ones */
+        get: operations["list_channel_playlists_api_channels__username__playlists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/{username}/subscription": {
         parameters: {
             query?: never;
@@ -210,6 +227,42 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a playlist (private unless you say otherwise) */
+        post: operations["create_playlist_api_playlists_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playlists/{playlist_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A playlist with the videos you may watch; private ones only for the owner */
+        get: operations["get_playlist_api_playlists__playlist_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete your playlist; its videos stay */
+        delete: operations["delete_playlist_api_playlists__playlist_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit your playlist's title, description or visibility */
+        patch: operations["update_playlist_api_playlists__playlist_id__patch"];
         trace?: never;
     };
     "/api/search/videos": {
@@ -650,6 +703,106 @@ export interface components {
              * @description Relative URL of the HLS master playlist
              */
             url: string;
+        };
+        /** PlaylistCreateIn */
+        PlaylistCreateIn: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Title */
+            title: string;
+            /** @default private */
+            visibility: components["schemas"]["VideoVisibility"];
+        };
+        /** PlaylistOut */
+        PlaylistOut: {
+            channel: components["schemas"]["ChannelBriefOut"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Items
+             * @description In playlist order; only what the caller may watch
+             */
+            items: components["schemas"]["VideoCardOut"][];
+            /**
+             * Thumbnail Url
+             * @description The first such video's; null if none
+             */
+            thumbnail_url: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Video Count
+             * @description Videos the caller may watch
+             */
+            video_count: number;
+            visibility: components["schemas"]["VideoVisibility"];
+        };
+        /** PlaylistPage */
+        PlaylistPage: {
+            /** Items */
+            items: components["schemas"]["PlaylistSummaryOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page
+             */
+            next_cursor: string | null;
+        };
+        /**
+         * PlaylistSummaryOut
+         * @description A playlist as listed. Counts and the thumbnail cover only the videos the caller may
+         *     watch.
+         */
+        PlaylistSummaryOut: {
+            channel: components["schemas"]["ChannelBriefOut"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thumbnail Url
+             * @description The first such video's; null if none
+             */
+            thumbnail_url: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Video Count
+             * @description Videos the caller may watch
+             */
+            video_count: number;
+            visibility: components["schemas"]["VideoVisibility"];
+        };
+        /** PlaylistUpdateIn */
+        PlaylistUpdateIn: {
+            /** Description */
+            description?: string | null;
+            /** Title */
+            title?: string | null;
+            visibility?: components["schemas"]["VideoVisibility"] | null;
         };
         /** PresignedUploadOut */
         PresignedUploadOut: {
@@ -1275,6 +1428,49 @@ export interface operations {
             };
         };
     };
+    list_channel_playlists_api_channels__username__playlists_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     subscribe_api_channels__username__subscription_put: {
         parameters: {
             query?: never;
@@ -1556,6 +1752,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    create_playlist_api_playlists_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_playlist_api_playlists__playlist_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_playlist_api_playlists__playlist_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_playlist_api_playlists__playlist_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playlist_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaylistUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaylistOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

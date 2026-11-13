@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
@@ -13,10 +14,13 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.video import VideoVisibility
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Playlist(Base):
@@ -40,6 +44,9 @@ class Playlist(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # Loaded only on request, so N+1s fail loudly.
+    owner: Mapped["User"] = relationship(lazy="raise")
 
 
 class PlaylistItem(Base):

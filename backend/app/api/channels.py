@@ -9,7 +9,9 @@ from app.schemas.channels import (
     SubscriptionStateOut,
 )
 from app.schemas.errors import ErrorOut
+from app.schemas.playlists import PlaylistPage, PlaylistSummaryOut
 from app.services import channels as channels_service
+from app.services import playlists as playlists_service
 
 router = APIRouter(
     prefix="/channels",
@@ -41,6 +43,26 @@ async def list_channel_videos(
     )
     return ChannelVideoPage(
         items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor
+    )
+
+
+@router.get(
+    "/{username}/playlists",
+    response_model=PlaylistPage,
+    summary="A channel's playlists, newest first; the owner also sees private and unlisted ones",
+)
+async def list_channel_playlists(
+    username: str,
+    session: SessionDep,
+    viewer: OptionalUser,
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_VIDEO_PAGE,
+) -> PlaylistPage:
+    playlists, next_cursor = await playlists_service.list_channel_playlists(
+        session, viewer, username, cursor=cursor, limit=limit
+    )
+    return PlaylistPage(
+        items=[PlaylistSummaryOut.model_validate(p) for p in playlists], next_cursor=next_cursor
     )
 
 

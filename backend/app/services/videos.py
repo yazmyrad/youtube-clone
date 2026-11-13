@@ -186,6 +186,20 @@ async def adjust_counters(session: AsyncSession, video_id: uuid.UUID, **deltas: 
     )
 
 
+def to_card(video: Video) -> VideoCard:
+    """For a ready video the caller may see, loaded with its owner."""
+    return VideoCard(
+        id=video.id,
+        title=video.title,
+        duration_seconds=video.duration_seconds,
+        views_count=video.views_count,
+        published_at=video.published_at,
+        thumbnail_url=playback.thumbnail_url(video.id),
+        channel=video.owner,
+        visibility=video.visibility,
+    )
+
+
 async def _listed_page(
     session: AsyncSession, *criteria: ColumnElement[bool], cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
@@ -212,20 +226,7 @@ async def _card_page(
     if len(videos) > limit:
         videos = videos[:limit]
         next_cursor = encode_cursor(videos[-1].published_at, videos[-1].id)
-    cards = [
-        VideoCard(
-            id=video.id,
-            title=video.title,
-            duration_seconds=video.duration_seconds,
-            views_count=video.views_count,
-            published_at=video.published_at,
-            thumbnail_url=playback.thumbnail_url(video.id),
-            channel=video.owner,
-            visibility=video.visibility,
-        )
-        for video in videos
-    ]
-    return cards, next_cursor
+    return [to_card(video) for video in videos], next_cursor
 
 
 async def list_feed(

@@ -11,6 +11,7 @@ from app.api import (
     feed,
     health,
     internal,
+    playlists,
     reactions,
     search,
     users,
@@ -33,7 +34,19 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(title="YouTube clone API", version="0.1.0", lifespan=lifespan)
     install_error_handlers(app)
-    for module in (health, auth, users, admin, videos, reactions, comments, search, channels, feed):
+    for module in (
+        health,
+        auth,
+        users,
+        admin,
+        videos,
+        reactions,
+        comments,
+        search,
+        channels,
+        feed,
+        playlists,
+    ):
         app.include_router(module.router, prefix="/api")
     # Outside /api on purpose: nginx proxies only /api/, so this has no public route.
     app.include_router(internal.router)

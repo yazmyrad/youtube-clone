@@ -493,6 +493,232 @@
         "title": "PlaybackOut",
         "type": "object"
       },
+      "PlaylistCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 1000,
+            "pattern": "^[^\\x00]*$",
+            "title": "Description",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Title",
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility",
+            "default": "private"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "PlaylistCreateIn",
+        "type": "object"
+      },
+      "PlaylistOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelBriefOut"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "description": "In playlist order; only what the caller may watch",
+            "items": {
+              "$ref": "#/components/schemas/VideoCardOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first such video's; null if none",
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "video_count": {
+            "description": "Videos the caller may watch",
+            "title": "Video Count",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "visibility",
+          "channel",
+          "video_count",
+          "thumbnail_url",
+          "updated_at",
+          "description",
+          "created_at",
+          "items"
+        ],
+        "title": "PlaylistOut",
+        "type": "object"
+      },
+      "PlaylistPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlaylistSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` to get the next page",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "PlaylistPage",
+        "type": "object"
+      },
+      "PlaylistSummaryOut": {
+        "description": "A playlist as listed. Counts and the thumbnail cover only the videos the caller may\nwatch.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelBriefOut"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first such video's; null if none",
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "video_count": {
+            "description": "Videos the caller may watch",
+            "title": "Video Count",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "visibility",
+          "channel",
+          "video_count",
+          "thumbnail_url",
+          "updated_at"
+        ],
+        "title": "PlaylistSummaryOut",
+        "type": "object"
+      },
+      "PlaylistUpdateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "pattern": "^[^\\x00]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "PlaylistUpdateIn",
+        "type": "object"
+      },
       "PresignedUploadOut": {
         "properties": {
           "fields": {
@@ -1644,6 +1870,92 @@
         ]
       }
     },
+    "/api/channels/{username}/playlists": {
+      "get": {
+        "operationId": "list_channel_playlists_api_channels__username__playlists_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "title": "Username",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "A channel's playlists, newest first; the owner also sees private and unlisted ones",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
     "/api/channels/{username}/subscription": {
       "delete": {
         "operationId": "unsubscribe_api_channels__username__subscription_delete",
@@ -2058,6 +2370,275 @@
         "summary": "Liveness and database check",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/playlists": {
+      "post": {
+        "operationId": "create_playlist_api_playlists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create a playlist (private unless you say otherwise)",
+        "tags": [
+          "playlists"
+        ]
+      }
+    },
+    "/api/playlists/{playlist_id}": {
+      "delete": {
+        "operationId": "delete_playlist_api_playlists__playlist_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "playlist_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Playlist Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete your playlist; its videos stay",
+        "tags": [
+          "playlists"
+        ]
+      },
+      "get": {
+        "operationId": "get_playlist_api_playlists__playlist_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "playlist_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Playlist Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "A playlist with the videos you may watch; private ones only for the owner",
+        "tags": [
+          "playlists"
+        ]
+      },
+      "patch": {
+        "operationId": "update_playlist_api_playlists__playlist_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "playlist_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Playlist Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Edit your playlist's title, description or visibility",
+        "tags": [
+          "playlists"
         ]
       }
     },
