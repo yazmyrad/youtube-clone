@@ -458,6 +458,7 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 | `POST /playlists/{id}/items` | owner + view of the video | Add video |
 | `DELETE /playlists/{id}/items/{video_id}` | owner | Remove video |
 | `PUT /playlists/{id}/items/order` | owner | Reorder |
+| `GET /users/me/playlists?video_id=` | auth | Own playlists, each saying whether it holds the video (Save dialog) |
 
 ### Search
 
