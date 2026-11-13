@@ -317,6 +317,34 @@
         "title": "CommentPage",
         "type": "object"
       },
+      "DecisionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "default": "",
+            "maxLength": 1000,
+            "pattern": "^[^\\x00]*$",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "DecisionIn",
+        "type": "object"
+      },
+      "DecisionOut": {
+        "properties": {
+          "reports_closed": {
+            "description": "Open reports on the video that this closed",
+            "title": "Reports Closed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reports_closed"
+        ],
+        "title": "DecisionOut",
+        "type": "object"
+      },
       "ErrorOut": {
         "properties": {
           "detail": {
@@ -367,6 +395,24 @@
           "database"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "HideIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "Shown to the video's owner",
+            "maxLength": 1000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "HideIn",
         "type": "object"
       },
       "HistoryEntryOut": {
@@ -917,6 +963,123 @@
         "title": "PresignedUploadOut",
         "type": "object"
       },
+      "QueueEntryOut": {
+        "properties": {
+          "first_reported_at": {
+            "format": "date-time",
+            "title": "First Reported At",
+            "type": "string"
+          },
+          "open_reports": {
+            "title": "Open Reports",
+            "type": "integer"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/ReportReason"
+            },
+            "title": "Reasons",
+            "type": "object"
+          },
+          "reports": {
+            "description": "The latest few, newest first",
+            "items": {
+              "$ref": "#/components/schemas/QueuedReportOut"
+            },
+            "title": "Reports",
+            "type": "array"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "video": {
+            "$ref": "#/components/schemas/ReportedVideoOut"
+          }
+        },
+        "required": [
+          "video",
+          "thumbnail_url",
+          "open_reports",
+          "reasons",
+          "first_reported_at",
+          "reports"
+        ],
+        "title": "QueueEntryOut",
+        "type": "object"
+      },
+      "QueuePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` to get the next page",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "QueuePage",
+        "type": "object"
+      },
+      "QueuedReportOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/ReporterOut"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "details",
+          "reporter",
+          "created_at"
+        ],
+        "title": "QueuedReportOut",
+        "type": "object"
+      },
       "ReactionIn": {
         "additionalProperties": false,
         "properties": {
@@ -1081,6 +1244,63 @@
         ],
         "title": "ReportStatus",
         "type": "string"
+      },
+      "ReportedVideoOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelBriefOut"
+          },
+          "hidden_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VideoStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "visibility",
+          "status",
+          "hidden_at",
+          "channel"
+        ],
+        "title": "ReportedVideoOut",
+        "type": "object"
+      },
+      "ReporterOut": {
+        "properties": {
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "title": "ReporterOut",
+        "type": "object"
       },
       "SubscribedChannelOut": {
         "properties": {
@@ -1433,6 +1653,31 @@
             ],
             "title": "Duration Seconds"
           },
+          "hidden_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set if a moderator hid it",
+            "title": "Hidden At"
+          },
+          "hidden_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The moderator's reason, if hidden",
+            "title": "Hidden Reason"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1507,7 +1752,9 @@
           "dislikes_count",
           "comments_count",
           "thumbnail_url",
-          "my_reaction"
+          "my_reaction",
+          "hidden_at",
+          "hidden_reason"
         ],
         "title": "VideoDetailsOut",
         "type": "object"
@@ -2669,6 +2916,478 @@
         "summary": "Liveness and database check",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/moderation/reports": {
+      "get": {
+        "operationId": "list_queue_api_moderation_reports_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Videos with open reports, the longest-waiting first",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/moderation/reports/{report_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_report_api_moderation_reports__report_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dismiss the report, and the video's other open reports",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/moderation/reports/{report_id}/resolve": {
+      "post": {
+        "operationId": "resolve_report_api_moderation_reports__report_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mark the report, and the video's other open reports, resolved",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/moderation/videos/{video_id}/hide": {
+      "post": {
+        "operationId": "hide_video_api_moderation_videos__video_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hide a video everywhere, with a reason its owner sees; resolves its reports",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/moderation/videos/{video_id}/restore": {
+      "post": {
+        "operationId": "restore_video_api_moderation_videos__video_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restore a hidden video",
+        "tags": [
+          "moderation"
         ]
       }
     },

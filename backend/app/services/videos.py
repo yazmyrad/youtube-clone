@@ -30,7 +30,7 @@ from app.models import (
     VideoVisibility,
 )
 from app.schemas.videos import VideoCreateIn, VideoUpdateIn
-from app.services import playback, storage
+from app.services import moderation, playback, storage
 from app.services.storage import PresignedUpload
 
 MAX_ACTIVE_UPLOADS = 3
@@ -53,6 +53,8 @@ class VideoDetails:
     comments_count: int
     thumbnail_url: str | None
     my_reaction: ReactionType | None
+    hidden_at: datetime | None
+    hidden_reason: str | None
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,11 @@ async def get_video(session: AsyncSession, user: User | None, video_id: uuid.UUI
         comments_count=video.comments_count,
         thumbnail_url=playback.thumbnail_url(video.id) if can_show_thumbnail(video) else None,
         my_reaction=reaction.reaction if reaction else None,
+        hidden_at=video.hidden_at,
+        # Only those who may view a hidden video get this far: its owner and moderators.
+        hidden_reason=(
+            await moderation.hidden_reason(session, video.id) if video.hidden_at else None
+        ),
     )
 
 

@@ -89,6 +89,8 @@ class VideoDetailsOut(BaseModel):
     comments_count: int
     thumbnail_url: str | None = Field(description="Signed; null if not ready or hidden")
     my_reaction: ReactionType | None = Field(description="Null if none, or not logged in")
+    hidden_at: datetime | None = Field(description="Set if a moderator hid it")
+    hidden_reason: str | None = Field(description="The moderator's reason, if hidden")
 
 
 class VideoCardOut(BaseModel):

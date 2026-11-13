@@ -112,9 +112,7 @@ async def has_open_report(session: AsyncSession, video_id: uuid.UUID) -> bool:
     """Served by the partial unique index on open reports."""
     return bool(
         await session.scalar(
-            select(
-                exists().where(Report.video_id == video_id, Report.status == ReportStatus.open)
-            )
+            select(exists().where(Report.video_id == video_id, Report.status == ReportStatus.open))
         )
     )
 

@@ -110,6 +110,8 @@ async def test_returns_only_the_public_fields(
         "comments_count",
         "thumbnail_url",
         "my_reaction",
+        "hidden_at",
+        "hidden_reason",
     }
     assert body["channel"] == {"username": "alice", "display_name": "Alice"}
     assert body["views_count"] == 0

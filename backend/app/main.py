@@ -11,6 +11,7 @@ from app.api import (
     feed,
     health,
     internal,
+    moderation,
     playlists,
     reactions,
     search,
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
         channels,
         feed,
         playlists,
+        moderation,
     ):
         app.include_router(module.router, prefix="/api")
     # Outside /api on purpose: nginx proxies only /api/, so this has no public route.
