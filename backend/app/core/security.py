@@ -95,3 +95,13 @@ def verify_media(scope: str, video_id: str, exp: str, sig: str) -> bool:
         return hmac.compare_digest(_media_signature(scope, video_id, exp), sig.encode())
     except ValueError:
         return False
+
+
+def viewer_key(user_id: uuid.UUID | None, ip: str, user_agent: str) -> bytes:
+    """Who a view belongs to, for counting each viewer once a day (D52). A signed-in user is
+    their id; anyone else is their IP and browser. Keyed, so the stored value can't be
+    reversed into an IP by trying them all, and labelled, so it can't collide with the
+    media signatures made with the same secret."""
+    secret = get_settings().playback_secret.get_secret_value().encode()
+    who = f"user:{user_id}" if user_id is not None else f"anon:{ip}\n{user_agent}"
+    return hmac.new(secret, f"view-key\0{who}".encode(), hashlib.sha256).digest()

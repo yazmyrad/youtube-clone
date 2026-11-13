@@ -1527,6 +1527,50 @@
         ],
         "title": "VideoVisibility",
         "type": "string"
+      },
+      "ViewIn": {
+        "additionalProperties": false,
+        "properties": {
+          "position_seconds": {
+            "description": "Where playback is now",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Position Seconds",
+            "type": "integer"
+          },
+          "watched_seconds": {
+            "description": "Seconds actually played since the page opened",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Watched Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "watched_seconds",
+          "position_seconds"
+        ],
+        "title": "ViewIn",
+        "type": "object"
+      },
+      "ViewOut": {
+        "properties": {
+          "counted": {
+            "description": "Whether this call counted a new view",
+            "title": "Counted",
+            "type": "boolean"
+          },
+          "views_count": {
+            "title": "Views Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "counted",
+          "views_count"
+        ],
+        "title": "ViewOut",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -4533,6 +4577,94 @@
           }
         ],
         "summary": "Confirm the upload and start processing (safe to repeat)",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/api/videos/{video_id}/view": {
+      "post": {
+        "operationId": "record_view_api_videos__video_id__view_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Playback heartbeat: counts a view after 30 s or half the video, once a day",
         "tags": [
           "videos"
         ]

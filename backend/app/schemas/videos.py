@@ -170,3 +170,15 @@ class VideoAccessOut(BaseModel):
 class VideoAccessPage(BaseModel):
     items: list[VideoAccessOut]
     next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
+class ViewIn(StrictModel):
+    watched_seconds: int = Field(
+        ge=0, le=86_400, description="Seconds actually played since the page opened"
+    )
+    position_seconds: int = Field(ge=0, le=86_400, description="Where playback is now")
+
+
+class ViewOut(BaseModel):
+    counted: bool = Field(description="Whether this call counted a new view")
+    views_count: int

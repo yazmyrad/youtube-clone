@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
+from app.core.client import ClientDep
 from app.core.pagination import DEFAULT_VIDEO_PAGE, KeysetCursor, PageLimit
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
 from app.models.user import USERNAME_PATTERN
@@ -19,9 +20,12 @@ from app.schemas.videos import (
     VideoDetailsOut,
     VideoOwnerOut,
     VideoUpdateIn,
+    ViewIn,
+    ViewOut,
 )
 from app.services import playback as playback_service
 from app.services import videos as videos_service
+from app.services import views as views_service
 
 Username = Annotated[str, Path(pattern=USERNAME_PATTERN)]
 
@@ -127,6 +131,35 @@ async def start_playback(
 ) -> PlaybackOut:
     return PlaybackOut.model_validate(
         await playback_service.issue_playback(session, user, video_id)
+    )
+
+
+@router.post(
+    "/{video_id}/view",
+    response_model=ViewOut,
+    summary="Playback heartbeat: counts a view after 30 s or half the video, once a day",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorOut},
+        status.HTTP_409_CONFLICT: {"model": ErrorOut},
+    },
+)
+async def record_view(
+    video_id: uuid.UUID,
+    data: ViewIn,
+    viewer: OptionalUser,
+    client: ClientDep,
+    session: SessionDep,
+) -> ViewOut:
+    return ViewOut.model_validate(
+        await views_service.record_view(
+            session,
+            viewer,
+            video_id,
+            client,
+            watched_seconds=data.watched_seconds,
+            position_seconds=data.position_seconds,
+        ),
+        from_attributes=True,
     )
 
 
