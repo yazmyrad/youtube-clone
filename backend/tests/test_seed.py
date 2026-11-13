@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.models import (
     Comment,
+    Playlist,
+    PlaylistItem,
     ProcessingJob,
     ReactionType,
     Subscription,
@@ -242,3 +244,30 @@ async def test_viewers_subscribe_and_the_counts_match(
             .where(User.username == viewer.username)
         )
         assert follows == len(seed.CHANNELS) - 1, viewer.username
+
+
+def test_demo_playlists_name_real_demo_videos_and_owners() -> None:
+    titles = {video.title for video in ALL_VIDEOS}
+    owners = {account.username for account in seed._accounts()}
+    for playlist in seed.PLAYLISTS:
+        assert playlist.owner in owners, playlist.title
+        assert set(playlist.videos) <= titles, playlist.title
+        assert len(set(playlist.videos)) == len(playlist.videos), playlist.title
+
+
+async def test_adds_the_demo_playlists_in_order(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    await run_seed(session, tmp_path)
+
+    for demo in seed.PLAYLISTS:
+        playlist = await session.scalar(select(Playlist).where(Playlist.title == demo.title))
+        assert playlist is not None, demo.title
+        assert playlist.visibility == demo.visibility
+        titles = await session.scalars(
+            select(Video.title)
+            .join(PlaylistItem, PlaylistItem.video_id == Video.id)
+            .where(PlaylistItem.playlist_id == playlist.id)
+            .order_by(PlaylistItem.position)
+        )
+        assert tuple(titles) == demo.videos

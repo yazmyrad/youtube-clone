@@ -23,6 +23,8 @@ from app.core import security
 from app.core.config import get_settings
 from app.models import (
     Comment,
+    Playlist,
+    PlaylistItem,
     ReactionType,
     Subscription,
     User,
@@ -205,6 +207,52 @@ VIEWERS = (
 )
 ADMIN = DemoAccount("admin", "Site Admin", UserRole.admin)
 
+
+@dataclass(frozen=True)
+class DemoPlaylist:
+    owner: str
+    title: str
+    description: str
+    visibility: VideoVisibility
+    videos: tuple[str, ...]  # Titles, in playlist order.
+
+
+PLAYLISTS = (
+    DemoPlaylist(
+        "codebytes",
+        "The 100 Seconds series",
+        "Big ideas, short videos.",
+        VideoVisibility.public,
+        ("Rust in 100 Seconds", "WebAssembly in 100 Seconds", "Big O Notation Explained"),
+    ),
+    DemoPlaylist(
+        "terminal_tales",
+        "Terminal essentials",
+        "Start here if the command line still feels scary.",
+        VideoVisibility.public,
+        ("SSH keys from zero", "tmux for beginners", "10 Bash one-liners I use every day"),
+    ),
+    DemoPlaylist(
+        "dana_dev",
+        "Backend picks",
+        "What I send new teammates.",
+        VideoVisibility.public,
+        (
+            "Postgres indexes, visually",
+            "Docker vs VMs",
+            "CI pipelines that don't hurt",
+            "Git rebase explained",
+        ),
+    ),
+    DemoPlaylist(
+        "lucy_lints",
+        "Watch later",
+        "",
+        VideoVisibility.private,
+        ("CSS Grid in 10 minutes", "I tried 5 JavaScript runtimes"),
+    ),
+)
+
 COMMENTS = (
     "This finally made it click for me, thanks!",
     "Can you do a follow-up on the advanced parts?",
@@ -248,8 +296,9 @@ async def seed(
     # Read now: after the rollback below, the objects are expired and can't load lazily.
     user_ids = [user.id for user in users.values()]
     try:
-        await _add_videos(session, users, make_clip, workdir)
+        video_ids = await _add_videos(session, users, make_clip, workdir)
         await _subscribe_viewers(session, users)
+        await _add_playlists(session, users, video_ids)
     except BaseException:
         # The passwords die with this run, so its accounts must too: otherwise a rerun would
         # find them, do nothing, and leave demo accounts nobody can log in to.
@@ -260,10 +309,12 @@ async def seed(
 
 async def _add_videos(
     session: AsyncSession, users: dict[str, User], make_clip: ClipMaker, workdir: Path
-) -> None:
+) -> dict[str, uuid.UUID]:
+    """Returns the videos' ids by title."""
     viewers = [users[v.username] for v in VIEWERS]
     now = datetime.now(UTC)
     rng = random.Random(0)  # noqa: S311 - demo data, not security; fixed for repeatability
+    video_ids: dict[str, uuid.UUID] = {}
     index = 0
     for channel in CHANNELS:
         owner = users[channel.username]
@@ -278,7 +329,28 @@ async def _add_videos(
             )
             video_id = await _add_video(session, owner, demo, card, now, make_clip, workdir)
             await _engage(session, rng, viewers, video_id, demo.days_ago, now)
+            video_ids[demo.title] = video_id
             index += 1
+    return video_ids
+
+
+async def _add_playlists(
+    session: AsyncSession, users: dict[str, User], video_ids: dict[str, uuid.UUID]
+) -> None:
+    for demo in PLAYLISTS:
+        playlist = Playlist(
+            owner_id=users[demo.owner].id,
+            title=demo.title,
+            description=demo.description,
+            visibility=demo.visibility,
+        )
+        session.add(playlist)
+        await session.flush()
+        session.add_all(
+            PlaylistItem(playlist_id=playlist.id, video_id=video_ids[title], position=position)
+            for position, title in enumerate(demo.videos)
+        )
+    await session.commit()
 
 
 async def _subscribe_viewers(session: AsyncSession, users: dict[str, User]) -> None:

@@ -268,6 +268,38 @@ expect "unsubscribe" 200 "$subscription" -X DELETE "${fan_auth[@]}"
 state="$(json '(d["subscribers_count"], d["is_subscribed"])' < "$work/body")"
 [ "$state" = "(0, False)" ] && pass "unsubscribing counts down" || fail "after unsubscribing: $state"
 
+# --- Playlists (D34) -------------------------------------------------------
+
+curl -fsS --max-time 20 -o "$work/playlist" "${auth[@]}" "${json_type[@]}" \
+    -d '{"title":"Smoke list","visibility":"public"}' "$base/api/playlists" \
+    || die "could not create a playlist"
+playlist_id="$(json 'd["id"]' < "$work/playlist")"
+for id in "$id_a" "$id_b"; do
+    expect "D34 add a video to the playlist" 200 "/api/playlists/$playlist_id/items" -X POST \
+        "${auth[@]}" "${json_type[@]}" -d "{\"video_id\":\"$id\"}"
+done
+expect "D34 the owner sees both of their videos" 200 "/api/playlists/$playlist_id" "${auth[@]}"
+[ "$(json 'd["video_count"]' < "$work/body")" = 2 ] && pass "D34 the owner's count is 2" \
+    || fail "D34 the owner's count is $(json 'd["video_count"]' < "$work/body")"
+expect "D34 the playlist, anonymously" 200 "/api/playlists/$playlist_id"
+json '"\n".join(v["id"] for v in d["items"])' < "$work/body" > "$work/listed"
+[ "$(cat "$work/listed")" = "$id_a" ] && pass "D34 others see only the public video" \
+    || fail "D34 others see: $(tr '\n' ' ' < "$work/listed")"
+body_has "$id_b" && fail "D34 the private video's id is in the playlist" \
+    || pass "D34 the private video's id isn't in the playlist"
+expect "D34 the playlist page is served" 200 "/playlist?list=$playlist_id"
+curl -fsS --max-time 20 -o "$work/playlist" "${fan_auth[@]}" "${json_type[@]}" \
+    -d '{"title":"Fan list"}' "$base/api/playlists" || die "could not create the fan's playlist"
+fan_playlist="$(json 'd["id"]' < "$work/playlist")"
+expect "D34 the fan can't add a private video to their own playlist" 404 \
+    "/api/playlists/$fan_playlist/items" -X POST "${fan_auth[@]}" "${json_type[@]}" \
+    -d "{\"video_id\":\"$id_b\"}"
+expect "the fan can add the public one" 200 "/api/playlists/$fan_playlist/items" -X POST \
+    "${fan_auth[@]}" "${json_type[@]}" -d "{\"video_id\":\"$id_a\"}"
+expect "make the playlist private" 200 "/api/playlists/$playlist_id" -X PATCH "${auth[@]}" \
+    "${json_type[@]}" -d '{"visibility":"private"}'
+expect "a private playlist is 404 for others" 404 "/api/playlists/$playlist_id" "${fan_auth[@]}"
+
 if [ -n "$thumb_url" ]; then
     expect "D02 the home card's thumbnail loads" 200 "$thumb_url"
     [ "$(head -c 3 "$work/body" | od -An -tx1 | tr -d ' \n')" = ffd8ff ] \
