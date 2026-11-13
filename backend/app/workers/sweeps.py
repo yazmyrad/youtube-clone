@@ -1,4 +1,4 @@
-"""Storage cleanup. Each sweep is safe to repeat and to run from several workers.
+"""Cleanup. Each sweep is safe to repeat and to run from several workers.
 
 A row and its objects can't change in one transaction, so objects go first: a failure
 leaves the row in place and the next sweep finishes the work.
@@ -6,12 +6,13 @@ leaves the row in place and the next sweep finishes the work.
 
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, exists, func, select, update
 
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
-from app.models import JobStatus, ProcessingJob, Video, VideoStatus
+from app.models import JobStatus, ProcessingJob, Video, VideoStatus, VideoView
 from app.services import storage
 
 logger = logging.getLogger(__name__)
@@ -106,7 +107,17 @@ async def purge_deleted_videos() -> None:
             await session.commit()
 
 
+async def forget_old_views() -> None:
+    """A view only needs remembering for the day it counted on (D52). Days are UTC, as in
+    `views.record_view`."""
+    today = datetime.now(UTC).date()
+    async with get_sessionmaker()() as session:
+        await session.execute(delete(VideoView).where(VideoView.day < today))
+        await session.commit()
+
+
 async def run_all() -> None:
     await delete_finished_raw_files()
     await retire_abandoned_uploads()
     await purge_deleted_videos()
+    await forget_old_views()

@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models import JobStatus, ProcessingJob, Video, VideoStatus
+from app.models import JobStatus, ProcessingJob, Video, VideoStatus, VideoView
 from app.services import storage
 from app.workers import main as worker
 from app.workers import sweeps
@@ -195,3 +195,16 @@ async def test_the_sweep_loop_outlives_errors(
     loop.cancel()
     with pytest.raises(asyncio.CancelledError):
         await loop
+
+
+async def test_forgets_views_from_before_today(session: AsyncSession) -> None:
+    video_id = await _new_video(session)
+    today = datetime.now(UTC).date()
+    for day in (today - timedelta(days=2), today - timedelta(days=1), today):
+        session.add(VideoView(video_id=video_id, viewer_key=b"k", day=day))
+    await session.commit()
+
+    await sweeps.forget_old_views()
+
+    days = list(await session.scalars(select(VideoView.day)))
+    assert days == [today]
