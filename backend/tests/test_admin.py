@@ -3,8 +3,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import RefreshToken, User, UserRole
-from tests.helpers import PASSWORD, ApiUser, CreateUser, SetRole
+from app.models import ModerationAction, ModerationActionType, RefreshToken, User, UserRole
+from tests.helpers import PASSWORD, ApiUser, CreateUser, SetRole, create_ready_video
 
 ORIGIN = {"Origin": "http://test"}
 
@@ -91,9 +91,7 @@ async def test_moderator_cant_change_roles(
     assert (await _stored(session, moderator)).role == UserRole.moderator
 
 
-@pytest.mark.parametrize(
-    "body", [{"role": "user"}, {"role": "moderator"}, {"is_active": False}]
-)
+@pytest.mark.parametrize("body", [{"role": "user"}, {"role": "moderator"}, {"is_active": False}])
 async def test_admin_cant_demote_or_disable_self(
     api: httpx.AsyncClient,
     session: AsyncSession,
@@ -181,9 +179,7 @@ async def test_disable_applies_on_next_request_and_ends_sessions(
     relogin = await api.post("/api/auth/login", json={"email": alice.email, "password": PASSWORD})
     assert relogin.status_code == 403
 
-    await api.patch(
-        f"/api/admin/users/{alice.id}", headers=admin.headers, json={"is_active": True}
-    )
+    await api.patch(f"/api/admin/users/{alice.id}", headers=admin.headers, json={"is_active": True})
     relogin = await api.post("/api/auth/login", json={"email": alice.email, "password": PASSWORD})
     assert relogin.status_code == 200
 
@@ -233,3 +229,72 @@ async def test_update_rejects_unknown_values(
     alice = await create_user()
     response = await api.patch(f"/api/admin/users/{alice.id}", headers=admin.headers, json=body)
     assert response.status_code == 422
+
+
+async def _patch(
+    api: httpx.AsyncClient, admin: ApiUser, user: ApiUser, **changes: object
+) -> httpx.Response:
+    response = await api.patch(f"/api/admin/users/{user.id}", headers=admin.headers, json=changes)
+    assert response.status_code == 200, response.text
+    return response
+
+
+async def test_every_change_is_audited_and_no_change_isnt(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+) -> None:
+    admin = await _admin(create_user, set_role)
+    alice = await create_user("alice")
+
+    await _patch(api, admin, alice, role="moderator")
+    await _patch(api, admin, alice, role="moderator")  # No change.
+    await _patch(api, admin, alice, is_active=False)
+    await _patch(api, admin, alice, is_active=False)  # No change.
+    await _patch(api, admin, alice, is_active=True)
+
+    rows = (
+        await session.execute(
+            select(
+                ModerationAction.action,
+                ModerationAction.actor_id,
+                ModerationAction.target_user_id,
+                ModerationAction.reason,
+            ).order_by(ModerationAction.id)
+        )
+    ).all()
+    assert [(action, reason) for action, _, _, reason in rows] == [
+        (ModerationActionType.change_role, "user -> moderator"),
+        (ModerationActionType.disable_user, ""),
+        (ModerationActionType.enable_user, ""),
+    ]
+    assert {(str(actor), str(target)) for _, actor, target, _ in rows} == {(admin.id, alice.id)}
+
+
+async def test_a_disabled_users_videos_leave_every_listing_and_come_back(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    set_role: SetRole,
+) -> None:
+    admin = await _admin(create_user, set_role)
+    alice, bob = await create_user("alice"), await create_user("bob")
+    video = await create_ready_video(api, session, alice)
+    await api.patch("/api/videos/" + video, headers=alice.headers, json={"title": "Findable clip"})
+    await api.put("/api/channels/alice/subscription", headers=bob.headers)
+    listings = (
+        ("/api/videos", {}),
+        ("/api/search/videos?q=findable", {}),
+        ("/api/feed/subscriptions", bob.headers),
+        ("/api/channels/alice/videos", bob.headers),
+    )
+
+    async def shown() -> list[bool]:
+        return [video in (await api.get(url, headers=headers)).text for url, headers in listings]
+
+    assert await shown() == [True] * 4
+    await _patch(api, admin, alice, is_active=False)
+    assert await shown() == [False] * 4
+    await _patch(api, admin, alice, is_active=True)
+    assert await shown() == [True] * 4

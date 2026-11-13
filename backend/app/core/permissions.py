@@ -9,7 +9,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import ColumnElement, TextClause, and_, exists, or_, select
+from sqlalchemy import ColumnElement, and_, exists, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
@@ -155,10 +155,15 @@ async def ensure_can_delete_comment(
     raise Forbidden("You can't delete this comment")
 
 
-def listed_videos() -> TextClause:
-    """Which videos the feed and search may show, to anyone at all. The same literal SQL as
-    the partial indexes, because Postgres can't match bound parameters to their predicates."""
-    return LISTED
+def listed_videos() -> ColumnElement[bool]:
+    """Which videos the feed and search may show, to anyone at all: listed, and by a user who
+    isn't disabled, so a disabled user's videos return when they're enabled again. LISTED is
+    the same literal SQL as the partial indexes, because Postgres can't match bound
+    parameters to their predicates."""
+    active_owner = exists(
+        select(User.id).where(User.id == Video.owner_id, User.is_active.is_(True))
+    )
+    return and_(LISTED, active_owner)
 
 
 def channel_videos(viewer: User | None, channel: User) -> ColumnElement[bool]:
@@ -167,6 +172,9 @@ def channel_videos(viewer: User | None, channel: User) -> ColumnElement[bool]:
     everyone, as they have no thumbnail to show, and unfinished ones are on the upload page."""
     if viewer is not None and viewer.id == channel.id:
         return and_(Video.owner_id == channel.id, PUBLISHED, Video.hidden_at.is_(None))
+    if not channel.is_active:
+        # A disabled user's videos leave every listing, their own channel's included.
+        return false()
     return and_(Video.owner_id == channel.id, LISTED)
 
 

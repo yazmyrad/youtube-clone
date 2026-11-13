@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFound, Unauthorized
 from app.core.permissions import ensure_can_manage_user
-from app.models import RefreshToken, User
+from app.models import ModerationAction, ModerationActionType, RefreshToken, User
 from app.schemas.admin import AdminUserUpdateIn
 
 
@@ -51,9 +51,22 @@ async def update_user(
         raise NotFound("User not found")
     ensure_can_manage_user(current_actor, target, role=data.role, is_active=data.is_active)
 
-    if data.role is not None:
+    def audit(action: ModerationActionType, reason: str = "") -> None:
+        session.add(
+            ModerationAction(
+                actor_id=current_actor.id, action=action, target_user_id=target.id, reason=reason
+            )
+        )
+
+    if data.role is not None and data.role != target.role:
+        audit(ModerationActionType.change_role, f"{target.role.value} -> {data.role.value}")
         target.role = data.role
-    if data.is_active is not None:
+    if data.is_active is not None and data.is_active != target.is_active:
+        audit(
+            ModerationActionType.enable_user
+            if data.is_active
+            else ModerationActionType.disable_user
+        )
         target.is_active = data.is_active
         if not data.is_active:
             # Access tokens stop working at once because the user is reloaded on every
