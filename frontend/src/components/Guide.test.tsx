@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import { COLLAPSED_CHANNELS, FullGuide } from "./Guide";
+import { COLLAPSED_CHANNELS, FullGuide, staffEntries } from "./Guide";
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", () => ({ api: { GET: get } }));
@@ -90,4 +90,12 @@ it("has no Subscriptions section without subscriptions", async () => {
   await vi.waitFor(() => expect(get).toHaveBeenCalled());
   await act(async () => {});
   expect(container.querySelector("section")).toBeNull();
+});
+
+it.each([
+  ["user", []],
+  ["moderator", ["/moderation"]],
+  ["admin", ["/moderation"]],
+])("gives a %s the staff links %j", (role, links) => {
+  expect(staffEntries(role).map((entry) => entry.to)).toEqual(links);
 });

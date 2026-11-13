@@ -5,6 +5,7 @@ import { ChannelPage } from "./pages/ChannelPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { ModerationPage } from "./pages/ModerationPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaylistPage } from "./pages/PlaylistPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/results" element={<SearchPage />} />
         <Route path="/feed/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/feed/history" element={<HistoryPage />} />
+        <Route path="/moderation" element={<ModerationPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/:handle/:tab?" element={<ChannelPage />} />

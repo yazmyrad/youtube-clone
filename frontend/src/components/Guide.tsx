@@ -2,9 +2,10 @@ import { useState, type ComponentType } from "react";
 import { NavLink } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
+import { isModerator } from "../hooks/useModeration";
 import { useMySubscriptions, type SubscribedChannel } from "../hooks/useSubscriptions";
 import { channelPath } from "./format";
-import { HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
+import { FlagIcon, HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
 
 interface Entry {
   to: string;
@@ -17,6 +18,13 @@ const ENTRIES: Entry[] = [
   { to: "/feed/subscriptions", label: "Subscriptions", Icon: SubscriptionsIcon },
   { to: "/feed/history", label: "History", Icon: HistoryIcon },
 ];
+
+/** Pages only moderators and admins use. */
+export function staffEntries(role: string | undefined): Entry[] {
+  const entries: Entry[] = [];
+  if (isModerator(role)) entries.push({ to: "/moderation", label: "Reports", Icon: FlagIcon });
+  return entries;
+}
 
 /** How many channels the guide lists before "Show more", as on YouTube. */
 export const COLLAPSED_CHANNELS = 7;
@@ -75,6 +83,16 @@ export function FullGuide() {
         </NavLink>
       ))}
       {user && <Subscriptions />}
+      {staffEntries(user?.role).length > 0 && (
+        <section aria-label="Staff" className="mt-3 border-t border-line pt-3">
+          {staffEntries(user?.role).map(({ to, label, Icon }) => (
+            <NavLink key={to} to={to} end className={activeRow}>
+              <Icon />
+              {label}
+            </NavLink>
+          ))}
+        </section>
+      )}
     </nav>
   );
 }
