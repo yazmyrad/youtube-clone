@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { ChannelPage } from "./pages/ChannelPage";
+import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -21,6 +22,7 @@ export function App() {
         <Route index element={<HomePage />} />
         <Route path="/results" element={<SearchPage />} />
         <Route path="/feed/subscriptions" element={<SubscriptionsPage />} />
+        <Route path="/feed/history" element={<HistoryPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/:handle/:tab?" element={<ChannelPage />} />

@@ -58,7 +58,7 @@ const links = () => [...container.querySelectorAll("a")].map((a) => a.getAttribu
 it("links Home and Subscriptions, and lists no channels when signed out", async () => {
   await render();
 
-  expect(links()).toEqual(["/", "/feed/subscriptions"]);
+  expect(links()).toEqual(["/", "/feed/subscriptions", "/feed/history"]);
   expect(get).not.toHaveBeenCalled();
 });
 
@@ -70,14 +70,14 @@ it("lists the subscribed channels, and the rest after Show more", async () => {
 
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(links()).toHaveLength(2 + COLLAPSED_CHANNELS);
+    expect(links()).toHaveLength(3 + COLLAPSED_CHANNELS);
   });
   expect(links()).toContain("/@chan0");
   const more = [...container.querySelectorAll("button")].find(
     (b) => b.textContent === "Show 2 more",
   );
   await act(async () => more!.click());
-  expect(links()).toHaveLength(2 + COLLAPSED_CHANNELS + 2);
+  expect(links()).toHaveLength(3 + COLLAPSED_CHANNELS + 2);
   expect(container.textContent).toContain("Show fewer");
 });
 

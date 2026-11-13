@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useMySubscriptions, type SubscribedChannel } from "../hooks/useSubscriptions";
 import { channelPath } from "./format";
-import { HomeIcon, SubscriptionsIcon } from "./icons";
+import { HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
 
 interface Entry {
   to: string;
@@ -15,6 +15,7 @@ interface Entry {
 const ENTRIES: Entry[] = [
   { to: "/", label: "Home", Icon: HomeIcon },
   { to: "/feed/subscriptions", label: "Subscriptions", Icon: SubscriptionsIcon },
+  { to: "/feed/history", label: "History", Icon: HistoryIcon },
 ];
 
 /** How many channels the guide lists before "Show more", as on YouTube. */

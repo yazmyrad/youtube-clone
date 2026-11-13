@@ -64,3 +64,7 @@ it("opens a playlist by its list parameter", () => {
 it("opens the watch page inside a playlist", () => {
   expect(render("/watch?v=a7f3&list=p1")).toContain("aspect-video");
 });
+
+it("opens the watch history", () => {
+  expect(render("/feed/history")).not.toContain("The link may be broken");
+});

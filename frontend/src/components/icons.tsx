@@ -38,6 +38,12 @@ export const SubscriptionsIcon = () => (
   </Icon>
 );
 
+export const HistoryIcon = () => (
+  <Icon>
+    <path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9L8.8 12H6a7 7 0 1 1 2.1 5l-1.4 1.4A9 9 0 1 0 13 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8z" />
+  </Icon>
+);
+
 export const AccountIcon = () => (
   <Icon>
     <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zm0 14a8 8 0 0 1-6.2-3c.9-1.7 3.7-3 6.2-3s5.3 1.3 6.2 3a8 8 0 0 1-6.2 3z" />

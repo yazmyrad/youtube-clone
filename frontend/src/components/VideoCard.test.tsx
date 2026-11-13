@@ -51,3 +51,12 @@ it("leaves the channel out on the channel's own page, and shows a badge", () => 
   expect(html).not.toContain("Ana");
   expect(html).toContain("Private");
 });
+
+it("shows how much was watched, and nothing when nothing was", () => {
+  const html = render(<VideoRowCard video={video} progress={0.25} />);
+
+  expect(html).toContain('data-testid="progress"');
+  expect(html).toContain("width:25%");
+  expect(render(<VideoRowCard video={video} progress={0} />)).not.toContain("progress");
+  expect(render(<VideoRowCard video={video} />)).not.toContain('data-testid="progress"');
+});
