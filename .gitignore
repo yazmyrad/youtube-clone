@@ -1,6 +1,8 @@
 # Secrets: .env from install.sh, .env.dev and backend/.env from `make env`
 .env
 .env.dev
+# Demo passwords from install.sh and `make seed`
+demo-credentials*.txt
 
 # Python
 .venv/

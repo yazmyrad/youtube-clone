@@ -20,6 +20,10 @@ services:
     volumes:
       - ./backend/app:/srv/app:ro
 
+  seed:
+    volumes:
+      - ./backend/app:/srv/app:ro
+
   migrate:
     volumes:
       - ./backend/app:/srv/app:ro

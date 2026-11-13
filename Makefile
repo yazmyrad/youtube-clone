@@ -11,7 +11,7 @@ IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
 .PHONY: help setup env venv frontend-deps frontend-check api-types dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
-	run-local test test-storage test-upload smoke lint fix check
+	run-local test test-storage test-upload seed smoke lint fix check
 
 help: ## Show this list
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) \
@@ -109,6 +109,9 @@ test-storage: env ## Check MinIO buckets and permissions on the running dev stac
 
 test-upload: env ## Check uploads through nginx on the running dev stack (LARGE=1 sends 2 GB)
 	@LARGE="$(LARGE)" scripts/test-upload.sh $(DEV)
+
+seed: env ## Add demo channels, videos and accounts to the dev stack (passwords in demo-credentials.dev.txt)
+	@scripts/seed.sh demo-credentials.dev.txt $(DEV)
 
 smoke: env ## Check the running dev stack from outside, through nginx
 	@. ./.env.dev && SMOKE_DEV=1 scripts/smoke.sh "http://127.0.0.1:$$HTTP_PORT" $(DEV)

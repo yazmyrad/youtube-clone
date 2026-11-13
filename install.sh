@@ -7,7 +7,15 @@ cd "$(dirname "$(readlink -f "$0")")"
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ $# -eq 0 ] || die "unknown argument: $1 (usage: ./install.sh)"
+usage="usage: ./install.sh [--no-seed]"
+SEED=1
+for arg in "$@"; do
+    case "$arg" in
+        --no-seed) SEED=0 ;;
+        -h | --help) echo "$usage"; exit 0 ;;
+        *) die "unknown argument: $arg ($usage)" ;;
+    esac
+done
 
 SUDO=()
 if [ "$(id -u)" -ne 0 ]; then
@@ -107,9 +115,18 @@ log "Building and starting services (the first run takes a few minutes)"
 curl -fsS --max-time 10 "http://127.0.0.1:${port}/api/health" >/dev/null \
     || die "services started, but /api/health failed through nginx"
 
+CREDENTIALS=demo-credentials.txt
+if [ "$SEED" = 1 ]; then
+    log "Adding demo data (skip with --no-seed)"
+    scripts/seed.sh "$CREDENTIALS" "${DOCKER[@]}" compose || die "could not add demo data"
+fi
+
 host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 url="http://${host_ip:-localhost}"
 [ "$port" = 80 ] || url="${url}:${port}"
 
 log "Ready"
 printf '    Site:     %s/\n    API docs: %s/docs\n' "$url" "$url"
+if [ -f "$CREDENTIALS" ]; then
+    printf '    Demo:     accounts and passwords in %s/%s\n' "$PWD" "$CREDENTIALS"
+fi

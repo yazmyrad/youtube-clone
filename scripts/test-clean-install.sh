@@ -12,7 +12,7 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=youtube-clone
     exit 1
 fi
 
-tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude=.venv --exclude=__pycache__ --exclude='*.egg-info' \
+tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude='demo-credentials*.txt' --exclude=.venv --exclude=__pycache__ --exclude='*.egg-info' \
     --exclude=.pytest_cache --exclude=.ruff_cache --exclude=node_modules --exclude=dist -cf - . \
     | docker run --rm -i --network host -v /var/run/docker.sock:/var/run/docker.sock \
         -e HTTP_PORT=18081 ubuntu:24.04 bash -c '
@@ -26,5 +26,6 @@ tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude=.venv --exclude=_
     ./install.sh
     [ "$(stat -c %a .env)" = 600 ] || { echo "FAIL  .env is not mode 600" >&2; exit 1; }
     scripts/smoke.sh http://127.0.0.1:18081
+    scripts/test-demo-data.sh http://127.0.0.1:18081 demo-credentials.txt
 '
 printf 'clean install test passed\n'

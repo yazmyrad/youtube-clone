@@ -12,6 +12,8 @@ DOCKER=(docker)
 docker info >/dev/null 2>&1 || DOCKER=(sudo docker)
 
 [ ! -e .env ] || fail "remove .env first, so secret generation is tested"
+[ ! -e demo-credentials.txt ] || fail "remove demo-credentials.txt first, so seeding is tested"
+if ./install.sh --no-such-flag >/dev/null 2>&1; then fail "install.sh accepted an unknown flag"; fi
 [ -z "$("${DOCKER[@]}" volume ls -q --filter name=youtube-clone_)" ] \
     || fail "remove the existing stack first: docker compose down -v"
 
@@ -35,8 +37,10 @@ printf 'ok    only nginx publishes a port\n'
 
 scripts/smoke.sh "http://127.0.0.1:${port}" "${DOCKER[@]}" compose
 scripts/test-storage.sh "${DOCKER[@]}" compose
+scripts/test-demo-data.sh "http://127.0.0.1:${port}" demo-credentials.txt
 
 secrets_before="$(sha256sum .env)"
+demo_before="$(sha256sum demo-credentials.txt)"
 marker="$(date +%s%N)"
 psql "CREATE TABLE install_rerun_check (marker text); INSERT INTO install_rerun_check VALUES ('$marker');"
 trap 'psql "DROP TABLE IF EXISTS install_rerun_check;" || true' EXIT
@@ -44,6 +48,9 @@ trap 'psql "DROP TABLE IF EXISTS install_rerun_check;" || true' EXIT
 ./install.sh
 
 [ "$(sha256sum .env)" = "$secrets_before" ] || fail "install.sh changed .env on rerun"
+[ "$(sha256sum demo-credentials.txt)" = "$demo_before" ] || fail "install.sh changed demo passwords on rerun"
+[ "$(psql "SELECT count(*) FROM users WHERE email LIKE '%@demo.example.com';")" = 7 ] \
+    || fail "install.sh seeded the demo accounts twice"
 [ "$(psql 'SELECT marker FROM install_rerun_check;')" = "$marker" ] || fail "database data was lost on rerun"
 printf 'ok    rerun kept secrets and data\n'
 

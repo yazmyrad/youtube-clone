@@ -123,6 +123,31 @@ services:
     cap_drop:
       - ALL
 
+  # One-shot, only through `compose run seed` (install.sh does that): demo data. The worker
+  # image, because the clips are made with ffmpeg. Prints the demo passwords to stdout.
+  seed:
+    <<: *hardening
+    restart: "no"
+    profiles: ["seed"]
+    build:
+      context: backend
+      target: worker
+    command: ["python", "-m", "app.workers.seed"]
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    networks:
+      - backend
+      - storage
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
   postgres:
     <<: *hardening
     image: postgres:16.15-alpine
