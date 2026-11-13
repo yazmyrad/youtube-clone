@@ -472,6 +472,93 @@
         "title": "MeUpdateIn",
         "type": "object"
       },
+      "OwnPlaylistOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelBriefOut"
+          },
+          "contains_video": {
+            "description": "Whether it holds the `video_id` asked about",
+            "title": "Contains Video",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first such video's; null if none",
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "video_count": {
+            "description": "Videos the caller may watch",
+            "title": "Video Count",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "visibility",
+          "channel",
+          "video_count",
+          "thumbnail_url",
+          "updated_at",
+          "contains_video"
+        ],
+        "title": "OwnPlaylistOut",
+        "type": "object"
+      },
+      "OwnPlaylistPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnPlaylistOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` to get the next page",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "OwnPlaylistPage",
+        "type": "object"
+      },
       "PlaybackOut": {
         "properties": {
           "expires_at": {
@@ -3092,6 +3179,100 @@
           }
         ],
         "summary": "Edit display name and description",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/me/playlists": {
+      "get": {
+        "operationId": "list_my_playlists_api_users_me_playlists_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "video_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Video Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnPlaylistPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Your playlists, newest first, each saying whether it holds `video_id`",
         "tags": [
           "users"
         ]

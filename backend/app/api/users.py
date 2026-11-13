@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, status
 
 from app.core.pagination import (
@@ -9,9 +11,11 @@ from app.core.pagination import (
 from app.core.permissions import CurrentUser, SessionDep
 from app.schemas.channels import SubscribedChannelOut, SubscribedChannelPage
 from app.schemas.errors import ErrorOut
+from app.schemas.playlists import OwnPlaylistOut, OwnPlaylistPage
 from app.schemas.users import MeOut, MeUpdateIn
 from app.schemas.videos import VideoOwnerOut, VideoOwnerPage
 from app.services import channels as channels_service
+from app.services import playlists as playlists_service
 from app.services import users as users_service
 from app.services import videos as videos_service
 
@@ -68,4 +72,24 @@ async def list_my_subscriptions(
     return SubscribedChannelPage(
         items=[SubscribedChannelOut.model_validate(channel) for channel in channels],
         next_cursor=next_cursor,
+    )
+
+
+@router.get(
+    "/me/playlists",
+    response_model=OwnPlaylistPage,
+    summary="Your playlists, newest first, each saying whether it holds `video_id`",
+)
+async def list_my_playlists(
+    user: CurrentUser,
+    session: SessionDep,
+    video_id: uuid.UUID | None = None,
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_SUBSCRIPTION_PAGE,
+) -> OwnPlaylistPage:
+    playlists, next_cursor = await playlists_service.list_my_playlists(
+        session, user, video_id=video_id, cursor=cursor, limit=limit
+    )
+    return OwnPlaylistPage(
+        items=[OwnPlaylistOut.model_validate(p) for p in playlists], next_cursor=next_cursor
     )

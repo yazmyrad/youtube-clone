@@ -66,3 +66,12 @@ class PlaylistOrderIn(StrictModel):
         max_length=500,
         description="The new order of exactly the videos the playlist shows you",
     )
+
+
+class OwnPlaylistOut(PlaylistSummaryOut):
+    contains_video: bool = Field(description="Whether it holds the `video_id` asked about")
+
+
+class OwnPlaylistPage(BaseModel):
+    items: list[OwnPlaylistOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")

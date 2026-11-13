@@ -351,6 +351,23 @@ export interface paths {
         patch: operations["update_me_api_users_me_patch"];
         trace?: never;
     };
+    "/api/users/me/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your playlists, newest first, each saying whether it holds `video_id` */
+        get: operations["list_my_playlists_api_users_me_playlists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/me/subscriptions": {
         parameters: {
             query?: never;
@@ -740,6 +757,48 @@ export interface components {
             description?: string | null;
             /** Display Name */
             display_name?: string | null;
+        };
+        /** OwnPlaylistOut */
+        OwnPlaylistOut: {
+            channel: components["schemas"]["ChannelBriefOut"];
+            /**
+             * Contains Video
+             * @description Whether it holds the `video_id` asked about
+             */
+            contains_video: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thumbnail Url
+             * @description The first such video's; null if none
+             */
+            thumbnail_url: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Video Count
+             * @description Videos the caller may watch
+             */
+            video_count: number;
+            visibility: components["schemas"]["VideoVisibility"];
+        };
+        /** OwnPlaylistPage */
+        OwnPlaylistPage: {
+            /** Items */
+            items: components["schemas"]["OwnPlaylistOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page
+             */
+            next_cursor: string | null;
         };
         /** PlaybackOut */
         PlaybackOut: {
@@ -2280,6 +2339,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_playlists_api_users_me_playlists_get: {
+        parameters: {
+            query?: {
+                video_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnPlaylistPage"];
                 };
             };
             /** @description Unauthorized */

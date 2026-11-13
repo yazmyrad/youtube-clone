@@ -118,3 +118,72 @@ export function useDeletePlaylist(playlistId: string) {
     },
   });
 }
+
+export type OwnPlaylist = components["schemas"]["OwnPlaylistOut"];
+type Visibility = Playlist["visibility"];
+
+/** The caller's playlists for the Save dialog, each saying whether it holds `videoId`. */
+export function useMyPlaylists(videoId: string, enabled: boolean) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: [PLAYLISTS_KEY, "mine", user?.username ?? null, videoId],
+    enabled: enabled && user !== null,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await api.GET("/api/users/me/playlists", {
+        params: { query: { video_id: videoId, limit: 100 } },
+        signal,
+      });
+      if (!data) throw new Error(errorMessage(error));
+      return data.items;
+    },
+  });
+}
+
+/** Puts the video in the playlist, or takes it out. */
+export async function setSaved(
+  client: Api,
+  playlistId: string,
+  videoId: string,
+  saved: boolean,
+): Promise<Playlist> {
+  const { data, error } = saved
+    ? await client.POST("/api/playlists/{playlist_id}/items", {
+        params: { path: { playlist_id: playlistId } },
+        body: { video_id: videoId },
+      })
+    : await client.DELETE("/api/playlists/{playlist_id}/items/{video_id}", {
+        params: { path: { playlist_id: playlistId, video_id: videoId } },
+      });
+  if (!data) throw new Error(errorMessage(error));
+  return data;
+}
+
+/** A new playlist that starts with the video in it. */
+export async function createWithVideo(
+  client: Api,
+  title: string,
+  visibility: Visibility,
+  videoId: string,
+): Promise<Playlist> {
+  const { data, error } = await client.POST("/api/playlists", {
+    body: { title, visibility, description: "" },
+  });
+  if (!data) throw new Error(errorMessage(error));
+  return setSaved(client, data.id, videoId, true);
+}
+
+export function useSaveToPlaylist(videoId: string) {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: [PLAYLISTS_KEY] });
+  const toggle = useMutation({
+    mutationFn: ({ playlistId, saved }: { playlistId: string; saved: boolean }) =>
+      setSaved(api, playlistId, videoId, saved),
+    onSettled: refresh,
+  });
+  const create = useMutation({
+    mutationFn: ({ title, visibility }: { title: string; visibility: Visibility }) =>
+      createWithVideo(api, title, visibility, videoId),
+    onSettled: refresh,
+  });
+  return { toggle, create };
+}

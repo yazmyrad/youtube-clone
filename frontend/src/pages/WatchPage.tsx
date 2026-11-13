@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Comments } from "../components/Comments";
 import { nextInPlaylist, PlaylistPanel } from "../components/PlaylistPanel";
 import { ReactionButtons } from "../components/ReactionButtons";
+import { SaveButton } from "../components/SaveButton";
 import { SubscribeButton } from "../components/SubscribeButton";
 import { channelPath, formatSubscribers, watchPath } from "../components/format";
 import { useChannel } from "../hooks/useChannel";
@@ -51,7 +52,12 @@ function Details({ video }: { video: VideoDetails }) {
       <h1 className="mt-3 text-xl font-semibold wrap-anywhere">{video.title}</h1>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <ChannelRow video={video} />
-        {video.status === "ready" && <ReactionButtons video={video} />}
+        {video.status === "ready" && (
+          <div className="flex items-start gap-2">
+            <ReactionButtons video={video} />
+            <SaveButton videoId={video.id} />
+          </div>
+        )}
       </div>
       <div className="mt-3 rounded-xl bg-hover p-3 text-sm">
         <p className="font-medium">

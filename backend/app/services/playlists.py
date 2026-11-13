@@ -108,6 +108,51 @@ async def _summaries(
     ]
 
 
+@dataclass(frozen=True)
+class OwnPlaylist(PlaylistSummary):
+    contains_video: bool
+
+
+async def list_my_playlists(
+    session: AsyncSession,
+    user: User,
+    *,
+    video_id: uuid.UUID | None,
+    cursor: str | None,
+    limit: int,
+) -> tuple[list[OwnPlaylist], str | None]:
+    """The caller's playlists, newest first, each saying whether it holds `video_id`: what
+    the Save dialog shows."""
+    query = (
+        select(Playlist)
+        .options(joinedload(Playlist.owner, innerjoin=True))
+        .where(Playlist.owner_id == user.id)
+        .order_by(Playlist.created_at.desc(), Playlist.id.desc())
+        .limit(limit + 1)
+    )
+    if cursor:
+        query = query.where(tuple_(Playlist.created_at, Playlist.id) < decode_cursor(cursor))
+    playlists = list(await session.scalars(query))
+    next_cursor = None
+    if len(playlists) > limit:
+        playlists = playlists[:limit]
+        next_cursor = encode_cursor(playlists[-1].created_at, playlists[-1].id)
+    holding: set[uuid.UUID] = set()
+    if video_id is not None and playlists:
+        holding = set(
+            await session.scalars(
+                select(PlaylistItem.playlist_id).where(
+                    PlaylistItem.video_id == video_id,
+                    PlaylistItem.playlist_id.in_([p.id for p in playlists]),
+                )
+            )
+        )
+    summaries = await _summaries(session, user, playlists)
+    return [
+        OwnPlaylist(**vars(summary), contains_video=summary.id in holding) for summary in summaries
+    ], next_cursor
+
+
 async def _details(
     session: AsyncSession, viewer: User | None, playlist: Playlist
 ) -> PlaylistDetails:

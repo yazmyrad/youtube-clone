@@ -288,3 +288,31 @@ async def test_items_need_sign_in(
     response = await api.request(method, f"/api/playlists/{playlist}/items{path}", json=body)
 
     assert response.status_code == 401
+
+
+async def test_my_playlists_say_which_hold_the_video(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    alice, bob = await create_user("alice"), await create_user("bob")
+    [video] = await _videos(api, session, alice, 1)
+    holding = await _create(api, alice, visibility="private")
+    other = await _create(api, alice)
+    await _create(api, bob)
+    await _add(api, alice, holding, video)
+
+    response = await api.get(
+        "/api/users/me/playlists", headers=alice.headers, params={"video_id": video}
+    )
+    without = await api.get("/api/users/me/playlists", headers=alice.headers)
+
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert [(item["id"], item["contains_video"]) for item in items] == [
+        (other, False),
+        (holding, True),
+    ]
+    assert [item["contains_video"] for item in without.json()["items"]] == [False, False]
+
+
+async def test_my_playlists_need_sign_in(api: httpx.AsyncClient) -> None:
+    assert (await api.get("/api/users/me/playlists")).status_code == 401
