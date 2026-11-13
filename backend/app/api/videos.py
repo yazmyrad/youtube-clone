@@ -8,6 +8,7 @@ from app.core.pagination import DEFAULT_VIDEO_PAGE, KeysetCursor, PageLimit
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
 from app.models.user import USERNAME_PATTERN
 from app.schemas.errors import ErrorOut
+from app.schemas.reports import ReportIn, ReportOut
 from app.schemas.videos import (
     PlaybackOut,
     PresignedUploadOut,
@@ -24,6 +25,7 @@ from app.schemas.videos import (
     ViewOut,
 )
 from app.services import playback as playback_service
+from app.services import reports as reports_service
 from app.services import videos as videos_service
 from app.services import views as views_service
 
@@ -160,6 +162,25 @@ async def record_view(
             position_seconds=data.position_seconds,
         ),
         from_attributes=True,
+    )
+
+
+@router.post(
+    "/{video_id}/reports",
+    response_model=ReportOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Report a video you may watch; one open report per video",
+    responses={
+        status.HTTP_403_FORBIDDEN: {"model": ErrorOut},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorOut},
+        status.HTTP_409_CONFLICT: {"model": ErrorOut},
+    },
+)
+async def file_report(
+    video_id: uuid.UUID, data: ReportIn, user: CurrentUser, session: SessionDep
+) -> ReportOut:
+    return ReportOut.model_validate(
+        await reports_service.file_report(session, user, video_id, data)
     )
 
 

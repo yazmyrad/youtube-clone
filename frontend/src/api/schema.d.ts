@@ -562,6 +562,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/videos/{video_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report a video you may watch; one open report per video */
+        post: operations["file_report_api_videos__video_id__reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/videos/{video_id}/upload/complete": {
         parameters: {
             query?: never;
@@ -1052,6 +1069,50 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** ReportIn */
+        ReportIn: {
+            /**
+             * Details
+             * @default
+             */
+            details: string;
+            reason: components["schemas"]["ReportReason"];
+        };
+        /**
+         * ReportOut
+         * @description What the reporter sees of their own report.
+         */
+        ReportOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Details */
+            details: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            reason: components["schemas"]["ReportReason"];
+            status: components["schemas"]["ReportStatus"];
+            /**
+             * Video Id
+             * Format: uuid
+             */
+            video_id: string;
+        };
+        /**
+         * ReportReason
+         * @enum {string}
+         */
+        ReportReason: "spam" | "violence" | "sexual" | "copyright" | "other";
+        /**
+         * ReportStatus
+         * @enum {string}
+         */
+        ReportStatus: "open" | "resolved" | "dismissed";
         /** SubscribedChannelOut */
         SubscribedChannelOut: {
             /** Display Name */
@@ -3346,6 +3407,77 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_report_api_videos__video_id__reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

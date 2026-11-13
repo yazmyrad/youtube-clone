@@ -3,6 +3,7 @@
 Routers depend on these; nothing re-implements them inline.
 """
 
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -17,6 +18,8 @@ from app.core.errors import Conflict, Forbidden, NotFound, Unauthorized
 from app.models import (
     Comment,
     Playlist,
+    Report,
+    ReportStatus,
     User,
     UserRole,
     Video,
@@ -83,8 +86,7 @@ def ensure_video_owner(user: User, video: Video) -> None:
 
 
 async def can_view(session: AsyncSession, user: User | None, video: Video) -> bool:
-    """The viewing matrix (architecture.md, section 4). Fails closed for the row whose
-    table doesn't exist yet: a moderator's open report. The allowlist applies to any role:
+    """The viewing matrix (architecture.md, section 4). The allowlist applies to any role:
     it's the owner's own decision to share, not a moderator's power."""
     if video.deleted_at is not None:
         return False
@@ -98,7 +100,23 @@ async def can_view(session: AsyncSession, user: User | None, video: Video) -> bo
         return True
     if user is None:
         return False
-    return await session.get(VideoAccess, (video.id, user.id)) is not None
+    if await session.get(VideoAccess, (video.id, user.id)) is not None:
+        return True
+    # D35: a moderator sees a private video only to judge a report on it.
+    return user.role in (UserRole.moderator, UserRole.admin) and await has_open_report(
+        session, video.id
+    )
+
+
+async def has_open_report(session: AsyncSession, video_id: uuid.UUID) -> bool:
+    """Served by the partial unique index on open reports."""
+    return bool(
+        await session.scalar(
+            select(
+                exists().where(Report.video_id == video_id, Report.status == ReportStatus.open)
+            )
+        )
+    )
 
 
 async def ensure_can_view(session: AsyncSession, user: User | None, video: Video) -> None:
@@ -180,6 +198,13 @@ def playable_videos(viewer: User | None) -> ColumnElement[bool]:
         shown,
         or_(Video.visibility != VideoVisibility.private, Video.owner_id == viewer.id, shared),
     )
+
+
+async def ensure_can_report(session: AsyncSession, user: User, video: Video) -> None:
+    """Anyone who may watch it, but its owner, and not a hidden video (section 4)."""
+    await ensure_can_engage(session, user, video)
+    if video.owner_id == user.id:
+        raise Forbidden("You can't report your own video")
 
 
 def can_view_playlist(user: User | None, playlist: Playlist) -> bool:
