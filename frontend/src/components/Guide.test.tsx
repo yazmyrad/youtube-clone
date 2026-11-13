@@ -95,7 +95,7 @@ it("has no Subscriptions section without subscriptions", async () => {
 it.each([
   ["user", []],
   ["moderator", ["/moderation"]],
-  ["admin", ["/moderation"]],
+  ["admin", ["/moderation", "/admin/users"]],
 ])("gives a %s the staff links %j", (role, links) => {
   expect(staffEntries(role).map((entry) => entry.to)).toEqual(links);
 });

@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { isModerator } from "../hooks/useModeration";
 import { useMySubscriptions, type SubscribedChannel } from "../hooks/useSubscriptions";
 import { channelPath } from "./format";
-import { FlagIcon, HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
+import { AccountIcon, FlagIcon, HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
 
 interface Entry {
   to: string;
@@ -23,6 +23,7 @@ const ENTRIES: Entry[] = [
 export function staffEntries(role: string | undefined): Entry[] {
   const entries: Entry[] = [];
   if (isModerator(role)) entries.push({ to: "/moderation", label: "Reports", Icon: FlagIcon });
+  if (role === "admin") entries.push({ to: "/admin/users", label: "Users", Icon: AccountIcon });
   return entries;
 }
 

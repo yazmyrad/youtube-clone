@@ -68,3 +68,8 @@ it("opens the watch page inside a playlist", () => {
 it("opens the watch history", () => {
   expect(render("/feed/history")).not.toContain("The link may be broken");
 });
+
+it("has no staff pages for a plain user", () => {
+  expect(render("/moderation")).toContain("The link may be broken");
+  expect(render("/admin/users")).toContain("The link may be broken");
+});

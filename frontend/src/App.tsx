@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { ChannelPage } from "./pages/ChannelPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
@@ -25,6 +26,7 @@ export function App() {
         <Route path="/feed/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/feed/history" element={<HistoryPage />} />
         <Route path="/moderation" element={<ModerationPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/:handle/:tab?" element={<ChannelPage />} />
