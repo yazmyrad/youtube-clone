@@ -300,6 +300,30 @@ expect "make the playlist private" 200 "/api/playlists/$playlist_id" -X PATCH "$
     "${json_type[@]}" -d '{"visibility":"private"}'
 expect "a private playlist is 404 for others" 404 "/api/playlists/$playlist_id" "${fan_auth[@]}"
 
+# --- Views and history (D52) ----------------------------------------------
+
+view_body='{"watched_seconds":60,"position_seconds":1}'
+counted() { # extra curl arguments...; prints the heartbeat's "counted"
+    request -X POST "${json_type[@]}" -A "smoke-$name" -d "$view_body" "$@" \
+        "$base/api/videos/$id_a/view" > /dev/null
+    json 'd["counted"]' < "$work/body"
+}
+[ "$(counted)" = True ] && pass "D52 a first anonymous view counts" || fail "D52 a first view didn't count"
+[ "$(counted)" = False ] && pass "D52 a repeat view on the same day doesn't" \
+    || fail "D52 a repeat view counted"
+[ "$(counted -H 'X-Real-IP: 198.51.100.77' -H 'X-Forwarded-For: 198.51.100.77')" = False ] \
+    && pass "D52 a forged client address doesn't make a new viewer" \
+    || fail "D52 a forged X-Real-IP counted a new view"
+[ "$(counted "${fan_auth[@]}")" = True ] && pass "D52 a signed-in viewer counts on their own" \
+    || fail "D52 the signed-in view didn't count"
+[ "$(counted "${fan_auth[@]}")" = False ] && pass "D52 and only once" \
+    || fail "D52 the signed-in repeat counted"
+expect "the history" 200 "/api/users/me/history" "${fan_auth[@]}"
+[ "$(json 'd["items"][0]["video"]["id"]' < "$work/body")" = "$id_a" ] \
+    && pass "the watched video is in the history" || fail "the history lacks the video"
+expect "the history page is served" 200 "/feed/history"
+expect "clear the history" 204 "/api/users/me/history" -X DELETE "${fan_auth[@]}"
+
 if [ -n "$thumb_url" ]; then
     expect "D02 the home card's thumbnail loads" 200 "$thumb_url"
     [ "$(head -c 3 "$work/body" | od -An -tx1 | tr -d ' \n')" = ffd8ff ] \
