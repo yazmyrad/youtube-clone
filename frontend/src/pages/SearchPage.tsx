@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { LoadMore } from "../components/LoadMore";
 import { VideoRowCard } from "../components/VideoCard";
+import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { MIN_QUERY, searchText, useSearch } from "../hooks/useSearch";
 
 function Notice({ title, hint }: { title: string; hint?: string }) {
@@ -17,6 +18,7 @@ export function SearchPage() {
   const [params] = useSearchParams();
   const text = searchText(params.get("search_query"));
   const results = useSearch(text);
+  const renewThumbnails = useRenewThumbnails(results);
 
   if (text === null) {
     return (
@@ -33,7 +35,7 @@ export function SearchPage() {
       </p>
     );
   }
-  if (results.isError) {
+  if (!results.data) {
     return (
       <div role="alert">
         <Notice title="Couldn't search right now" hint="Check your connection and try again." />
@@ -52,15 +54,11 @@ export function SearchPage() {
       <ul className="flex flex-col gap-4">
         {videos.map((video) => (
           <li key={video.id}>
-            <VideoRowCard video={video} />
+            <VideoRowCard video={video} onThumbnailError={renewThumbnails} />
           </li>
         ))}
       </ul>
-      <LoadMore
-        hasMore={results.hasNextPage}
-        loading={results.isFetchingNextPage}
-        onMore={() => results.fetchNextPage()}
-      />
+      <LoadMore pages={results} />
     </div>
   );
 }

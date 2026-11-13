@@ -1,6 +1,7 @@
 import { LoadMore } from "../components/LoadMore";
 import { VideoGridCard } from "../components/VideoCard";
 import { useFeed } from "../hooks/useFeed";
+import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 
 const GRID = "grid gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 
@@ -21,6 +22,7 @@ function Skeleton() {
 
 export function HomePage() {
   const feed = useFeed();
+  const renewThumbnails = useRenewThumbnails(feed);
 
   let body;
   if (feed.isPending) {
@@ -31,7 +33,7 @@ export function HomePage() {
         ))}
       </div>
     );
-  } else if (feed.isError) {
+  } else if (!feed.data) {
     body = (
       <div role="alert" className="flex flex-col items-center gap-4 p-16 text-center">
         <p className="text-ink-muted">Couldn't load videos.</p>
@@ -53,16 +55,13 @@ export function HomePage() {
         </p>
       ) : (
         <>
+          <h1 className="sr-only">Home</h1>
           <div className={GRID}>
             {videos.map((video) => (
-              <VideoGridCard key={video.id} video={video} />
+              <VideoGridCard key={video.id} video={video} onThumbnailError={renewThumbnails} />
             ))}
           </div>
-          <LoadMore
-            hasMore={feed.hasNextPage}
-            loading={feed.isFetchingNextPage}
-            onMore={() => feed.fetchNextPage()}
-          />
+          <LoadMore pages={feed} />
         </>
       );
   }

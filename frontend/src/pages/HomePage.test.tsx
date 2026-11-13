@@ -105,3 +105,25 @@ it("offers a retry when the feed fails", async () => {
   await shows("Couldn't load videos");
   expect(container.querySelector('[role="alert"]')).not.toBeNull();
 });
+
+it("keeps the loaded videos when the next page fails, and retries only on a click", async () => {
+  get.mockResolvedValueOnce({ data: { items: [card("a", "First")], next_cursor: "c1" } });
+  get.mockResolvedValueOnce({ data: undefined, error: { detail: "boom" } });
+  get.mockResolvedValueOnce({ data: { items: [card("b", "Second")], next_cursor: null } });
+
+  await render();
+  await shows("First");
+  const button = (label: string) =>
+    [...container.querySelectorAll("button")].find((b) => b.textContent === label);
+  await act(async () => button("Show more")!.click());
+
+  await shows("Couldn't load more videos");
+  expect(container.textContent).toContain("First");
+  expect(get).toHaveBeenCalledTimes(2);
+
+  await act(async () => button("Retry")!.click());
+
+  await shows("Second");
+  expect(container.textContent).toContain("First");
+  expect(get).toHaveBeenCalledTimes(3);
+});
