@@ -134,6 +134,9 @@ services:
       target: worker
     command: ["python", "-m", "app.workers.seed"]
     environment: *backend-env
+    # Renders clips with ffmpeg while the site is up: same limits as the worker.
+    cpus: "${WORKER_CPUS:-1}"
+    mem_limit: 2g
     depends_on:
       migrate:
         condition: service_completed_successfully

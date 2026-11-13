@@ -21,10 +21,27 @@ trap 'rm -f "$tmp"' EXIT
 "$@" --progress quiet run --rm -T --build seed > "$tmp" \
     || { echo "ERROR: seeding demo data failed" >&2; exit 1; }
 
+pending() { # demo videos the worker hasn't finished
+    # shellcheck disable=SC2016 # expanded inside the container
+    "$@" exec -T postgres sh -c 'psql -qtA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+        SELECT count(*) FROM videos v JOIN users u ON u.id = v.owner_id
+        WHERE u.email LIKE '"'"'%@demo.example.com'"'"' AND v.status IN ('"'"'uploading'"'"', '"'"'processing'"'"')"'
+}
+
 if [ -s "$tmp" ]; then
     chmod 600 "$tmp"
     mv "$tmp" "$out"
     echo "==> Demo accounts and passwords saved to $out (readable only by you)"
+    # So the site is complete on the first visit, and a first upload isn't queued behind these.
+    echo "==> Processing the demo videos (about two minutes)"
+    deadline=$((SECONDS + 600))
+    while left="$(pending "$@")" && [ "${left:-1}" != 0 ]; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "WARNING: $left demo videos are still processing; they will appear when done" >&2
+            break
+        fi
+        sleep 5
+    done
 elif [ -f "$out" ]; then
     echo "==> Demo data is already there; its accounts are in $out"
 else
