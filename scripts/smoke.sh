@@ -207,6 +207,42 @@ expect "D02 details after like and comment" 200 "/api/videos/$id_a" "${auth[@]}"
 counts="$(json '(d["likes_count"], d["comments_count"], d["my_reaction"])' < "$work/body")"
 [ "$counts" = "(1, 1, 'like')" ] && pass "D02 the counters moved" || fail "D02 counters are $counts"
 
+# --- The main scenario (D02): others find the video on home and in search ----
+
+expect "D02 publish video A" 200 "/api/videos/$id_a" -X PATCH "${auth[@]}" "${json_type[@]}" \
+    -d "{\"title\":\"Smoke $name public\",\"visibility\":\"public\"}"
+expect "D02 rename private video B" 200 "/api/videos/$id_b" -X PATCH "${auth[@]}" "${json_type[@]}" \
+    -d "{\"title\":\"Smoke $name private\"}"
+
+for page in / "/results?search_query=$name"; do
+    expect "D02 $page is served" 200 "$page"
+    body_has 'id="root"' && pass "D02 $page is the SPA" || fail "D02 $page isn't the SPA"
+done
+
+listed() { # path; prints the listed video ids, one per line
+    expect "$2" 200 "$1"
+    json '"\n".join(v["id"] for v in d["items"])' < "$work/body" > "$work/listed"
+}
+listed "/api/videos?limit=50" "D02 the home feed, anonymously"
+grep -qx "$id_a" "$work/listed" && pass "D02 the public video is on home" \
+    || fail "D02 the public video isn't on home"
+grep -qx "$id_b" "$work/listed" && fail "D33 the private video is on home" \
+    || pass "D33 the private video isn't on home"
+thumb_url="$(json 'next(v["thumbnail_url"] for v in d["items"] if v["id"] == "'"$id_a"'")' \
+    < "$work/body" 2>/dev/null)"
+
+listed "/api/search/videos?q=$name" "D02 search by part of the title, anonymously"
+[ "$(cat "$work/listed")" = "$id_a" ] && pass "D02 search finds only the public video" \
+    || fail "D02 search found: $(tr '\n' ' ' < "$work/listed")"
+
+if [ -n "$thumb_url" ]; then
+    expect "D02 the home card's thumbnail loads" 200 "$thumb_url"
+    [ "$(head -c 3 "$work/body" | od -An -tx1 | tr -d ' \n')" = ffd8ff ] \
+        && pass "D02 the thumbnail is a JPEG" || fail "D02 the thumbnail isn't a JPEG"
+else
+    fail "D02 the home card has no thumbnail"
+fi
+
 token="${url_a#/hls/}"; token="${token%%/*}"
 exp="${token%%.*}"; sig="${token#*.}"
 hls="/hls/$token/$id_a"
