@@ -5,6 +5,7 @@ import type { Api } from "../api/client";
 import { errorMessage } from "../api/errors";
 import type { components } from "../api/schema";
 import { useAuth } from "./useAuth";
+import { SUBSCRIPTIONS_KEY } from "./useSubscriptions";
 
 export type Channel = components["schemas"]["ChannelOut"];
 export type ChannelVideo = components["schemas"]["ChannelVideoOut"];
@@ -78,7 +79,7 @@ export function useSubscription(username: string) {
         (channel) => channel && { ...channel, ...state },
       );
       // The sidebar list and the subscriptions feed now differ.
-      void queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      void queryClient.invalidateQueries({ queryKey: [SUBSCRIPTIONS_KEY] });
     },
   });
 }

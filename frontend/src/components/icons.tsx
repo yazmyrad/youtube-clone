@@ -32,6 +32,12 @@ export const HomeIcon = () => (
   </Icon>
 );
 
+export const SubscriptionsIcon = () => (
+  <Icon>
+    <path d="M4 2h16v2H4zm-1 4h18v2H3zm-1 4h20v12H2zm8 2.5v7l6-3.5z" />
+  </Icon>
+);
+
 export const AccountIcon = () => (
   <Icon>
     <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zm0 14a8 8 0 0 1-6.2-3c.9-1.7 3.7-3 6.2-3s5.3 1.3 6.2 3a8 8 0 0 1-6.2 3z" />

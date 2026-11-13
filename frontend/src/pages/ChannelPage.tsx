@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { LoadMore } from "../components/LoadMore";
 import { SubscribeButton } from "../components/SubscribeButton";
 import { VideoGridCard } from "../components/VideoCard";
+import { GRID } from "../components/VideoFeed";
 import { formatSubscribers } from "../components/format";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -14,8 +15,6 @@ import {
 } from "../hooks/useChannel";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { NotFoundPage } from "./NotFoundPage";
-
-const GRID = "grid gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 
 const BADGES: Record<ChannelVideo["visibility"], string | undefined> = {
   public: undefined,
