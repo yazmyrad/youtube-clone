@@ -8,14 +8,14 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import TextClause
+from sqlalchemy import ColumnElement, TextClause, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.db import get_session
 from app.core.errors import Conflict, Forbidden, NotFound, Unauthorized
 from app.models import Comment, User, UserRole, Video, VideoAccess, VideoStatus, VideoVisibility
-from app.models.video import LISTED
+from app.models.video import LISTED, PUBLISHED
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
@@ -134,6 +134,15 @@ def listed_videos() -> TextClause:
     """Which videos the feed and search may show, to anyone at all. The same literal SQL as
     the partial indexes, because Postgres can't match bound parameters to their predicates."""
     return LISTED
+
+
+def channel_videos(viewer: User | None, channel: User) -> ColumnElement[bool]:
+    """Which of a channel's videos its page lists for `viewer`. Others see what the feed would
+    show; the owner also sees their private and unlisted ones. Hidden videos stay off for
+    everyone, as they have no thumbnail to show, and unfinished ones are on the upload page."""
+    if viewer is not None and viewer.id == channel.id:
+        return and_(Video.owner_id == channel.id, PUBLISHED, Video.hidden_at.is_(None))
+    return and_(Video.owner_id == channel.id, LISTED)
 
 
 def can_show_thumbnail(video: Video) -> bool:

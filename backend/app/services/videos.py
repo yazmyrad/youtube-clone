@@ -12,6 +12,7 @@ from app.core.errors import Conflict, NotFound
 from app.core.pagination import decode_cursor, encode_cursor
 from app.core.permissions import (
     can_show_thumbnail,
+    channel_videos,
     ensure_can_engage,
     ensure_can_view,
     ensure_video_owner,
@@ -62,6 +63,7 @@ class VideoCard:
     published_at: datetime
     thumbnail_url: str
     channel: User
+    visibility: VideoVisibility
 
 
 async def create_video(
@@ -132,9 +134,7 @@ async def complete_upload(session: AsyncSession, user: User, video_id: uuid.UUID
     return video
 
 
-async def get_video(
-    session: AsyncSession, user: User | None, video_id: uuid.UUID
-) -> VideoDetails:
+async def get_video(session: AsyncSession, user: User | None, video_id: uuid.UUID) -> VideoDetails:
     video = await session.get(Video, video_id, options=[joinedload(Video.owner, innerjoin=True)])
     if video is None:
         raise NotFound("Video not found")
@@ -189,10 +189,18 @@ async def _listed_page(
     session: AsyncSession, *criteria: ColumnElement[bool], cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
     """Listed videos matching `criteria`, newest first, with keyset pagination."""
+    return await _card_page(session, listed_videos(), *criteria, cursor=cursor, limit=limit)
+
+
+async def _card_page(
+    session: AsyncSession, *criteria: ColumnElement[bool], cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    """Ready videos matching `criteria`, newest first, with keyset pagination. The criteria
+    decide who may see them."""
     query = (
         select(Video)
         .options(joinedload(Video.owner, innerjoin=True))
-        .where(listed_videos(), *criteria)
+        .where(*criteria)
         .order_by(Video.published_at.desc(), Video.id.desc())
         .limit(limit + 1)
     )
@@ -212,6 +220,7 @@ async def _listed_page(
             published_at=video.published_at,
             thumbnail_url=playback.thumbnail_url(video.id),
             channel=video.owner,
+            visibility=video.visibility,
         )
         for video in videos
     ]
@@ -222,6 +231,12 @@ async def list_feed(
     session: AsyncSession, *, cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
     return await _listed_page(session, cursor=cursor, limit=limit)
+
+
+async def list_channel_videos(
+    session: AsyncSession, viewer: User | None, channel: User, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    return await _card_page(session, channel_videos(viewer, channel), cursor=cursor, limit=limit)
 
 
 async def list_my_videos(

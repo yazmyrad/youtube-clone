@@ -109,6 +109,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{username}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channel details */
+        get: operations["get_channel_api_channels__username__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{username}/videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A channel's videos, newest first; the owner also sees private and unlisted ones */
+        get: operations["list_channel_videos_api_channels__username__videos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/comments/{comment_id}": {
         parameters: {
             query?: never;
@@ -391,6 +425,67 @@ export interface components {
             display_name: string;
             /** Username */
             username: string;
+        };
+        /**
+         * ChannelOut
+         * @description A channel's page header. A channel is a user, addressed by username.
+         */
+        ChannelOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Is Subscribed
+             * @description Whether the caller subscribes; false if anonymous
+             */
+            is_subscribed: boolean;
+            /** Subscribers Count */
+            subscribers_count: number;
+            /** Username */
+            username: string;
+        };
+        /** ChannelVideoOut */
+        ChannelVideoOut: {
+            channel: components["schemas"]["ChannelBriefOut"];
+            /** Duration Seconds */
+            duration_seconds: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Thumbnail Url
+             * @description Signed; request the list again after it expires
+             */
+            thumbnail_url: string;
+            /** Title */
+            title: string;
+            /** Views Count */
+            views_count: number;
+            /** @description Others only ever see public videos; the owner also sees the rest */
+            visibility: components["schemas"]["VideoVisibility"];
+        };
+        /** ChannelVideoPage */
+        ChannelVideoPage: {
+            /** Items */
+            items: components["schemas"]["ChannelVideoOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page
+             */
+            next_cursor: string | null;
         };
         /** CommentIn */
         CommentIn: {
@@ -1041,6 +1136,89 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_channel_api_channels__username__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channel_videos_api_channels__username__videos_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelVideoPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

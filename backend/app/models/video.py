@@ -41,6 +41,8 @@ class VideoStatus(enum.StrEnum):
 LISTED = text(
     "visibility = 'public' AND status = 'ready' AND hidden_at IS NULL AND deleted_at IS NULL"
 )
+# Ready and not deleted, in any visibility: the channel index's predicate.
+PUBLISHED = text("status = 'ready' AND deleted_at IS NULL")
 
 
 class Video(Base):
@@ -80,7 +82,7 @@ class Video(Base):
             "owner_id",
             text("published_at DESC"),
             text("id DESC"),
-            postgresql_where=text("status = 'ready' AND deleted_at IS NULL"),
+            postgresql_where=PUBLISHED,
         ),
         # The owner's own video list.
         Index(

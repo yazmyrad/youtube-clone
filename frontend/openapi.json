@@ -122,6 +122,126 @@
         "title": "ChannelBriefOut",
         "type": "object"
       },
+      "ChannelOut": {
+        "description": "A channel's page header. A channel is a user, addressed by username.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "is_subscribed": {
+            "description": "Whether the caller subscribes; false if anonymous",
+            "title": "Is Subscribed",
+            "type": "boolean"
+          },
+          "subscribers_count": {
+            "title": "Subscribers Count",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "display_name",
+          "description",
+          "subscribers_count",
+          "created_at",
+          "is_subscribed"
+        ],
+        "title": "ChannelOut",
+        "type": "object"
+      },
+      "ChannelVideoOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelBriefOut"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "description": "Signed; request the list again after it expires",
+            "title": "Thumbnail Url",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "views_count": {
+            "title": "Views Count",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/VideoVisibility",
+            "description": "Others only ever see public videos; the owner also sees the rest"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "duration_seconds",
+          "views_count",
+          "published_at",
+          "thumbnail_url",
+          "channel",
+          "visibility"
+        ],
+        "title": "ChannelVideoOut",
+        "type": "object"
+      },
+      "ChannelVideoPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelVideoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` to get the next page",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ChannelVideoPage",
+        "type": "object"
+      },
       "CommentIn": {
         "additionalProperties": false,
         "properties": {
@@ -1393,6 +1513,149 @@
         "summary": "Create an account",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/channels/{username}": {
+      "get": {
+        "operationId": "get_channel_api_channels__username__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "title": "Username",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Channel details",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
+    "/api/channels/{username}/videos": {
+      "get": {
+        "operationId": "list_channel_videos_api_channels__username__videos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "title": "Username",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelVideoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "A channel's videos, newest first; the owner also sees private and unlisted ones",
+        "tags": [
+          "channels"
         ]
       }
     },
