@@ -182,3 +182,16 @@ class ViewIn(StrictModel):
 class ViewOut(BaseModel):
     counted: bool = Field(description="Whether this call counted a new view")
     views_count: int
+
+
+class HistoryEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    video: VideoCardOut
+    progress_seconds: int = Field(description="Where you left off")
+    watched_at: datetime
+
+
+class HistoryPage(BaseModel):
+    items: list[HistoryEntryOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")

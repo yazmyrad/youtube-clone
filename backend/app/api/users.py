@@ -13,8 +13,9 @@ from app.schemas.channels import SubscribedChannelOut, SubscribedChannelPage
 from app.schemas.errors import ErrorOut
 from app.schemas.playlists import OwnPlaylistOut, OwnPlaylistPage
 from app.schemas.users import MeOut, MeUpdateIn
-from app.schemas.videos import VideoOwnerOut, VideoOwnerPage
+from app.schemas.videos import HistoryEntryOut, HistoryPage, VideoOwnerOut, VideoOwnerPage
 from app.services import channels as channels_service
+from app.services import history as history_service
 from app.services import playlists as playlists_service
 from app.services import users as users_service
 from app.services import videos as videos_service
@@ -93,3 +94,41 @@ async def list_my_playlists(
     return OwnPlaylistPage(
         items=[OwnPlaylistOut.model_validate(p) for p in playlists], next_cursor=next_cursor
     )
+
+
+@router.get(
+    "/me/history",
+    response_model=HistoryPage,
+    summary="Your watch history, most recent first; only videos you may still watch",
+)
+async def list_history(
+    user: CurrentUser,
+    session: SessionDep,
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_VIDEO_PAGE,
+) -> HistoryPage:
+    entries, next_cursor = await history_service.list_history(
+        session, user, cursor=cursor, limit=limit
+    )
+    return HistoryPage(
+        items=[HistoryEntryOut.model_validate(entry) for entry in entries],
+        next_cursor=next_cursor,
+    )
+
+
+@router.delete(
+    "/me/history",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Clear your watch history",
+)
+async def clear_history(user: CurrentUser, session: SessionDep) -> None:
+    await history_service.clear(session, user)
+
+
+@router.delete(
+    "/me/history/{video_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove one video from your watch history (safe to repeat)",
+)
+async def remove_history_entry(video_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> None:
+    await history_service.remove_entry(session, user, video_id)
