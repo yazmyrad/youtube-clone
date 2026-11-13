@@ -60,3 +60,7 @@ it("opens a playlist by its list parameter", () => {
   expect(render("/playlist?list=p1")).not.toContain("The link may be broken");
   expect(render("/playlist")).toContain("The link may be broken");
 });
+
+it("opens the watch page inside a playlist", () => {
+  expect(render("/watch?v=a7f3&list=p1")).toContain("aspect-video");
+});

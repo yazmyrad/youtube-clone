@@ -1,10 +1,12 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Comments } from "../components/Comments";
+import { nextInPlaylist, PlaylistPanel } from "../components/PlaylistPanel";
 import { ReactionButtons } from "../components/ReactionButtons";
 import { SubscribeButton } from "../components/SubscribeButton";
-import { channelPath, formatSubscribers } from "../components/format";
+import { channelPath, formatSubscribers, watchPath } from "../components/format";
 import { useChannel } from "../hooks/useChannel";
+import { usePlaylist } from "../hooks/usePlaylists";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { statusMessage, useVideo, VideoNotFound, type VideoDetails } from "../hooks/useVideo";
 import { NotFoundPage } from "./NotFoundPage";
@@ -61,8 +63,13 @@ function Details({ video }: { video: VideoDetails }) {
   );
 }
 
-function Watch({ videoId }: { videoId: string }) {
+function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | null }) {
   const video = useVideo(videoId);
+  const navigate = useNavigate();
+  // A playlist the caller can't see, or a broken link, just plays the video alone.
+  const playlist = usePlaylist(playlistId).data ?? null;
+  const next = playlist ? nextInPlaylist(playlist, videoId) : null;
+  const playNext = next && playlist ? () => void navigate(watchPath(next, playlist.id)) : undefined;
 
   if (video.isError) {
     if (video.error instanceof VideoNotFound) return <NotFoundPage />;
@@ -74,8 +81,8 @@ function Watch({ videoId }: { videoId: string }) {
   }
 
   const message = video.data ? statusMessage(video.data.status) : null;
-  return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+  const main = (
+    <div className="min-w-0 flex-1">
       {video.isPending && <div className="aspect-video w-full rounded-xl bg-hover" />}
       {message !== null && (
         <div className="grid aspect-video w-full place-items-center rounded-xl bg-black p-6 text-center text-white">
@@ -83,10 +90,21 @@ function Watch({ videoId }: { videoId: string }) {
         </div>
       )}
       {video.data?.status === "ready" && (
-        <VideoPlayer videoId={videoId} poster={video.data.thumbnail_url ?? undefined} />
+        <VideoPlayer
+          videoId={videoId}
+          poster={video.data.thumbnail_url ?? undefined}
+          onEnded={playNext}
+        />
       )}
       {video.data && <Details video={video.data} />}
       {video.data?.status === "ready" && <Comments video={video.data} />}
+    </div>
+  );
+  if (!playlist) return <div className="mx-auto max-w-5xl px-4 py-6">{main}</div>;
+  return (
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start">
+      {main}
+      <PlaylistPanel playlist={playlist} videoId={videoId} />
     </div>
   );
 }
@@ -94,7 +112,8 @@ function Watch({ videoId }: { videoId: string }) {
 export function WatchPage() {
   const [params] = useSearchParams();
   const videoId = params.get("v");
+  const playlistId = params.get("list");
   if (!videoId) return <NotFoundPage />;
   // A new video starts from a clean page, not with the last one's details on screen.
-  return <Watch key={videoId} videoId={videoId} />;
+  return <Watch key={videoId} videoId={videoId} playlistId={playlistId} />;
 }

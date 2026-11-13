@@ -105,7 +105,16 @@ function playNatively(
   };
 }
 
-export function VideoPlayer({ videoId, poster }: { videoId: string; poster?: string }) {
+export function VideoPlayer({
+  videoId,
+  poster,
+  onEnded,
+}: {
+  videoId: string;
+  poster?: string;
+  /** Called when the video plays to its end, as for moving on in a playlist. */
+  onEnded?: () => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failure, setFailure] = useState<PlayerFailure | null>(null);
 
@@ -161,6 +170,7 @@ export function VideoPlayer({ videoId, poster }: { videoId: string; poster?: str
         controls={failure === null}
         autoPlay
         playsInline
+        onEnded={onEnded}
         className="size-full"
       />
       {failure && (

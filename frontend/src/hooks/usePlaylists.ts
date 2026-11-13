@@ -20,14 +20,15 @@ export function playlistKey(playlistId: string, viewer: string | null) {
   return [PLAYLISTS_KEY, "one", playlistId, viewer];
 }
 
-export function usePlaylist(playlistId: string) {
+/** Off while `playlistId` is null, for the watch page outside a playlist. */
+export function usePlaylist(playlistId: string | null) {
   const { user, isLoading } = useAuth();
   return useQuery({
-    queryKey: playlistKey(playlistId, user?.username ?? null),
-    enabled: !isLoading,
+    queryKey: playlistKey(playlistId ?? "", user?.username ?? null),
+    enabled: !isLoading && playlistId !== null,
     queryFn: async ({ signal }) => {
       const { data, error, response } = await api.GET("/api/playlists/{playlist_id}", {
-        params: { path: { playlist_id: playlistId } },
+        params: { path: { playlist_id: playlistId ?? "" } },
         signal,
       });
       if (data) return data;
