@@ -115,6 +115,13 @@ async def upload_media(key: str, source: Path, content_type: str) -> None:
     await asyncio.to_thread(_put, get_settings().media_bucket, key, source, content_type)
 
 
+async def upload_raw(key: str, source: Path) -> None:
+    """Puts a source file where a browser upload would land. Only the seed uses this."""
+    await asyncio.to_thread(
+        _put, get_settings().uploads_bucket, key, source, "application/octet-stream"
+    )
+
+
 async def delete_object(bucket: str, key: str) -> None:
     """Deleting something that's already gone is not an error."""
     await asyncio.to_thread(get_client().delete_object, Bucket=bucket, Key=key)

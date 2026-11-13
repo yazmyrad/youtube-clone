@@ -277,3 +277,57 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
 
     master = _write_master(hls_dir, renditions, info.duration)
     return Transcoded(hls_dir=hls_dir, master=master, thumbnail=thumbnail)
+
+
+# Demo clips. Installed with ffmpeg on Debian and Ubuntu, through fontconfig's dependencies.
+FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
+TITLE_CARD_TIMEOUT_SECONDS = 120
+
+
+@dataclass(frozen=True)
+class TitleCard:
+    title: str
+    channel: str
+    tag: str
+    color: str  # RRGGBB
+    tone_hz: int
+    seconds: int
+
+
+async def render_title_card(card: TitleCard, path: Path) -> None:
+    """Writes a 720p H.264/AAC clip: the title on a solid color, the channel and a topic tag.
+
+    Text goes through files, so no title can break out of the filter syntax."""
+    texts = {"title": card.title, "channel": card.channel, "tag": card.tag}
+    for name, value in texts.items():
+        path.with_suffix(f".{name}.txt").write_text(value)
+    bold, regular, mono = (
+        FONT_DIR / f"DejaVu{face}.ttf" for face in ("Sans-Bold", "Sans", "SansMono-Bold")
+    )
+
+    def text(name: str, font: Path, style: str) -> str:
+        return f"drawtext=fontfile={font}:textfile={path.with_suffix(f'.{name}.txt')}:{style}"
+
+    video = ",".join(
+        (
+            text("title", bold, "fontcolor=white:fontsize=72:x=(w-tw)/2:y=(h-th)/2"),
+            text("channel", regular, "fontcolor=white@0.85:fontsize=36:x=64:y=h-100"),
+            text("tag", mono, "fontcolor=white@0.7:fontsize=32:x=64:y=64"),
+        )
+    )
+    seconds = str(card.seconds)
+    try:
+        await _run(
+            [
+                "ffmpeg", "-nostdin", "-v", "error", "-y",
+                "-f", "lavfi", "-i", f"color=c=0x{card.color}:s=1280x720:r=24:d={seconds}",
+                "-f", "lavfi", "-i", f"sine=f={card.tone_hz}:d={seconds}",
+                "-vf", video, "-af", "volume=0.2",
+                "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-shortest", str(path),
+            ],
+            TITLE_CARD_TIMEOUT_SECONDS,
+        )  # fmt: skip
+    finally:
+        for name in texts:
+            path.with_suffix(f".{name}.txt").unlink(missing_ok=True)
