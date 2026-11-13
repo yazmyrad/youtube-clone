@@ -29,7 +29,7 @@ cleanup() {
             true' "$id" 2>/dev/null
     done
     "${compose[@]}" exec -T postgres sh -c \
-        'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM videos WHERE owner_id IN (SELECT id FROM users WHERE username = '"'"'$0'"'"'); DELETE FROM users WHERE username IN ('"'"'$0'"'"', '"'"'${0}f'"'"')"' \
+        'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DELETE FROM videos WHERE owner_id IN (SELECT id FROM users WHERE username = '"'"'$0'"'"'); DELETE FROM moderation_actions WHERE actor_id IN (SELECT id FROM users WHERE username = '"'"'${0}m'"'"'); DELETE FROM users WHERE username IN ('"'"'$0'"'"', '"'"'${0}f'"'"', '"'"'${0}m'"'"')"' \
         "$name" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -323,6 +323,47 @@ expect "the history" 200 "/api/users/me/history" "${fan_auth[@]}"
     && pass "the watched video is in the history" || fail "the history lacks the video"
 expect "the history page is served" 200 "/feed/history"
 expect "clear the history" 204 "/api/users/me/history" -X DELETE "${fan_auth[@]}"
+
+# --- Reports and moderation (D55, D56, D46) --------------------------------
+
+psql_dev() { # SQL; runs it in the stack's database, prints the bare result
+    "${compose[@]}" exec -T postgres sh -c 'psql -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$0"' "$1"
+}
+moderator="${name}m"
+curl -fsS --max-time 20 -o /dev/null "${json_type[@]}" -d "{\"username\":\"$moderator\",\"email\":\"$moderator@example.com\",\"password\":\"correct horse battery\",\"display_name\":\"Mod\"}" \
+    "$base/api/auth/register" || die "could not register a moderator"
+psql_dev "UPDATE users SET role = 'moderator' WHERE username = '$moderator'" > /dev/null \
+    || die "could not promote the moderator"
+curl -fsS --max-time 20 -o "$work/login" "${json_type[@]}" \
+    -d "{\"email\":\"$moderator@example.com\",\"password\":\"correct horse battery\"}" \
+    "$base/api/auth/login" || die "could not log in as the moderator"
+mod_auth=(-H "Authorization: Bearer $(json 'd["access_token"]' < "$work/login")")
+
+expect "D56 report a video" 201 "/api/videos/$id_a/reports" -X POST "${fan_auth[@]}" \
+    "${json_type[@]}" -d '{"reason":"spam","details":"Smoke report"}'
+expect "D56 a second open report is refused" 409 "/api/videos/$id_a/reports" -X POST \
+    "${fan_auth[@]}" "${json_type[@]}" -d '{"reason":"other"}'
+expect "a user can't open the queue" 403 "/api/moderation/reports" "${fan_auth[@]}"
+expect "D55 the moderator's queue" 200 "/api/moderation/reports?limit=100" "${mod_auth[@]}"
+body_has "$id_a" && pass "D55 the reported video is queued" || fail "D55 the queue lacks the video"
+expect "D55 hide the video" 200 "/api/moderation/videos/$id_a/hide" -X POST "${mod_auth[@]}" \
+    "${json_type[@]}" -d '{"reason":"Smoke hide"}'
+listed "/api/videos?limit=100" "D55 the home feed after hiding"
+grep -qx "$id_a" "$work/listed" && fail "D55 the hidden video is on home" \
+    || pass "D55 the hidden video left home"
+expect "D46 a hidden video gets no playback" 404 "/api/videos/$id_a/playback" -X POST
+expect "D55 the owner sees why" 200 "/api/videos/$id_a" "${auth[@]}"
+[ "$(json 'd["hidden_reason"]' < "$work/body")" = "Smoke hide" ] \
+    && pass "D55 the owner sees the reason" || fail "D55 the owner doesn't see the reason"
+expect "D55 restore the video" 204 "/api/moderation/videos/$id_a/restore" -X POST \
+    "${mod_auth[@]}" "${json_type[@]}" -d '{}'
+listed "/api/videos?limit=100" "D55 the home feed after restoring"
+grep -qx "$id_a" "$work/listed" && pass "D55 the restored video is back on home" \
+    || fail "D55 the restored video isn't on home"
+audit="$(psql_dev "SELECT string_agg(action::text, ',' ORDER BY id) FROM moderation_actions WHERE target_video_id = '$id_a'")"
+[ "$audit" = "hide_video,resolve_report,restore_video" ] && pass "D55 every step is audited" \
+    || fail "D55 the audit log has: $audit"
+expect "the moderation page is served" 200 "/moderation"
 
 if [ -n "$thumb_url" ]; then
     expect "D02 the home card's thumbnail loads" 200 "$thumb_url"
