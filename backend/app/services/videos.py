@@ -21,6 +21,7 @@ from app.core.permissions import (
 from app.models import (
     ProcessingJob,
     ReactionType,
+    Subscription,
     User,
     Video,
     VideoAccess,
@@ -231,6 +232,15 @@ async def list_feed(
     session: AsyncSession, *, cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
     return await _listed_page(session, cursor=cursor, limit=limit)
+
+
+async def list_subscription_feed(
+    session: AsyncSession, user: User, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    """Listed videos from the channels `user` subscribes to, newest first. Subscribing gives
+    no extra access: a private or unlisted video stays off this feed like any other."""
+    subscribed = select(Subscription.channel_id).where(Subscription.subscriber_id == user.id)
+    return await _listed_page(session, Video.owner_id.in_(subscribed), cursor=cursor, limit=limit)
 
 
 async def list_channel_videos(
