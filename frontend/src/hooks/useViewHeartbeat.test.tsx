@@ -88,3 +88,29 @@ it("says nothing about a video that never played", () => {
 
   expect(post).not.toHaveBeenCalled();
 });
+
+it("slows down once the view is settled", () => {
+  const tick = () => {
+    play(10);
+    vi.advanceTimersByTime(HEARTBEAT_MS);
+  };
+  for (let i = 0; i < 3; i++) tick(); // Up to 30 s: a report every 10 s.
+  expect(sent()).toHaveLength(3);
+
+  tick();
+  tick(); // Settled: 10 and 20 s after the last report are too soon.
+  expect(sent()).toHaveLength(3);
+  tick();
+
+  expect(sent()).toHaveLength(4);
+});
+
+it("keeps the place when leaving after only seeking", () => {
+  time = 95;
+  video().dispatchEvent(new Event("seeked"));
+
+  act(() => root.unmount());
+  root = createRoot(container);
+
+  expect(sent()).toEqual([{ watched_seconds: 0, position_seconds: 95 }]);
+});

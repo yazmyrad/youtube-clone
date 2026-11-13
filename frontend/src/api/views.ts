@@ -2,6 +2,10 @@ import type { Api } from "./client";
 
 /** How often a playing video reports, in milliseconds. */
 export const HEARTBEAT_MS = 10_000;
+/** How often once the view is settled: the server counts one after at most this many
+ * seconds played, and later reports only move the place in the history. */
+export const SETTLED_AFTER_SECONDS = 30;
+export const SETTLED_HEARTBEAT_MS = 30_000;
 
 /** Seconds actually played: forward steps between time updates, so seeking ahead or
  * scrubbing doesn't count, and neither does sitting paused. */

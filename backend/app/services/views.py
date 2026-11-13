@@ -48,7 +48,9 @@ async def record_view(
     duration = video.duration_seconds or 0
 
     counted = False
-    if min(watched_seconds, duration) >= seconds_to_count(duration):
+    # As on YouTube, a channel watching its own video adds no view.
+    own = viewer is not None and viewer.id == video.owner_id
+    if not own and min(watched_seconds, duration) >= seconds_to_count(duration):
         key = security.viewer_key(viewer.id if viewer else None, client.ip, client.user_agent)
         inserted = await session.scalar(
             insert(VideoView)

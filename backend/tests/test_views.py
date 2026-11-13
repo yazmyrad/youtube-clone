@@ -233,3 +233,16 @@ async def test_validates_the_heartbeat(
     response = await api.post(f"/api/videos/{video}/view", json=body)
 
     assert response.status_code == 422
+
+
+async def test_watching_your_own_video_adds_no_view(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    alice = await create_user("alice")
+    video = await create_ready_video(api, session, alice)
+
+    response = await _view(api, video, alice)
+
+    assert response.json() == {"counted": False, "views_count": 0}
+    assert await _views(session, video) == (0, 0)
+    assert await session.scalar(select(func.count()).select_from(WatchHistory)) == 1

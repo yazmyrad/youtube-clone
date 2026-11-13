@@ -1,7 +1,13 @@
 import { useEffect, type RefObject } from "react";
 
 import { api } from "../api/client";
-import { HEARTBEAT_MS, sendView, WatchTracker } from "../api/views";
+import {
+  HEARTBEAT_MS,
+  sendView,
+  SETTLED_AFTER_SECONDS,
+  SETTLED_HEARTBEAT_MS,
+  WatchTracker,
+} from "../api/views";
 
 /** Reports playback to the server while `video` plays, and when it pauses or ends: the
  * server counts the view and keeps the viewer's place in their history. */
@@ -25,14 +31,22 @@ export function useViewHeartbeat(video: RefObject<HTMLVideoElement | null>, vide
     on("seeked", () => tracker.seeked(element.currentTime));
     on("pause", send);
     on("ended", send);
+    let lastTick = 0;
     const timer = window.setInterval(() => {
-      if (!element.paused) send();
+      if (element.paused) return;
+      lastTick += HEARTBEAT_MS;
+      // Once the view is settled, slow down: the reports only keep the history's place.
+      const settled = tracker.watched >= SETTLED_AFTER_SECONDS;
+      if (settled && lastTick < SETTLED_HEARTBEAT_MS) return;
+      lastTick = 0;
+      send();
     }, HEARTBEAT_MS);
 
     return () => {
       window.clearInterval(timer);
       listeners.abort();
-      if (tracker.watched > 0) send();
+      // Also after only seeking: the history keeps the place.
+      if (tracker.watched > 0 || element.currentTime > 0) send();
     };
   }, [video, videoId]);
 }
