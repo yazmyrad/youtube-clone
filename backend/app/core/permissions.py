@@ -95,7 +95,13 @@ async def can_view(session: AsyncSession, user: User | None, video: Video) -> bo
     if video.status != VideoStatus.ready:
         return False
     if video.hidden_at is not None:
-        return user is not None and user.role in (UserRole.moderator, UserRole.admin)
+        if user is None or user.role not in (UserRole.moderator, UserRole.admin):
+            return False
+        # Moderators see hidden videos to decide on restoring them, but a private one only
+        # while it has an open report, like any private video (D35).
+        return video.visibility != VideoVisibility.private or await has_open_report(
+            session, video.id
+        )
     if video.visibility != VideoVisibility.private:
         return True
     if user is None:
@@ -136,6 +142,26 @@ async def ensure_can_engage(session: AsyncSession, user: User | None, video: Vid
     await ensure_can_play(session, user, video)
     if video.status != VideoStatus.ready:
         raise Conflict("The video isn't ready yet")
+    if await _reviewing_only(session, user, video):
+        raise Forbidden("Moderators can only review this video")
+
+
+async def _reviewing_only(session: AsyncSession, user: User | None, video: Video) -> bool:
+    """Whether `user` sees this private video only through the D35 window: they may review
+    it, not like, comment, report or add views to something its owner kept private."""
+    if user is None or video.visibility != VideoVisibility.private:
+        return False
+    if video.owner_id == user.id:
+        return False
+    return await session.get(VideoAccess, (video.id, user.id)) is None
+
+
+def ensure_can_restore(video: Video | None) -> Video:
+    """Restoring shows a moderator nothing, so it needs no viewing rights: a hidden private
+    video has no open report left to grant them (D35), and must still be restorable."""
+    if video is None or video.deleted_at is not None:
+        raise NotFound("Video not found")
+    return video
 
 
 async def ensure_can_delete_comment(
@@ -157,7 +183,8 @@ async def ensure_can_delete_comment(
 
 def listed_videos() -> ColumnElement[bool]:
     """Which videos the feed and search may show, to anyone at all: listed, and by a user who
-    isn't disabled, so a disabled user's videos return when they're enabled again. LISTED is
+    isn't disabled, so a disabled user's videos return when they're enabled again. Only
+    listings, as architecture.md specifies: a link to one still plays. LISTED is
     the same literal SQL as the partial indexes, because Postgres can't match bound
     parameters to their predicates."""
     active_owner = exists(

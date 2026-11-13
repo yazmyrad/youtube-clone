@@ -79,13 +79,29 @@ export async function decide(client: Api, decision: Decision): Promise<void> {
   if (!result.response.ok) throw new Error(errorMessage(result.error));
 }
 
-/** After a decision every view of the video may be stale: its details, the feeds, the
- * queue. Reloading them all is simplest, and decisions are rare. */
+/** Everything that may show a video, and so goes stale when one is hidden or restored. The
+ * account itself and playback grants don't. */
+const SHOWS_VIDEOS = new Set([
+  "video",
+  "feed",
+  "search",
+  "channel",
+  "playlists",
+  "subscriptions",
+  "history",
+  "moderation",
+]);
+
 export function useDecide() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (decision: Decision) => decide(api, decision),
-    onSettled: () => queryClient.invalidateQueries(),
+    // Not awaited: the buttons come back as soon as the decision is made.
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        predicate: (query) => SHOWS_VIDEOS.has(String(query.queryKey[0])),
+      });
+    },
   });
 }
 

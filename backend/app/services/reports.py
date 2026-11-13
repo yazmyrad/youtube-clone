@@ -2,6 +2,7 @@
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +15,14 @@ from app.schemas.reports import ReportIn
 async def file_report(
     session: AsyncSession, user: User, video_id: uuid.UUID, data: ReportIn
 ) -> Report:
-    video = await session.get(Video, video_id)
+    # A share lock: a concurrent hide holds the row exclusively, so this waits for it and then
+    # sees the video hidden, instead of leaving an open report on a hidden video.
+    video = await session.scalar(
+        select(Video)
+        .where(Video.id == video_id)
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
+    )
     if video is None:
         raise NotFound("Video not found")
     await ensure_can_report(session, user, video)

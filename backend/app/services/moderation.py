@@ -2,7 +2,6 @@
 writes a row to the audit log in the same transaction."""
 
 import uuid
-from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -12,7 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from app.core.errors import Conflict, NotFound
 from app.core.pagination import decode_cursor, encode_cursor
-from app.core.permissions import can_show_thumbnail, ensure_can_view
+from app.core.permissions import can_show_thumbnail, ensure_can_restore, ensure_can_view
 from app.models import (
     ModerationAction,
     ModerationActionType,
@@ -77,13 +76,34 @@ async def list_queue(
         next_cursor = encode_cursor(rows[-1].first_reported_at, rows[-1].Video.id)
 
     video_ids = [row.Video.id for row in rows]
+    # The latest few per video, however many a brigaded video has.
+    ranked = (
+        select(
+            Report.id,
+            func.row_number()
+            .over(partition_by=Report.video_id, order_by=Report.created_at.desc())
+            .label("rank"),
+        )
+        .where(Report.video_id.in_(video_ids), Report.status == ReportStatus.open)
+        .subquery()
+    )
     reports = (
         await session.scalars(
             select(Report)
-            .where(Report.video_id.in_(video_ids), Report.status == ReportStatus.open)
+            .join(ranked, ranked.c.id == Report.id)
+            .where(ranked.c.rank <= REPORTS_SHOWN)
             .order_by(Report.created_at.desc())
         )
     ).all()
+    reason_counts: dict[uuid.UUID, dict[ReportReason, int]] = {}
+    for video_id, reason, count in (
+        await session.execute(
+            select(Report.video_id, Report.reason, func.count())
+            .where(Report.video_id.in_(video_ids), Report.status == ReportStatus.open)
+            .group_by(Report.video_id, Report.reason)
+        )
+    ).all():
+        reason_counts.setdefault(video_id, {})[reason] = count
     reporters = {
         user.id: user
         for user in await session.scalars(
@@ -104,7 +124,7 @@ async def list_queue(
                     playback.thumbnail_url(row.Video.id) if can_show_thumbnail(row.Video) else None
                 ),
                 open_reports=row.open_reports,
-                reasons=dict(Counter(report.reason for report in open_reports)),
+                reasons=reason_counts.get(row.Video.id, {}),
                 first_reported_at=row.first_reported_at,
                 reports=[
                     QueuedReport(
@@ -114,7 +134,7 @@ async def list_queue(
                         reporter=reporters[report.reporter_id],
                         created_at=report.created_at,
                     )
-                    for report in open_reports[:REPORTS_SHOWN]
+                    for report in open_reports
                 ],
             )
         )
@@ -214,7 +234,9 @@ async def hide_video(
 async def restore_video(
     session: AsyncSession, moderator: User, video_id: uuid.UUID, reason: str
 ) -> None:
-    video = await _video_for_update(session, moderator, video_id)
+    video = ensure_can_restore(
+        await session.scalar(select(Video).where(Video.id == video_id).with_for_update())
+    )
     if video.hidden_at is None:
         raise Conflict("The video isn't hidden")
     video.hidden_at = None

@@ -322,3 +322,79 @@ async def test_a_deleted_video_leaves_the_queue(
     await session.commit()
 
     assert (await _queue(api, mod))["items"] == []
+
+
+async def test_a_hidden_private_video_stays_closed_to_moderators_but_can_be_restored(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, mod: ApiUser
+) -> None:
+    """D35: hiding resolves the report, and with it the moderator's window."""
+    alice, friend = await create_user("alice"), await create_user("friend")
+    video = await create_ready_video(api, session, alice, visibility="private")
+    await api.put(f"/api/videos/{video}/access/friend", headers=alice.headers)
+    await _report(api, friend, video)
+    await api.post(
+        f"/api/moderation/videos/{video}/hide", headers=mod.headers, json={"reason": "Bad"}
+    )
+
+    details = await api.get(f"/api/videos/{video}", headers=mod.headers)
+    restored = await api.post(
+        f"/api/moderation/videos/{video}/restore", headers=mod.headers, json={}
+    )
+
+    assert details.status_code == 404
+    assert restored.status_code == 204
+
+
+async def test_a_video_made_private_after_hiding_closes_to_moderators(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, mod: ApiUser
+) -> None:
+    alice = await create_user("alice")
+    video = await create_ready_video(api, session, alice)
+    await api.post(
+        f"/api/moderation/videos/{video}/hide", headers=mod.headers, json={"reason": "Bad"}
+    )
+    assert (await api.get(f"/api/videos/{video}", headers=mod.headers)).status_code == 200
+
+    await api.patch(f"/api/videos/{video}", headers=alice.headers, json={"visibility": "private"})
+
+    assert (await api.get(f"/api/videos/{video}", headers=mod.headers)).status_code == 404
+
+
+async def test_the_d35_window_is_for_review_only(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, mod: ApiUser
+) -> None:
+    alice, friend = await create_user("alice"), await create_user("friend")
+    video = await create_ready_video(api, session, alice, visibility="private")
+    await api.put(f"/api/videos/{video}/access/friend", headers=alice.headers)
+    await _report(api, friend, video)
+    url = f"/api/videos/{video}"
+
+    playback = await api.post(f"{url}/playback", headers=mod.headers)
+    like = await api.put(f"{url}/reaction", headers=mod.headers, json={"reaction": "like"})
+    comment = await api.post(f"{url}/comments", headers=mod.headers, json={"body": "Hi"})
+    view = await api.post(
+        f"{url}/view", headers=mod.headers, json={"watched_seconds": 60, "position_seconds": 1}
+    )
+
+    assert playback.status_code == 200
+    assert (like.status_code, comment.status_code, view.status_code) == (403, 403, 403)
+    # Those the owner shared it with still can.
+    shared = await api.put(f"{url}/reaction", headers=friend.headers, json={"reaction": "like"})
+    assert shared.status_code == 200
+
+
+async def test_the_queue_shows_the_latest_few_reports_and_counts_them_all(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser, mod: ApiUser
+) -> None:
+    alice = await create_user("alice")
+    video = await create_ready_video(api, session, alice)
+    for i in range(7):
+        reporter = await create_user(f"user{i}")
+        await _report(api, reporter, video, "spam" if i < 4 else "other")
+
+    [entry] = (await _queue(api, mod))["items"]
+
+    assert entry["open_reports"] == 7
+    assert entry["reasons"] == {"spam": 4, "other": 3}
+    assert len(entry["reports"]) == 5
+    assert entry["reports"][0]["reporter"]["username"] == "user6"
