@@ -321,7 +321,7 @@ View deduplication. Rows are short-lived and removed by a daily sweep.
 | `viewer_key` | bytea | HMAC of the user ID, or of IP + User-Agent for anonymous viewers |
 | `day` | date | NOT NULL |
 
-PK `(video_id, viewer_key, day)`, so one counted view per viewer, video and day. Index `(day)`. The raw IP is never stored.
+PK `(video_id, viewer_key, day)`, so one counted view per viewer, video and day. Index `(day)`. The raw IP is never stored. The IP comes from `X-Real-IP`, which nginx sets from the connection and overwrites; that is trustworthy only while nginx is the API's sole entry point, so the API port is never published. Behind a CDN or load balancer, nginx would need `real_ip_from` for it.
 
 ### `reports`
 
