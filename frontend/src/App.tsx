@@ -5,6 +5,7 @@ import { ChannelPage } from "./pages/ChannelPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PlaylistPage } from "./pages/PlaylistPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
@@ -22,7 +23,8 @@ export function App() {
         <Route path="/feed/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/watch" element={<WatchPage />} />
-        <Route path="/:handle" element={<ChannelPage />} />
+        <Route path="/:handle/:tab?" element={<ChannelPage />} />
+        <Route path="/playlist" element={<PlaylistPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

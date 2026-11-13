@@ -49,3 +49,14 @@ it("opens a channel page at /@username", () => {
 it("has no channel page without the @", () => {
   expect(render("/ana")).toContain("The link may be broken");
 });
+
+it("opens a channel's tabs, and nothing else under it", () => {
+  expect(render("/@ana/playlists")).not.toContain("The link may be broken");
+  expect(render("/@ana/videos")).not.toContain("The link may be broken");
+  expect(render("/@ana/about-us")).toContain("The link may be broken");
+});
+
+it("opens a playlist by its list parameter", () => {
+  expect(render("/playlist?list=p1")).not.toContain("The link may be broken");
+  expect(render("/playlist")).toContain("The link may be broken");
+});

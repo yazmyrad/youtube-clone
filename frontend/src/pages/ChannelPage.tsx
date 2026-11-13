@@ -1,10 +1,11 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, NavLink, useParams } from "react-router-dom";
 
 import { LoadMore } from "../components/LoadMore";
+import { PlaylistCard } from "../components/PlaylistCard";
 import { SubscribeButton } from "../components/SubscribeButton";
 import { VideoGridCard } from "../components/VideoCard";
 import { GRID } from "../components/VideoFeed";
-import { formatSubscribers } from "../components/format";
+import { channelPath, formatSubscribers } from "../components/format";
 import { useAuth } from "../hooks/useAuth";
 import {
   ChannelNotFound,
@@ -13,6 +14,7 @@ import {
   type Channel,
   type ChannelVideo,
 } from "../hooks/useChannel";
+import { useChannelPlaylists } from "../hooks/usePlaylists";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { NotFoundPage } from "./NotFoundPage";
 
@@ -21,6 +23,12 @@ const BADGES: Record<ChannelVideo["visibility"], string | undefined> = {
   unlisted: "Unlisted",
   private: "Private",
 };
+
+const TABS = [
+  { tab: "videos", label: "Videos" },
+  { tab: "playlists", label: "Playlists" },
+] as const;
+type Tab = (typeof TABS)[number]["tab"];
 
 /** "@ana" from the path; anything else isn't a channel. */
 export function handleToUsername(handle: string | undefined): string | null {
@@ -108,7 +116,43 @@ function Videos({ username }: { username: string }) {
   );
 }
 
-function ChannelView({ username }: { username: string }) {
+function Playlists({ username }: { username: string }) {
+  const playlists = useChannelPlaylists(username);
+  const renewThumbnails = useRenewThumbnails(playlists);
+
+  if (playlists.isPending) return <div aria-busy="true" className="h-40" />;
+  if (!playlists.data) {
+    return (
+      <div role="alert" className="flex flex-col items-center gap-4 p-16 text-center">
+        <p className="text-ink-muted">Couldn't load playlists.</p>
+        <button
+          type="button"
+          onClick={() => playlists.refetch()}
+          className="rounded-full bg-hover px-4 py-2 text-sm font-medium hover:bg-hover-strong"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+  const items = playlists.data.pages.flatMap((page) => page.items);
+  if (items.length === 0) {
+    return <p className="p-16 text-center text-ink-muted">This channel has no playlists.</p>;
+  }
+  return (
+    <>
+      <h2 className="sr-only">Playlists</h2>
+      <div className={GRID}>
+        {items.map((playlist) => (
+          <PlaylistCard key={playlist.id} playlist={playlist} onThumbnailError={renewThumbnails} />
+        ))}
+      </div>
+      <LoadMore pages={playlists} />
+    </>
+  );
+}
+
+function ChannelView({ username, current }: { username: string; current: Tab }) {
   const channel = useChannel(username);
 
   if (channel.isError) {
@@ -124,19 +168,36 @@ function ChannelView({ username }: { username: string }) {
   return (
     <div className="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6">
       <Header channel={channel.data} />
-      <nav aria-label="Channel" className="mt-6 border-b border-line">
-        <span className="inline-block border-b-2 border-ink px-3 pb-3 font-medium">Videos</span>
+      <nav aria-label="Channel" className="mt-6 flex border-b border-line">
+        {TABS.map(({ tab, label }) => (
+          <NavLink
+            key={tab}
+            to={`${channelPath(channel.data.username)}/${tab}`}
+            aria-current={tab === current ? "page" : undefined}
+            className={`border-b-2 px-3 pb-3 font-medium ${
+              tab === current ? "border-ink" : "border-transparent text-ink-muted hover:border-line"
+            }`}
+          >
+            {label}
+          </NavLink>
+        ))}
       </nav>
       <div className="mt-6">
-        <Videos username={channel.data.username} />
+        {current === "videos" ? (
+          <Videos username={channel.data.username} />
+        ) : (
+          <Playlists username={channel.data.username} />
+        )}
       </div>
     </div>
   );
 }
 
 export function ChannelPage() {
-  const username = handleToUsername(useParams().handle);
-  if (!username) return <NotFoundPage />;
+  const { handle, tab = "videos" } = useParams();
+  const username = handleToUsername(handle);
+  const current = TABS.find((entry) => entry.tab === tab)?.tab;
+  if (!username || !current) return <NotFoundPage />;
   // Another channel starts from a clean page.
-  return <ChannelView key={username.toLowerCase()} username={username} />;
+  return <ChannelView key={username.toLowerCase()} username={username} current={current} />;
 }

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { channelPath, formatAge, formatDuration, formatSubscribers, formatViews } from "./format";
+import {
+  channelPath,
+  formatAge,
+  formatDuration,
+  formatSubscribers,
+  formatViews,
+  playlistPath,
+  videoCount,
+  watchPath,
+} from "./format";
 
 describe("formatDuration", () => {
   it.each([
@@ -58,5 +67,21 @@ describe("formatSubscribers", () => {
 describe("channelPath", () => {
   it("puts an @ before the username", () => {
     expect(channelPath("ana_dev")).toBe("/@ana_dev");
+  });
+});
+
+describe("playlist paths", () => {
+  it("links a playlist and a video inside it", () => {
+    expect(playlistPath("p1")).toBe("/playlist?list=p1");
+    expect(watchPath("v1")).toBe("/watch?v=v1");
+    expect(watchPath("v1", "p1")).toBe("/watch?v=v1&list=p1");
+  });
+
+  it.each([
+    [1, "1 video"],
+    [2, "2 videos"],
+    [1500, "1,500 videos"],
+  ])("counts %d as %s", (count, text) => {
+    expect(videoCount(count)).toBe(text);
   });
 });

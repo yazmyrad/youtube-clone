@@ -85,7 +85,7 @@ async function render(path = "/@ana") {
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
-            <Route path="/:handle" element={<ChannelPage />} />
+            <Route path="/:handle/:tab?" element={<ChannelPage />} />
           </Routes>
           <Where />
         </MemoryRouter>
@@ -205,6 +205,57 @@ it("is a not-found page for an unknown channel", async () => {
   serve(null);
 
   await render("/@nobody");
+
+  await shows("This page isn't available");
+});
+
+it("lists the channel's playlists on its Playlists tab", async () => {
+  api.GET.mockImplementation(async (path: string) => {
+    if (path === "/api/channels/{username}") return { data: CHANNEL, response: new Response() };
+    if (path === "/api/channels/{username}/playlists") {
+      return {
+        data: {
+          items: [
+            {
+              id: "p1",
+              title: "Rust picks",
+              visibility: "public",
+              channel: { username: "ana", display_name: "Ana Codes" },
+              video_count: 3,
+              thumbnail_url: "/thumbs/a.jpg",
+              updated_at: "2026-01-02T00:00:00Z",
+            },
+          ],
+          next_cursor: null,
+        },
+      };
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+
+  await render("/@ana/playlists");
+  await shows("Rust picks");
+
+  expect(container.textContent).toContain("3 videos");
+  const links = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  expect(links).toContain("/playlist?list=p1");
+  expect(links).toContain("/@ana/videos");
+  const current = container.querySelector("nav [aria-current=page]");
+  expect(current?.textContent).toBe("Playlists");
+});
+
+it("says so when the channel has no playlists", async () => {
+  serve(CHANNEL);
+
+  await render("/@ana/playlists");
+
+  await shows("This channel has no playlists.");
+});
+
+it("is a not-found page for an unknown tab", async () => {
+  serve(CHANNEL);
+
+  await render("/@ana/about-us");
 
   await shows("This page isn't available");
 });

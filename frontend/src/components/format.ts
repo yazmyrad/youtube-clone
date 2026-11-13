@@ -46,3 +46,17 @@ export function formatSubscribers(count: number): string {
 export function channelPath(username: string): string {
   return `/@${encodeURIComponent(username)}`;
 }
+
+export function playlistPath(playlistId: string): string {
+  return `/playlist?list=${encodeURIComponent(playlistId)}`;
+}
+
+/** The watch page, inside a playlist: YouTube's "/watch?v=…&list=…". */
+export function watchPath(videoId: string, playlistId?: string): string {
+  const video = `/watch?v=${encodeURIComponent(videoId)}`;
+  return playlistId ? `${video}&list=${encodeURIComponent(playlistId)}` : video;
+}
+
+export function videoCount(count: number): string {
+  return count === 1 ? "1 video" : `${count.toLocaleString("en")} videos`;
+}

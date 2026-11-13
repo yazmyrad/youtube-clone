@@ -79,3 +79,15 @@ export function Logo() {
     </span>
   );
 }
+
+export const PlaylistIcon = () => (
+  <Icon width="20" height="20">
+    <path d="M3 5h12v2H3zm0 4h12v2H3zm0 4h8v2H3zm13 0v6l5-3z" />
+  </Icon>
+);
+
+export const PlayIcon = () => (
+  <Icon width="20" height="20">
+    <path d="M8 5v14l11-7z" />
+  </Icon>
+);
