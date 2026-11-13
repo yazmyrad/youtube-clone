@@ -28,3 +28,23 @@ class ChannelVideoOut(VideoCardOut):
 class ChannelVideoPage(BaseModel):
     items: list[ChannelVideoOut]
     next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
+class SubscriptionStateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    is_subscribed: bool
+    subscribers_count: int
+
+
+class SubscribedChannelOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    username: str
+    display_name: str
+    subscribed_at: datetime
+
+
+class SubscribedChannelPage(BaseModel):
+    items: list[SubscribedChannelOut]
+    next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")

@@ -1,10 +1,17 @@
 from fastapi import APIRouter, status
 
-from app.core.pagination import DEFAULT_VIDEO_PAGE, KeysetCursor, PageLimit
+from app.core.pagination import (
+    DEFAULT_SUBSCRIPTION_PAGE,
+    DEFAULT_VIDEO_PAGE,
+    KeysetCursor,
+    PageLimit,
+)
 from app.core.permissions import CurrentUser, SessionDep
+from app.schemas.channels import SubscribedChannelOut, SubscribedChannelPage
 from app.schemas.errors import ErrorOut
 from app.schemas.users import MeOut, MeUpdateIn
 from app.schemas.videos import VideoOwnerOut, VideoOwnerPage
+from app.services import channels as channels_service
 from app.services import users as users_service
 from app.services import videos as videos_service
 
@@ -41,4 +48,24 @@ async def list_my_videos(
     )
     return VideoOwnerPage(
         items=[VideoOwnerOut.model_validate(video) for video in videos], next_cursor=next_cursor
+    )
+
+
+@router.get(
+    "/me/subscriptions",
+    response_model=SubscribedChannelPage,
+    summary="Channels you subscribe to, most recently subscribed first",
+)
+async def list_my_subscriptions(
+    user: CurrentUser,
+    session: SessionDep,
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_SUBSCRIPTION_PAGE,
+) -> SubscribedChannelPage:
+    channels, next_cursor = await channels_service.list_my_subscriptions(
+        session, user, cursor=cursor, limit=limit
+    )
+    return SubscribedChannelPage(
+        items=[SubscribedChannelOut.model_validate(channel) for channel in channels],
+        next_cursor=next_cursor,
     )

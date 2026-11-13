@@ -16,6 +16,7 @@ KeysetCursor = Annotated[str | None, Query(pattern=_CURSOR_PATTERN)]
 PageLimit = Annotated[int, Query(ge=1, le=100)]
 DEFAULT_VIDEO_PAGE = 24
 DEFAULT_COMMENT_PAGE = 20
+DEFAULT_SUBSCRIPTION_PAGE = 50
 
 
 def encode_cursor(timestamp: datetime, item_id: uuid.UUID) -> str:

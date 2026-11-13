@@ -145,6 +145,12 @@ def channel_videos(viewer: User | None, channel: User) -> ColumnElement[bool]:
     return and_(Video.owner_id == channel.id, LISTED)
 
 
+def ensure_can_subscribe(user: User, channel: User) -> None:
+    """Any signed-in user may subscribe to any channel but their own (D53)."""
+    if user.id == channel.id:
+        raise Forbidden("You can't subscribe to your own channel")
+
+
 def can_show_thumbnail(video: Video) -> bool:
     """For a caller who already passed `can_view`. Follows playback: a hidden video shows
     nobody its picture, and one that isn't ready has none."""

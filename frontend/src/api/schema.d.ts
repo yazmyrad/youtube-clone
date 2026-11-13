@@ -126,6 +126,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{username}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Subscribe to a channel (safe to repeat; not to your own) */
+        put: operations["subscribe_api_channels__username__subscription_put"];
+        post?: never;
+        /** Unsubscribe from a channel (safe to repeat) */
+        delete: operations["unsubscribe_api_channels__username__subscription_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/{username}/videos": {
         parameters: {
             query?: never;
@@ -210,6 +228,23 @@ export interface paths {
         head?: never;
         /** Edit display name and description */
         patch: operations["update_me_api_users_me_patch"];
+        trace?: never;
+    };
+    "/api/users/me/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channels you subscribe to, most recently subscribed first */
+        get: operations["list_my_subscriptions_api_users_me_subscriptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/users/me/videos": {
@@ -644,6 +679,35 @@ export interface components {
             password: string;
             /** Username */
             username: string;
+        };
+        /** SubscribedChannelOut */
+        SubscribedChannelOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Subscribed At
+             * Format: date-time
+             */
+            subscribed_at: string;
+            /** Username */
+            username: string;
+        };
+        /** SubscribedChannelPage */
+        SubscribedChannelPage: {
+            /** Items */
+            items: components["schemas"]["SubscribedChannelOut"][];
+            /**
+             * Next Cursor
+             * @description Pass as `cursor` to get the next page
+             */
+            next_cursor: string | null;
+        };
+        /** SubscriptionStateOut */
+        SubscriptionStateOut: {
+            /** Is Subscribed */
+            is_subscribed: boolean;
+            /** Subscribers Count */
+            subscribers_count: number;
         };
         /** TokenOut */
         TokenOut: {
@@ -1194,6 +1258,122 @@ export interface operations {
             };
         };
     };
+    subscribe_api_channels__username__subscription_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStateOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsubscribe_api_channels__username__subscription_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStateOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_channel_videos_api_channels__username__videos_get: {
         parameters: {
             query?: {
@@ -1405,6 +1585,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_subscriptions_api_users_me_subscriptions_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscribedChannelPage"];
                 };
             };
             /** @description Unauthorized */

@@ -1,8 +1,13 @@
 from fastapi import APIRouter, status
 
 from app.core.pagination import DEFAULT_VIDEO_PAGE, KeysetCursor, PageLimit
-from app.core.permissions import OptionalUser, SessionDep
-from app.schemas.channels import ChannelOut, ChannelVideoOut, ChannelVideoPage
+from app.core.permissions import CurrentUser, OptionalUser, SessionDep
+from app.schemas.channels import (
+    ChannelOut,
+    ChannelVideoOut,
+    ChannelVideoPage,
+    SubscriptionStateOut,
+)
 from app.schemas.errors import ErrorOut
 from app.services import channels as channels_service
 
@@ -36,4 +41,36 @@ async def list_channel_videos(
     )
     return ChannelVideoPage(
         items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor
+    )
+
+
+_SUBSCRIPTION_ERRORS: dict[int | str, dict[str, object]] = {
+    status.HTTP_401_UNAUTHORIZED: {"model": ErrorOut},
+    status.HTTP_403_FORBIDDEN: {"model": ErrorOut},
+}
+
+
+@router.put(
+    "/{username}/subscription",
+    response_model=SubscriptionStateOut,
+    responses=_SUBSCRIPTION_ERRORS,
+    summary="Subscribe to a channel (safe to repeat; not to your own)",
+)
+async def subscribe(username: str, user: CurrentUser, session: SessionDep) -> SubscriptionStateOut:
+    return SubscriptionStateOut.model_validate(
+        await channels_service.subscribe(session, user, username)
+    )
+
+
+@router.delete(
+    "/{username}/subscription",
+    response_model=SubscriptionStateOut,
+    responses=_SUBSCRIPTION_ERRORS,
+    summary="Unsubscribe from a channel (safe to repeat)",
+)
+async def unsubscribe(
+    username: str, user: CurrentUser, session: SessionDep
+) -> SubscriptionStateOut:
+    return SubscriptionStateOut.model_validate(
+        await channels_service.unsubscribe(session, user, username)
     )
