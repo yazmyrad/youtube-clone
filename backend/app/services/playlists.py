@@ -5,15 +5,16 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.core.errors import NotFound
+from app.core.errors import Conflict, NotFound
 from app.core.pagination import decode_cursor, encode_cursor
 from app.core.permissions import (
     channel_playlists,
+    ensure_can_view,
     ensure_can_view_playlist,
     ensure_playlist_owner,
     playable_videos,
@@ -23,6 +24,9 @@ from app.schemas.playlists import PlaylistCreateIn, PlaylistUpdateIn
 from app.services import playback
 from app.services.channels import get_channel_user
 from app.services.videos import VideoCard, to_card
+
+# Enough for any real list, and it bounds what one read of a playlist costs.
+MAX_PLAYLIST_ITEMS = 500
 
 
 @dataclass(frozen=True)
@@ -194,3 +198,90 @@ async def list_channel_playlists(
         playlists = playlists[:limit]
         next_cursor = encode_cursor(playlists[-1].created_at, playlists[-1].id)
     return await _summaries(session, viewer, playlists), next_cursor
+
+
+async def _touch(session: AsyncSession, playlist: Playlist) -> None:
+    """Item changes count as edits of the playlist."""
+    playlist.updated_at = func.now()
+    await session.commit()
+    session.expunge(playlist)
+
+
+async def add_item(
+    session: AsyncSession, user: User, playlist_id: uuid.UUID, video_id: uuid.UUID
+) -> PlaylistDetails:
+    """Appends the video. Safe to repeat: a video already there stays where it is. The
+    playlist's row lock makes concurrent adds take turns, so positions stay unique."""
+    playlist = await get_owned_for_update(session, user, playlist_id)
+    video = await session.get(Video, video_id)
+    if video is None:
+        raise NotFound("Video not found")
+    await ensure_can_view(session, user, video)
+    if await session.get(PlaylistItem, (playlist.id, video.id)) is None:
+        count = await session.scalar(
+            select(func.count())
+            .select_from(PlaylistItem)
+            .where(PlaylistItem.playlist_id == playlist.id)
+        )
+        if (count or 0) >= MAX_PLAYLIST_ITEMS:
+            raise Conflict(f"A playlist holds at most {MAX_PLAYLIST_ITEMS} videos")
+        last = await session.scalar(
+            select(func.max(PlaylistItem.position)).where(PlaylistItem.playlist_id == playlist.id)
+        )
+        position = 0 if last is None else last + 1
+        session.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=position))
+        await _touch(session, playlist)
+    else:
+        await session.commit()
+    return await get_playlist(session, user, playlist_id)
+
+
+async def remove_item(
+    session: AsyncSession, user: User, playlist_id: uuid.UUID, video_id: uuid.UUID
+) -> PlaylistDetails:
+    """Safe to repeat. The items after it move up, so positions stay 0..n-1."""
+    playlist = await get_owned_for_update(session, user, playlist_id)
+    position = await session.scalar(
+        delete(PlaylistItem)
+        .where(PlaylistItem.playlist_id == playlist.id, PlaylistItem.video_id == video_id)
+        .returning(PlaylistItem.position)
+    )
+    if position is not None:
+        await session.execute(
+            update(PlaylistItem)
+            .where(PlaylistItem.playlist_id == playlist.id, PlaylistItem.position > position)
+            .values(position=PlaylistItem.position - 1)
+        )
+        await _touch(session, playlist)
+    else:
+        await session.commit()
+    return await get_playlist(session, user, playlist_id)
+
+
+async def reorder_items(
+    session: AsyncSession, user: User, playlist_id: uuid.UUID, video_ids: list[uuid.UUID]
+) -> PlaylistDetails:
+    """`video_ids` is the new order of exactly the videos the owner sees in the playlist.
+    Any the owner can no longer watch keep their order, after those."""
+    playlist = await get_owned_for_update(session, user, playlist_id)
+    rows = (
+        await session.execute(
+            select(PlaylistItem.video_id, playable_videos(user).label("shown"))
+            .join(Video, Video.id == PlaylistItem.video_id)
+            .where(PlaylistItem.playlist_id == playlist.id)
+            .order_by(PlaylistItem.position)
+        )
+    ).all()
+    shown = [row.video_id for row in rows if row.shown]
+    if len(set(video_ids)) != len(video_ids) or set(video_ids) != set(shown):
+        raise Conflict("The playlist has changed. Reload it and try again")
+    order = [*video_ids, *(row.video_id for row in rows if not row.shown)]
+    # The unique (playlist, position) check is deferred to commit, so swaps are fine.
+    for position, video_id in enumerate(order):
+        await session.execute(
+            update(PlaylistItem)
+            .where(PlaylistItem.playlist_id == playlist.id, PlaylistItem.video_id == video_id)
+            .values(position=position)
+        )
+    await _touch(session, playlist)
+    return await get_playlist(session, user, playlist_id)

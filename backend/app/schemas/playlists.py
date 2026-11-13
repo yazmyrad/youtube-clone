@@ -55,3 +55,14 @@ class PlaylistOut(PlaylistSummaryOut):
 class PlaylistPage(BaseModel):
     items: list[PlaylistSummaryOut]
     next_cursor: str | None = Field(description="Pass as `cursor` to get the next page")
+
+
+class PlaylistItemIn(StrictModel):
+    video_id: uuid.UUID
+
+
+class PlaylistOrderIn(StrictModel):
+    video_ids: list[uuid.UUID] = Field(
+        max_length=500,
+        description="The new order of exactly the videos the playlist shows you",
+    )

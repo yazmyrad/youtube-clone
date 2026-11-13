@@ -4,7 +4,13 @@ from fastapi import APIRouter, status
 
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
 from app.schemas.errors import ErrorOut
-from app.schemas.playlists import PlaylistCreateIn, PlaylistOut, PlaylistUpdateIn
+from app.schemas.playlists import (
+    PlaylistCreateIn,
+    PlaylistItemIn,
+    PlaylistOrderIn,
+    PlaylistOut,
+    PlaylistUpdateIn,
+)
 from app.services import playlists as playlists_service
 
 router = APIRouter(
@@ -62,3 +68,44 @@ async def update_playlist(
 )
 async def delete_playlist(playlist_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> None:
     await playlists_service.delete_playlist(session, user, playlist_id)
+
+
+@router.post(
+    "/{playlist_id}/items",
+    response_model=PlaylistOut,
+    summary="Add a video you may watch to the end of your playlist (safe to repeat)",
+    responses={status.HTTP_409_CONFLICT: {"model": ErrorOut}},
+)
+async def add_item(
+    playlist_id: uuid.UUID, data: PlaylistItemIn, user: CurrentUser, session: SessionDep
+) -> PlaylistOut:
+    return PlaylistOut.model_validate(
+        await playlists_service.add_item(session, user, playlist_id, data.video_id)
+    )
+
+
+@router.delete(
+    "/{playlist_id}/items/{video_id}",
+    response_model=PlaylistOut,
+    summary="Remove a video from your playlist (safe to repeat)",
+)
+async def remove_item(
+    playlist_id: uuid.UUID, video_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> PlaylistOut:
+    return PlaylistOut.model_validate(
+        await playlists_service.remove_item(session, user, playlist_id, video_id)
+    )
+
+
+@router.put(
+    "/{playlist_id}/items/order",
+    response_model=PlaylistOut,
+    summary="Reorder your playlist",
+    responses={status.HTTP_409_CONFLICT: {"model": ErrorOut}},
+)
+async def reorder_items(
+    playlist_id: uuid.UUID, data: PlaylistOrderIn, user: CurrentUser, session: SessionDep
+) -> PlaylistOut:
+    return PlaylistOut.model_validate(
+        await playlists_service.reorder_items(session, user, playlist_id, data.video_ids)
+    )
