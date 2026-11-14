@@ -100,6 +100,33 @@ async def test_limit_on_uploads_in_progress(
     assert (await _create(api, bob)).status_code == 201
 
 
+async def test_limit_on_videos_uploading_or_processing(
+    api: httpx.AsyncClient, session: AsyncSession, create_user: CreateUser
+) -> None:
+    """Processing videos count too, so one account can't queue the worker up without end."""
+    alice = await create_user("alice")
+    for _ in range(4):
+        created = await _create(api, alice)
+        await session.execute(
+            update(Video)
+            .where(Video.id == created.json()["video"]["id"])
+            .values(status=VideoStatus.processing)
+        )
+        await session.commit()
+
+    fifth = await _create(api, alice)
+    sixth = await _create(api, alice)
+
+    assert fifth.status_code == 201
+    assert sixth.status_code == 409
+    assert "uploading or processing" in sixth.json()["detail"]
+    await session.execute(
+        update(Video).where(Video.owner_id == alice.id).values(status=VideoStatus.failed)
+    )
+    await session.commit()
+    assert (await _create(api, alice)).status_code == 201
+
+
 async def test_limit_holds_under_concurrent_requests(
     api: httpx.AsyncClient, create_user: CreateUser
 ) -> None:

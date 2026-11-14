@@ -34,6 +34,9 @@ from app.services import moderation, playback, storage
 from app.services.storage import PresignedUpload
 
 MAX_ACTIVE_UPLOADS = 3
+# Uploading or still processing. One worker processes one video at a time, so this bounds how
+# long one account can keep everyone else's videos waiting.
+MAX_UNFINISHED_VIDEOS = 5
 
 
 @dataclass(frozen=True)
@@ -77,17 +80,27 @@ async def create_video(
     await session.execute(
         select(User.id).where(User.id == owner.id).with_for_update(key_share=True)
     )
-    active = await session.scalar(
-        select(func.count())
-        .select_from(Video)
-        .where(
-            Video.owner_id == owner.id,
-            Video.status == VideoStatus.uploading,
-            Video.deleted_at.is_(None),
-        )
+    counts = dict(
+        (
+            await session.execute(
+                select(Video.status, func.count())
+                .where(
+                    Video.owner_id == owner.id,
+                    Video.status.in_([VideoStatus.uploading, VideoStatus.processing]),
+                    Video.deleted_at.is_(None),
+                )
+                .group_by(Video.status)
+            )
+        ).all()
     )
-    if active is not None and active >= MAX_ACTIVE_UPLOADS:
+    uploading = counts.get(VideoStatus.uploading, 0)
+    if uploading >= MAX_ACTIVE_UPLOADS:
         raise Conflict(f"You can have at most {MAX_ACTIVE_UPLOADS} uploads in progress")
+    if uploading + counts.get(VideoStatus.processing, 0) >= MAX_UNFINISHED_VIDEOS:
+        raise Conflict(
+            f"You can have at most {MAX_UNFINISHED_VIDEOS} videos uploading or processing. "
+            "Wait for one to finish"
+        )
 
     video_id = uuid.uuid4()
     key = storage.raw_key(video_id)
