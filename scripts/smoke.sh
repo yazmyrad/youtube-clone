@@ -504,6 +504,19 @@ for path in "${traversals[@]}"; do
     no_object "D45 ${path#"$hls"}" "$path"
 done
 
+# --- D61: the API docs work without internet access -------------------------
+
+expect "D61 /docs is served" 200 "/docs"
+grep -aoE '(src|href)="[^"]+"' "$work/body" | grep -vE '="/' > "$work/external" || true
+[ ! -s "$work/external" ] && pass "D61 /docs loads nothing from elsewhere" \
+    || fail "D61 /docs loads: $(tr '\n' ' ' < "$work/external")"
+has_header "content-security-policy: default-src 'self'" && pass "D61 /docs has a CSP" \
+    || fail "D61 /docs has no CSP"
+expect "D61 Swagger UI's script is served" 200 "/api/docs-assets/swagger-ui-bundle.js"
+expect "D61 the schema is served" 200 "/openapi.json"
+body_has '"/api/moderation/reports"' && pass "D61 the schema lists the API" \
+    || fail "D61 the schema lacks routes"
+
 # --- Headers ---------------------------------------------------------------
 
 for path in / /api/health "/watch?v=$id_a"; do
