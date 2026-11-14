@@ -1,5 +1,6 @@
 import { Link, NavLink, useParams } from "react-router-dom";
 
+import { Avatar } from "../components/Avatar";
 import { LoadMore } from "../components/LoadMore";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { SubscribeButton } from "../components/SubscribeButton";
@@ -41,12 +42,11 @@ function Header({ channel }: { channel: Channel }) {
   const own = user?.username === channel.username;
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-      <span
-        aria-hidden
-        className="grid size-20 shrink-0 place-items-center rounded-full bg-accent text-4xl font-medium text-white uppercase sm:size-40 sm:text-7xl"
-      >
-        {Array.from(channel.display_name)[0] ?? "?"}
-      </span>
+      <Avatar
+        name={channel.display_name}
+        username={channel.username}
+        className="size-20 text-4xl sm:size-40 sm:text-7xl"
+      />
       <div className="min-w-0 space-y-2">
         <h1 className="text-2xl font-bold wrap-anywhere sm:text-4xl">{channel.display_name}</h1>
         <p className="text-sm text-ink-muted">

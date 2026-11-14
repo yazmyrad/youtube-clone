@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import type { components } from "../api/schema";
+import { Avatar } from "./Avatar";
 import { channelPath, formatAge, formatDuration, formatViews } from "./format";
 
 export type VideoCardData = components["schemas"]["VideoCardOut"];
@@ -46,17 +47,6 @@ function Thumbnail({ video, onThumbnailError, progress }: CardProps) {
   );
 }
 
-function Avatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden
-      className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-medium text-white uppercase"
-    >
-      {Array.from(name)[0] ?? "?"}
-    </span>
-  );
-}
-
 function Meta({ video }: { video: VideoCardData }) {
   return (
     <p className="text-sm text-ink-muted">
@@ -89,7 +79,7 @@ export function VideoGridCard({
       <div className="mt-3 flex gap-3">
         {showChannel && (
           <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
-            <Avatar name={video.channel.display_name} />
+            <Avatar name={video.channel.display_name} username={video.channel.username} />
           </Link>
         )}
         <div className="min-w-0">
@@ -132,7 +122,7 @@ export function VideoRowCard({ video, onThumbnailError, progress }: CardProps) {
         <Meta video={video} />
         <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
           <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
-            <Avatar name={video.channel.display_name} />
+            <Avatar name={video.channel.display_name} username={video.channel.username} />
           </Link>
           <span className="truncate">
             <ChannelLink video={video} />

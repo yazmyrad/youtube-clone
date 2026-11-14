@@ -1,3 +1,4 @@
+import { Avatar } from "./Avatar";
 import { useEffect, useRef, useState } from "react";
 
 import type { Me } from "../hooks/useAuth";
@@ -32,8 +33,6 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
     }
   }
 
-  const initial = user.display_name.charAt(0).toUpperCase();
-
   return (
     <div ref={root} className="relative">
       <button
@@ -41,9 +40,9 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
         aria-label="Account menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="grid size-8 place-items-center rounded-full bg-accent text-sm font-medium text-white"
+        className="rounded-full"
       >
-        {initial}
+        <Avatar name={user.display_name} username={user.username} className="size-8 text-sm" />
       </button>
       {open && (
         <div className="absolute top-10 right-0 w-64 rounded-xl border border-line bg-page py-2 shadow-lg">

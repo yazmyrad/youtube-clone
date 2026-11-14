@@ -1,5 +1,6 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import { Avatar } from "../components/Avatar";
 import { Comments } from "../components/Comments";
 import { HiddenNotice } from "../components/HiddenNotice";
 import { HideButton } from "../components/HideButton";
@@ -22,13 +23,12 @@ function ChannelRow({ video }: { video: VideoDetails }) {
   const href = channelPath(video.channel.username);
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Link
-        to={href}
-        tabIndex={-1}
-        aria-hidden
-        className="grid size-10 shrink-0 place-items-center rounded-full bg-accent font-medium text-white"
-      >
-        {video.channel.display_name.charAt(0).toUpperCase()}
+      <Link to={href} tabIndex={-1} aria-hidden>
+        <Avatar
+          name={video.channel.display_name}
+          username={video.channel.username}
+          className="size-10"
+        />
       </Link>
       <div className="min-w-0">
         <p className="truncate font-medium">

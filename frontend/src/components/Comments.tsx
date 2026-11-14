@@ -10,22 +10,16 @@ import {
   type Comment,
 } from "../hooks/useComments";
 import type { VideoDetails } from "../hooks/useVideo";
-
-function LetterAvatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden
-      className="grid size-10 shrink-0 place-items-center rounded-full bg-accent font-medium text-white"
-    >
-      {name.charAt(0).toUpperCase()}
-    </span>
-  );
-}
+import { Avatar } from "./Avatar";
 
 export function CommentItem({ comment }: { comment: Comment }) {
   return (
     <li className="flex gap-3">
-      <LetterAvatar name={comment.author.display_name} />
+      <Avatar
+        name={comment.author.display_name}
+        username={comment.author.username}
+        className="size-10"
+      />
       <div className="min-w-0">
         <p className="text-xs">
           <span className="font-medium">@{comment.author.username}</span>{" "}
@@ -65,7 +59,7 @@ function CommentForm({ videoId }: { videoId: string }) {
 
   return (
     <form onSubmit={submit} className="flex gap-3">
-      <LetterAvatar name={user.display_name} />
+      <Avatar name={user.display_name} username={user.username} className="size-10" />
       <div className="min-w-0 flex-1">
         <textarea
           aria-label="Add a comment"
@@ -101,7 +95,9 @@ export function Comments({ video }: { video: VideoDetails }) {
 
   return (
     <section className="mt-6">
-      <h2 className="mb-4 text-xl font-semibold">{video.comments_count.toLocaleString()} Comments</h2>
+      <h2 className="mb-4 text-xl font-semibold">
+        {video.comments_count.toLocaleString()} Comments
+      </h2>
       <CommentForm videoId={video.id} />
       {comments.isError && (
         <p role="alert" className="mt-4 text-sm text-red-700">

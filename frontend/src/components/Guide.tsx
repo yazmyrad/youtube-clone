@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { isModerator } from "../hooks/useModeration";
 import { useMySubscriptions, type SubscribedChannel } from "../hooks/useSubscriptions";
+import { Avatar } from "./Avatar";
 import { channelPath } from "./format";
 import { AccountIcon, FlagIcon, HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
 
@@ -37,12 +38,7 @@ const activeRow = ({ isActive }: { isActive: boolean }) =>
 function ChannelEntry({ channel }: { channel: SubscribedChannel }) {
   return (
     <NavLink to={channelPath(channel.username)} className={activeRow}>
-      <span
-        aria-hidden
-        className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-medium text-white uppercase"
-      >
-        {Array.from(channel.display_name)[0] ?? "?"}
-      </span>
+      <Avatar name={channel.display_name} username={channel.username} className="size-6 text-xs" />
       <span className="truncate">{channel.display_name}</span>
     </NavLink>
   );
