@@ -73,4 +73,6 @@ async def process(claim: ClaimedJob) -> MediaResult:
         hls_prefix=prefix,
         thumbnail_key=thumbnail,
         duration_seconds=max(1, round(info.duration)),
+        width=info.width,
+        height=info.height,
     )

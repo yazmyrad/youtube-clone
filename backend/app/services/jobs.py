@@ -37,6 +37,9 @@ class MediaResult:
     hls_prefix: str
     thumbnail_key: str
     duration_seconds: int
+    # As displayed, after any rotation: what makes a video a Short.
+    width: int | None = None
+    height: int | None = None
 
 
 def _fence(claim: ClaimedJob) -> tuple[ColumnElement[bool], ...]:
@@ -176,6 +179,8 @@ async def complete(session: AsyncSession, claim: ClaimedJob, media: MediaResult)
         hls_prefix=media.hls_prefix,
         thumbnail_key=media.thumbnail_key,
         duration_seconds=media.duration_seconds,
+        width=media.width,
+        height=media.height,
         published_at=func.coalesce(Video.published_at, func.now()),
         failure_reason=None,
     )

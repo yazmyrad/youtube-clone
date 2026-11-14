@@ -168,13 +168,17 @@ def _even(value: float) -> int:
 
 
 def renditions_for(info: SourceInfo) -> list[Rendition]:
-    """360p, or the source's own height if lower, plus 720p for tall enough sources."""
+    """360p, or the source's own size if smaller, plus 720p for big enough sources. The number
+    is the short side, as on YouTube: a vertical video's 720p is 720x1280, not 405x720."""
+    short_side = min(info.width, info.height)
     result = []
     for name, target, max_rate in LADDER:
-        if target > 360 and info.height < target:
+        if target > 360 and short_side < target:
             continue
-        height = _even(min(target, info.height))
-        result.append(Rendition(name, _even(info.width * height / info.height), height, max_rate))
+        scale = min(target, short_side) / short_side
+        result.append(
+            Rendition(name, _even(info.width * scale), _even(info.height * scale), max_rate)
+        )
     return result
 
 

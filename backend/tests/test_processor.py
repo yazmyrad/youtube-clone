@@ -49,6 +49,7 @@ async def test_a_valid_clip_becomes_a_ready_video(
     video = await load_video(session, queued.video_id)
     assert video.status is VideoStatus.ready
     assert video.duration_seconds == 2
+    assert (video.width, video.height) == (1280, 720)
     assert video.hls_prefix == f"hls/{queued.video_id}"
     assert video.thumbnail_key == f"thumbs/{queued.video_id}.jpg"
     keys = _media_keys()
@@ -61,9 +62,7 @@ async def test_a_valid_clip_becomes_a_ready_video(
     assert head["ContentType"] == "application/vnd.apple.mpegurl"
 
 
-async def test_a_text_file_fails_with_a_readable_reason(
-    session: AsyncSession, minio: str
-) -> None:
+async def test_a_text_file_fails_with_a_readable_reason(session: AsyncSession, minio: str) -> None:
     """D14, through the worker and real storage."""
     queued = await _enqueue_file(session, b"not a video at all\n", max_attempts=1)
 

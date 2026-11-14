@@ -133,6 +133,15 @@ async def test_720p_source_gives_both_renditions(tmp_path: Path) -> None:
     assert list((result.hls_dir / "720p").glob("seg_*.ts"))
 
 
+async def test_a_vertical_source_is_sized_by_its_short_side(tmp_path: Path) -> None:
+    """As on YouTube: a vertical video's 720p is 720 wide, not 720 tall."""
+    result = await _transcode(tmp_path, size="720x1280")
+
+    assert _variants(result) == ["360p/index.m3u8", "720p/index.m3u8"]
+    assert "RESOLUTION=360x640" in result.master.read_text()
+    assert "RESOLUTION=720x1280" in result.master.read_text()
+
+
 async def test_never_upscales(tmp_path: Path) -> None:
     result = await _transcode(tmp_path, size="320x240")
 
@@ -157,7 +166,8 @@ async def test_segments_are_six_seconds_and_relative(tmp_path: Path) -> None:
     assert "#EXT-X-ENDLIST" in playlist
 
 
-async def test_a_rotated_source_uses_its_displayed_height(tmp_path: Path) -> None:
+async def test_a_rotated_source_uses_its_displayed_shape(tmp_path: Path) -> None:
+    """Stored landscape, displayed vertical: sized as the vertical video it shows."""
     clip = make_clip(tmp_path / "a.mp4", size="1280x720")
     rotated = tmp_path / "rotated.mp4"
     run_ffmpeg("-display_rotation", "90", "-i", str(clip), "-c", "copy", str(rotated))
@@ -168,8 +178,8 @@ async def test_a_rotated_source_uses_its_displayed_height(tmp_path: Path) -> Non
 
     assert _variants(result) == ["360p/index.m3u8", "720p/index.m3u8"]
     text = result.master.read_text()
-    assert "RESOLUTION=202x360" in text or "RESOLUTION=204x360" in text
-    assert "RESOLUTION=404x720" in text or "RESOLUTION=406x720" in text
+    assert "RESOLUTION=360x640" in text
+    assert "RESOLUTION=720x1280" in text
 
 
 async def test_a_broken_source_gives_a_readable_error(tmp_path: Path) -> None:
