@@ -7,6 +7,8 @@ x-hardening: &hardening
   restart: unless-stopped
   security_opt:
     - no-new-privileges:true
+  # Threads count too; ffmpeg and MinIO use a few dozen. Stops a runaway fork bomb.
+  pids_limit: 512
 
 x-backend-env: &backend-env
   DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:?run ./install.sh}:${POSTGRES_PASSWORD:?run ./install.sh}@postgres:5432/${POSTGRES_DB:?run ./install.sh}"
@@ -66,6 +68,8 @@ services:
     <<: *hardening
     build: backend
     environment: *backend-env
+    # Requests hold little; this keeps a leak or a flood from taking the host's memory.
+    mem_limit: 1g
     depends_on:
       migrate:
         condition: service_completed_successfully

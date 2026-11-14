@@ -159,3 +159,11 @@ def test_spa_csp_allows_no_inline_code() -> None:
     assert "style-src 'self';" in csp[1]
     assert "frame-ancestors 'none'" in csp[1]
     assert "unsafe" not in csp[1]
+
+
+def test_services_have_process_and_memory_limits() -> None:
+    services = yaml.safe_load(COMPOSE.read_text())["services"]
+
+    hardened = [name for name, service in services.items() if "pids_limit" in service]
+    assert {"nginx", "api", "worker", "minio"} <= set(hardened)
+    assert services["api"]["mem_limit"]

@@ -15,5 +15,18 @@ limit_req_zone $post_client zone=uploads:10m rate=10r/m;
 # The player's heartbeat: every 10 seconds per tab, so this leaves room for many tabs.
 limit_req_zone $post_client zone=views:10m rate=60r/m;
 
+# Every other API write (reactions, playlists, subscriptions, edits): generous for a person,
+# a brake for a script.
+map $request_method $api_write_client {
+    GET     "";
+    HEAD    "";
+    OPTIONS "";
+    default $binary_remote_addr;
+}
+limit_req_zone $api_write_client zone=api_writes:10m rate=120r/m;
+# Open uploads per client: each may stream up to 2 GB.
+limit_conn_zone $binary_remote_addr zone=upload_conns:10m;
+
 limit_req_status 429;
+limit_conn_status 429;
 limit_req_log_level warn;
