@@ -13,6 +13,7 @@ const card = (id: string, title: string) => ({
   published_at: "2026-01-02T03:04:05Z",
   thumbnail_url: `/thumbs/${id}.jpg`,
   channel: { username: "carol", display_name: "Carol" },
+  is_short: false,
 });
 
 const playlist: Playlist = {

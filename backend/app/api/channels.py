@@ -47,6 +47,26 @@ async def list_channel_videos(
 
 
 @router.get(
+    "/{username}/shorts",
+    response_model=ChannelVideoPage,
+    summary="A channel's Shorts, newest first; the owner also sees private and unlisted ones",
+)
+async def list_channel_shorts(
+    username: str,
+    session: SessionDep,
+    viewer: OptionalUser,
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_VIDEO_PAGE,
+) -> ChannelVideoPage:
+    cards, next_cursor = await channels_service.list_channel_shorts(
+        session, viewer, username, cursor=cursor, limit=limit
+    )
+    return ChannelVideoPage(
+        items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor
+    )
+
+
+@router.get(
     "/{username}/playlists",
     response_model=PlaylistPage,
     summary="A channel's playlists, newest first; the owner also sees private and unlisted ones",

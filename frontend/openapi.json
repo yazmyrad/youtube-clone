@@ -177,6 +177,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_short": {
+            "description": "A Short: open it at /shorts/{id}",
+            "title": "Is Short",
+            "type": "boolean"
+          },
           "published_at": {
             "format": "date-time",
             "title": "Published At",
@@ -207,6 +212,7 @@
           "views_count",
           "published_at",
           "thumbnail_url",
+          "is_short",
           "channel",
           "visibility"
         ],
@@ -1515,6 +1521,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_short": {
+            "description": "A Short: open it at /shorts/{id}",
+            "title": "Is Short",
+            "type": "boolean"
+          },
           "published_at": {
             "format": "date-time",
             "title": "Published At",
@@ -1541,6 +1552,7 @@
           "views_count",
           "published_at",
           "thumbnail_url",
+          "is_short",
           "channel"
         ],
         "title": "VideoCardOut",
@@ -1653,6 +1665,18 @@
             ],
             "title": "Duration Seconds"
           },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As displayed; null until processed",
+            "title": "Height"
+          },
           "hidden_at": {
             "anyOf": [
               {
@@ -1682,6 +1706,11 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "is_short": {
+            "description": "Taller than wide and at most 3 minutes",
+            "title": "Is Short",
+            "type": "boolean"
           },
           "likes_count": {
             "title": "Likes Count",
@@ -1735,6 +1764,18 @@
           },
           "visibility": {
             "$ref": "#/components/schemas/VideoVisibility"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As displayed; null until processed",
+            "title": "Width"
           }
         },
         "required": [
@@ -1754,7 +1795,10 @@
           "thumbnail_url",
           "my_reaction",
           "hidden_at",
-          "hidden_reason"
+          "hidden_reason",
+          "width",
+          "height",
+          "is_short"
         ],
         "title": "VideoDetailsOut",
         "type": "object"
@@ -2497,6 +2541,92 @@
           }
         ],
         "summary": "A channel's playlists, newest first; the owner also sees private and unlisted ones",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
+    "/api/channels/{username}/shorts": {
+      "get": {
+        "operationId": "list_channel_shorts_api_channels__username__shorts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "title": "Username",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelVideoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "A channel's Shorts, newest first; the owner also sees private and unlisted ones",
         "tags": [
           "channels"
         ]
@@ -4549,7 +4679,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List public videos, newest first",
+        "summary": "List public videos, newest first; Shorts are apart",
         "tags": [
           "videos"
         ]
@@ -4614,6 +4744,78 @@
           }
         ],
         "summary": "Create a video and get a presigned upload form",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/api/videos/shorts": {
+      "get": {
+        "operationId": "list_shorts_api_videos_shorts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCardPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List public Shorts, newest first",
         "tags": [
           "videos"
         ]

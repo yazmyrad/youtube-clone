@@ -91,6 +91,9 @@ class VideoDetailsOut(BaseModel):
     my_reaction: ReactionType | None = Field(description="Null if none, or not logged in")
     hidden_at: datetime | None = Field(description="Set if a moderator hid it")
     hidden_reason: str | None = Field(description="The moderator's reason, if hidden")
+    width: int | None = Field(description="As displayed; null until processed")
+    height: int | None = Field(description="As displayed; null until processed")
+    is_short: bool = Field(description="Taller than wide and at most 3 minutes")
 
 
 class VideoCardOut(BaseModel):
@@ -104,6 +107,7 @@ class VideoCardOut(BaseModel):
     views_count: int
     published_at: datetime
     thumbnail_url: str = Field(description="Signed; request the list again after it expires")
+    is_short: bool = Field(description="A Short: open it at /shorts/{id}")
     channel: ChannelBriefOut
 
 

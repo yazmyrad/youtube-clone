@@ -13,6 +13,7 @@ const video: VideoCardData = {
   published_at: "2026-01-02T03:04:05Z",
   thumbnail_url: "/thumbs/a7f3.jpg?sig=x",
   channel: { username: "ana", display_name: "Ana" },
+  is_short: false,
 };
 
 const render = (card: ReactElement) => renderToString(<MemoryRouter>{card}</MemoryRouter>);

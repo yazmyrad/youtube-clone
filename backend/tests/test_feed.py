@@ -43,6 +43,7 @@ async def test_card_fields(
         "views_count": 7,
         "published_at": "2026-01-01T12:00:00.123456Z",
         "channel": {"username": "alice", "display_name": "Alice"},
+        "is_short": False,
     }
 
 

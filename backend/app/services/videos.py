@@ -16,6 +16,7 @@ from app.core.permissions import (
     ensure_can_engage,
     ensure_can_view,
     ensure_video_owner,
+    listed_shorts,
     listed_videos,
 )
 from app.models import (
@@ -29,6 +30,7 @@ from app.models import (
     VideoStatus,
     VideoVisibility,
 )
+from app.models.video import is_short, not_short
 from app.schemas.videos import VideoCreateIn, VideoUpdateIn
 from app.services import moderation, playback, storage
 from app.services.storage import PresignedUpload
@@ -58,6 +60,9 @@ class VideoDetails:
     my_reaction: ReactionType | None
     hidden_at: datetime | None
     hidden_reason: str | None
+    width: int | None = None
+    height: int | None = None
+    is_short: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,7 @@ class VideoCard:
     thumbnail_url: str
     channel: User
     visibility: VideoVisibility
+    is_short: bool = False
 
 
 async def create_video(
@@ -177,6 +183,9 @@ async def get_video(session: AsyncSession, user: User | None, video_id: uuid.UUI
         hidden_reason=(
             await moderation.hidden_reason(session, video.id) if video.hidden_at else None
         ),
+        width=video.width,
+        height=video.height,
+        is_short=video.is_short,
     )
 
 
@@ -217,6 +226,7 @@ def to_card(video: Video) -> VideoCard:
         thumbnail_url=playback.thumbnail_url(video.id),
         channel=video.owner,
         visibility=video.visibility,
+        is_short=video.is_short,
     )
 
 
@@ -252,7 +262,14 @@ async def _card_page(
 async def list_feed(
     session: AsyncSession, *, cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
-    return await _listed_page(session, cursor=cursor, limit=limit)
+    """Shorts have their own shelf and feed, as on YouTube, so not here."""
+    return await _listed_page(session, not_short(), cursor=cursor, limit=limit)
+
+
+async def list_shorts(
+    session: AsyncSession, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    return await _card_page(session, listed_shorts(), cursor=cursor, limit=limit)
 
 
 async def list_subscription_feed(
@@ -261,13 +278,26 @@ async def list_subscription_feed(
     """Listed videos from the channels `user` subscribes to, newest first. Subscribing gives
     no extra access: a private or unlisted video stays off this feed like any other."""
     subscribed = select(Subscription.channel_id).where(Subscription.subscriber_id == user.id)
-    return await _listed_page(session, Video.owner_id.in_(subscribed), cursor=cursor, limit=limit)
+    return await _listed_page(
+        session, Video.owner_id.in_(subscribed), not_short(), cursor=cursor, limit=limit
+    )
 
 
 async def list_channel_videos(
     session: AsyncSession, viewer: User | None, channel: User, *, cursor: str | None, limit: int
 ) -> tuple[list[VideoCard], str | None]:
-    return await _card_page(session, channel_videos(viewer, channel), cursor=cursor, limit=limit)
+    """The Videos tab: Shorts are on their own tab."""
+    return await _card_page(
+        session, channel_videos(viewer, channel), not_short(), cursor=cursor, limit=limit
+    )
+
+
+async def list_channel_shorts(
+    session: AsyncSession, viewer: User | None, channel: User, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    return await _card_page(
+        session, channel_videos(viewer, channel), is_short(), cursor=cursor, limit=limit
+    )
 
 
 async def list_my_videos(

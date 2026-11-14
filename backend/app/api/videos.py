@@ -55,11 +55,27 @@ async def create_video(
     )
 
 
-@router.get("", response_model=VideoCardPage, summary="List public videos, newest first")
+@router.get(
+    "", response_model=VideoCardPage, summary="List public videos, newest first; Shorts are apart"
+)
 async def list_feed(
     session: SessionDep, cursor: KeysetCursor = None, limit: PageLimit = DEFAULT_VIDEO_PAGE
 ) -> VideoCardPage:
     cards, next_cursor = await videos_service.list_feed(session, cursor=cursor, limit=limit)
+    return VideoCardPage(
+        items=[VideoCardOut.model_validate(card) for card in cards], next_cursor=next_cursor
+    )
+
+
+@router.get(
+    "/shorts",
+    response_model=VideoCardPage,
+    summary="List public Shorts, newest first",
+)
+async def list_shorts(
+    session: SessionDep, cursor: KeysetCursor = None, limit: PageLimit = DEFAULT_VIDEO_PAGE
+) -> VideoCardPage:
+    cards, next_cursor = await videos_service.list_shorts(session, cursor=cursor, limit=limit)
     return VideoCardPage(
         items=[VideoCardOut.model_validate(card) for card in cards], next_cursor=next_cursor
     )

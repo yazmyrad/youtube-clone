@@ -27,7 +27,7 @@ from app.models import (
     VideoStatus,
     VideoVisibility,
 )
-from app.models.video import LISTED, PUBLISHED
+from app.models.video import LISTED, LISTED_SHORT, PUBLISHED
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/auth/login")
 
@@ -191,6 +191,14 @@ def listed_videos() -> ColumnElement[bool]:
         select(User.id).where(User.id == Video.owner_id, User.is_active.is_(True))
     )
     return and_(LISTED, active_owner)
+
+
+def listed_shorts() -> ColumnElement[bool]:
+    """listed_videos, Shorts only. LISTED_SHORT is the Shorts index's own literal predicate."""
+    active_owner = exists(
+        select(User.id).where(User.id == Video.owner_id, User.is_active.is_(True))
+    )
+    return and_(LISTED_SHORT, active_owner)
 
 
 def channel_videos(viewer: User | None, channel: User) -> ColumnElement[bool]:

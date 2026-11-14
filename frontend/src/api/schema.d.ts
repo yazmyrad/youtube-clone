@@ -143,6 +143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{username}/shorts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A channel's Shorts, newest first; the owner also sees private and unlisted ones */
+        get: operations["list_channel_shorts_api_channels__username__shorts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/{username}/subscription": {
         parameters: {
             query?: never;
@@ -529,11 +546,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List public videos, newest first */
+        /** List public videos, newest first; Shorts are apart */
         get: operations["list_feed_api_videos_get"];
         put?: never;
         /** Create a video and get a presigned upload form */
         post: operations["create_video_api_videos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/videos/shorts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List public Shorts, newest first */
+        get: operations["list_shorts_api_videos_shorts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -787,6 +821,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Short
+             * @description A Short: open it at /shorts/{id}
+             */
+            is_short: boolean;
             /**
              * Published At
              * Format: date-time
@@ -1390,6 +1429,11 @@ export interface components {
              */
             id: string;
             /**
+             * Is Short
+             * @description A Short: open it at /shorts/{id}
+             */
+            is_short: boolean;
+            /**
              * Published At
              * Format: date-time
              */
@@ -1451,6 +1495,11 @@ export interface components {
             /** Duration Seconds */
             duration_seconds: number | null;
             /**
+             * Height
+             * @description As displayed; null until processed
+             */
+            height: number | null;
+            /**
              * Hidden At
              * @description Set if a moderator hid it
              */
@@ -1465,6 +1514,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Short
+             * @description Taller than wide and at most 3 minutes
+             */
+            is_short: boolean;
             /** Likes Count */
             likes_count: number;
             /** @description Null if none, or not logged in */
@@ -1482,6 +1536,11 @@ export interface components {
             /** Views Count */
             views_count: number;
             visibility: components["schemas"]["VideoVisibility"];
+            /**
+             * Width
+             * @description As displayed; null until processed
+             */
+            width: number | null;
         };
         /**
          * VideoOwnerOut
@@ -1923,6 +1982,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlaylistPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channel_shorts_api_channels__username__shorts_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelVideoPage"];
                 };
             };
             /** @description Not Found */
@@ -3345,6 +3447,47 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shorts_api_videos_shorts_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoCardPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

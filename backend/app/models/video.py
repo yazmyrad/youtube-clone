@@ -13,10 +13,13 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    and_,
     func,
+    or_,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.base import Base
 
@@ -43,7 +46,8 @@ LISTED_SQL = (
 )
 LISTED = text(LISTED_SQL)
 # A Short, as YouTube decides: taller than wide, and at most three minutes.
-SHORT_SQL = "height > width AND duration_seconds <= 180"
+SHORT_MAX_SECONDS = 180
+SHORT_SQL = f"height > width AND duration_seconds <= {SHORT_MAX_SECONDS}"
 SHORT = text(SHORT_SQL)
 # The Shorts feed's index predicate; queries use this same literal SQL to match it.
 LISTED_SHORT = text(f"{LISTED_SQL} AND {SHORT_SQL}")
@@ -153,6 +157,31 @@ class Video(Base):
 
     # Loaded only on request, so locking queries never join users and N+1s fail loudly.
     owner: Mapped["User"] = relationship(lazy="raise")
+
+    @property
+    def is_short(self) -> bool:
+        """The same rule as SHORT_SQL. A video not yet measured isn't one."""
+        return (
+            self.width is not None
+            and self.height is not None
+            and self.duration_seconds is not None
+            and self.height > self.width
+            and self.duration_seconds <= SHORT_MAX_SECONDS
+        )
+
+
+def not_short() -> ColumnElement[bool]:
+    """Every video SHORT_SQL doesn't match, those not measured yet included."""
+    return or_(
+        Video.width.is_(None),
+        Video.height.is_(None),
+        Video.height <= Video.width,
+        Video.duration_seconds > SHORT_MAX_SECONDS,
+    )
+
+
+def is_short() -> ColumnElement[bool]:
+    return and_(Video.height > Video.width, Video.duration_seconds <= SHORT_MAX_SECONDS)
 
 
 class VideoAccess(Base):

@@ -68,6 +68,13 @@ async def list_channel_videos(
     return await videos.list_channel_videos(session, viewer, channel, cursor=cursor, limit=limit)
 
 
+async def list_channel_shorts(
+    session: AsyncSession, viewer: User | None, username: str, *, cursor: str | None, limit: int
+) -> tuple[list[VideoCard], str | None]:
+    channel = await get_channel_user(session, username)
+    return await videos.list_channel_shorts(session, viewer, channel, cursor=cursor, limit=limit)
+
+
 async def adjust_subscribers(session: AsyncSession, channel_id: uuid.UUID, delta: int) -> int:
     """Atomic, in the caller's transaction. Keeps `updated_at`: a new subscriber isn't an
     edit of the profile."""
