@@ -19,11 +19,11 @@ export function channelKey(username: string, viewer: string | null) {
   return ["channel", username.toLowerCase(), viewer];
 }
 
-export function useChannel(username: string) {
+export function useChannel(username: string, enabled = true) {
   const { user, isLoading } = useAuth();
   return useQuery({
     queryKey: channelKey(username, user?.username ?? null),
-    enabled: !isLoading,
+    enabled: enabled && !isLoading,
     queryFn: async ({ signal }) => {
       const { data, error, response } = await api.GET("/api/channels/{username}", {
         params: { path: { username } },

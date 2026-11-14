@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { errorMessage } from "../api/errors";
@@ -211,13 +211,19 @@ function ShortActions({
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
   const react = useReaction(video.id);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
   function press(pressed: Reaction) {
     if (!user) {
-      void navigate(`/login?next=${encodeURIComponent(pathname)}`);
+      // This Short's own address: scrolling moves the address bar, not the router.
+      void navigate(`/login?next=${encodeURIComponent(shortPath(video.id))}`);
       return;
     }
     react.mutate(nextReaction(video.my_reaction, pressed));
@@ -227,7 +233,6 @@ function ShortActions({
     try {
       await navigator.clipboard.writeText(`${window.location.origin}${shortPath(video.id)}`);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // No clipboard (an old browser, or not allowed): nothing to copy to.
     }
@@ -281,8 +286,9 @@ function ShortActions({
 }
 
 /** The channel and title over the bottom of the Short. */
-function ShortInfo({ video }: { video: ShortCardData }) {
-  const channel = useChannel(video.channel.username);
+function ShortInfo({ video, active }: { video: ShortCardData; active: boolean }) {
+  // Subscribe state only for the Short on screen: one request, not one per Short in the queue.
+  const channel = useChannel(video.channel.username, active);
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pt-16 pb-5 text-white">
       <div className="pointer-events-auto flex items-center gap-2">
@@ -294,7 +300,7 @@ function ShortInfo({ video }: { video: ShortCardData }) {
           />
           <span className="truncate text-sm font-medium">@{video.channel.username}</span>
         </Link>
-        {channel.data && <SubscribeButton channel={channel.data} />}
+        {active && channel.data && <SubscribeButton channel={channel.data} />}
       </div>
       <h2 className="mt-2 line-clamp-2 text-sm font-medium">{video.title}</h2>
     </div>
@@ -322,7 +328,7 @@ function ShortItem({
         ) : (
           <img src={video.thumbnail_url} alt="" className="size-full object-cover" />
         )}
-        <ShortInfo video={video} />
+        <ShortInfo video={video} active={active} />
       </div>
       <div className="hidden w-12 shrink-0 sm:block">
         {active && details.data && (
@@ -390,6 +396,9 @@ export function ShortsPage() {
   const scroller = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | undefined>(id);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  useEffect(() => {
+    if (id) setActiveId(id);
+  }, [id]);
 
   // /shorts alone opens the first Short; a regular video asked for as a Short opens normally.
   useEffect(() => {
@@ -400,6 +409,10 @@ export function ShortsPage() {
       void navigate(`/watch?v=${encodeURIComponent(id)}`, { replace: true });
     }
   }, [id, single.data, navigate]);
+  // A link to a Short that's gone: the feed instead.
+  useEffect(() => {
+    if (id && single.isError && queue[0]) void navigate(shortPath(queue[0].id), { replace: true });
+  }, [id, single.isError, queue, navigate]);
 
   // Opened from a shelf: start at that Short.
   const scrolledTo = useRef(false);
@@ -409,13 +422,17 @@ export function ShortsPage() {
     scrolledTo.current = true;
   }, [id, inFeed]);
 
+  const queueKey = queue.map((item) => item.id).join(",");
   // The Short most on screen plays, and the address follows it.
   useEffect(() => {
     const root = scroller.current;
     if (!root) return undefined;
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.find((entry) => entry.isIntersecting);
+        // A fast flick can report two at once: the one most on screen wins.
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         const shown = (visible?.target as HTMLElement | undefined)?.dataset.short;
         if (shown) {
           setActiveId(shown);
@@ -427,15 +444,14 @@ export function ShortsPage() {
     );
     root.querySelectorAll("[data-short]").forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [queue.length]);
+  }, [queueKey]);
 
   // Near the end, the next page of the feed.
   const index = queue.findIndex((item) => item.id === activeId);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
   useEffect(() => {
-    if (index >= queue.length - 2 && feed.hasNextPage && !feed.isFetchingNextPage) {
-      void feed.fetchNextPage();
-    }
-  }, [index, queue.length, feed]);
+    if (index >= queue.length - 2 && hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [index, queue.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const go = useCallback(
     (step: -1 | 1) => {

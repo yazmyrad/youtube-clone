@@ -84,6 +84,7 @@ beforeEach(() => {
       }
       if (path === "/api/videos/{video_id}") {
         const id = init.params?.path?.video_id ?? "";
+        if (id === "gone") return { data: undefined, error: { detail: "Not found" } };
         return { data: details(id, id !== "wide"), response: new Response() };
       }
       if (path === "/api/channels/{username}") return { data: undefined, response: new Response() };
@@ -222,4 +223,45 @@ it("goes to the next Short with the arrow key", async () => {
 
   const scrolled = vi.mocked(Element.prototype.scrollIntoView).mock.contexts[0] as Element;
   expect(scrolled.getAttribute("data-short")).toBe("b");
+});
+
+async function scrollTo(id: string) {
+  await settle(() => expect(observed.at(-1)?.elements.length).toBe(3));
+  const observer = observed.at(-1)!;
+  const target = observer.elements.find((e) => e.getAttribute("data-short") === id)!;
+  await act(async () =>
+    observer.callback(
+      [{ isIntersecting: true, intersectionRatio: 1, target } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ),
+  );
+}
+
+it("signs in back to the Short scrolled to", async () => {
+  await render("/shorts/a");
+  await scrollTo("b");
+  const like = await vi.waitFor(() => {
+    const button = container.querySelector<HTMLButtonElement>("section[data-short=b] button[aria-label=Like]");
+    expect(button).not.toBeNull();
+    return button!;
+  });
+
+  await act(async () => like.click());
+
+  expect(where()).toBe(`/login?next=${encodeURIComponent("/shorts/b")}`);
+});
+
+it("opens the feed for a link to a Short that's gone", async () => {
+  await render("/shorts/gone");
+
+  await settle(() => expect(where()).toBe("/shorts/a"));
+  await settle(() => expect(container.querySelector("section[data-short=a] video")).not.toBeNull());
+});
+
+it("asks for the channel of the Short on screen only", async () => {
+  await render("/shorts/a");
+  await settle(() => expect(container.querySelector("section[data-short=a] video")).not.toBeNull());
+
+  const channelCalls = api.GET.mock.calls.filter(([path]) => path === "/api/channels/{username}");
+  expect(channelCalls).toHaveLength(1);
 });
