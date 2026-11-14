@@ -1,7 +1,7 @@
-import { Avatar } from "./Avatar";
 import { useEffect, useRef, useState } from "react";
 
 import type { Me } from "../hooks/useAuth";
+import { Avatar } from "./Avatar";
 
 export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise<void> }) {
   const [open, setOpen] = useState(false);

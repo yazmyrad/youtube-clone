@@ -25,7 +25,7 @@ export function PlaylistPanel({
   return (
     <section
       aria-label="Playlist"
-      className="overflow-hidden rounded-xl border border-line lg:w-100 lg:shrink-0"
+      className="overflow-hidden rounded-xl border border-line"
     >
       <header className="bg-hover px-4 py-3">
         <h2 className="truncate text-lg font-bold">

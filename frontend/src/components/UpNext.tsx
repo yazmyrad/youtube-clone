@@ -1,4 +1,4 @@
-import { useFeed } from "../hooks/useFeed";
+import { useFeedFirstPage } from "../hooks/useFeed";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { VideoCompactCard } from "./VideoCard";
 
@@ -8,11 +8,9 @@ export const UP_NEXT = 12;
 /** The column beside the player: the latest public videos but the one playing. There are no
  * recommendations, so the newest is the best guess at what to watch next. */
 export function UpNext({ videoId }: { videoId: string }) {
-  const feed = useFeed();
+  const feed = useFeedFirstPage();
   const renewThumbnails = useRenewThumbnails(feed);
-  const videos = (feed.data?.pages.flatMap((page) => page.items) ?? [])
-    .filter((video) => video.id !== videoId)
-    .slice(0, UP_NEXT);
+  const videos = (feed.data ?? []).filter((video) => video.id !== videoId).slice(0, UP_NEXT);
 
   if (feed.isPending) {
     return (

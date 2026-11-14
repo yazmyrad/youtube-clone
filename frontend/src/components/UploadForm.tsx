@@ -25,7 +25,7 @@ type Progress = { stage: "sending"; share: number } | { stage: "finishing" } | n
 const CONTROL =
   "mt-1 block w-full rounded-lg border border-line px-3 text-base font-normal outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 const PRIMARY =
-  "h-10 rounded-full bg-accent px-6 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50";
+  "h-10 rounded-full bg-accent px-6 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-50";
 const SECONDARY = "h-10 rounded-full px-4 text-sm font-medium hover:bg-hover";
 const LEAVE_WARNING = "Leave this page? Your upload will be cancelled.";
 

@@ -51,6 +51,30 @@ async function render(videoId: string) {
 
 const titles = () => [...container.querySelectorAll("h3")].map((h) => h.textContent);
 
+it("shows a placeholder while loading", async () => {
+  get.mockReturnValue(new Promise(() => {}));
+
+  await render("0");
+
+  expect(container.querySelector("[aria-busy=true]")).not.toBeNull();
+});
+
+it("asks for the feed's first page only", async () => {
+  get.mockResolvedValue({ data: { items: [card("1")], next_cursor: "more" } });
+
+  await render("0");
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.querySelectorAll("h3")).toHaveLength(1);
+  });
+
+  expect(get).toHaveBeenCalledTimes(1);
+  expect(get).toHaveBeenCalledWith(
+    "/api/videos",
+    expect.objectContaining({ params: { query: { cursor: undefined } } }),
+  );
+});
+
 it("lists the latest videos but the one playing, up to a limit", async () => {
   const items = Array.from({ length: UP_NEXT + 5 }, (_, i) => card(String(i)));
   get.mockResolvedValue({ data: { items, next_cursor: null } });
@@ -73,8 +97,10 @@ it("shows nothing when there's nothing else", async () => {
   await render("0");
   await vi.waitFor(async () => {
     await act(async () => {});
+    expect(get).toHaveBeenCalled();
     expect(container.querySelector("[aria-busy]")).toBeNull();
   });
 
+  expect(container.querySelector("section")).toBeNull();
   expect(container.textContent).toBe("");
 });

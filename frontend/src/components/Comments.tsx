@@ -84,7 +84,7 @@ function CommentForm({ videoId }: { videoId: string }) {
           <button
             type="submit"
             disabled={body === null || add.isPending}
-            className="h-9 rounded-full bg-accent px-4 text-sm font-medium text-white hover:opacity-90 disabled:bg-hover disabled:text-ink-muted"
+            className="h-9 rounded-full bg-accent px-4 text-sm font-medium text-on-accent hover:opacity-90 disabled:bg-hover disabled:text-ink-muted"
           >
             Comment
           </button>

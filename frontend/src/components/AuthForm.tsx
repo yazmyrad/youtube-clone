@@ -85,7 +85,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="h-10 shrink-0 rounded-full bg-accent px-6 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="h-10 shrink-0 rounded-full bg-accent px-6 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-50"
         >
           {submitLabel}
         </button>

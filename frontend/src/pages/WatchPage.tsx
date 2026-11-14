@@ -73,7 +73,7 @@ function Details({ video }: { video: VideoDetails }) {
       </div>
       <div className="mt-3 rounded-xl bg-hover p-3 text-sm">
         <p className="font-medium">
-          {video.views_count.toLocaleString("en")} {video.views_count === 1 ? "view" : "views"}{" "}
+          {video.views_count.toLocaleString("en")} {video.views_count === 1 ? "view" : "views"}
           <time dateTime={published} title={new Date(published).toLocaleString()} className="ml-2">
             {formatAge(published)}
           </time>

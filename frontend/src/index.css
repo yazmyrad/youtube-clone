@@ -13,6 +13,8 @@
   --color-line: #d3d3d3;
   --color-accent: #065fd4;
   --color-accent-soft: #def1ff;
+  /* Text on accent buttons: white on the light theme's blue, near-black on the dark one's. */
+  --color-on-accent: #ffffff;
   --color-brand: #ff0033;
   --color-danger: #b91c1c;
   --color-danger-soft: #fdecec;
@@ -30,6 +32,7 @@
     --color-line: #3f3f3f;
     --color-accent: #3ea6ff;
     --color-accent-soft: #263850;
+    --color-on-accent: #0f0f0f;
     --color-danger: #ff8a80;
     --color-danger-soft: #3b1d1d;
   }
