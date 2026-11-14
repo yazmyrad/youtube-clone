@@ -190,3 +190,10 @@ def test_domain_mode_publishes_only_caddy_and_trusts_only_its_address() -> None:
     assert ipaddress.ip_address(caddy_ip) not in ipaddress.ip_network(pool["ip_range"])
     assert services["api"]["environment"]["COOKIE_SECURE"] == "true"
     assert services["api"]["environment"]["PUBLIC_ORIGIN"].startswith("https://")
+
+
+def test_minio_dockerfile_default_matches_the_pinned_image() -> None:
+    image = yaml.safe_load(COMPOSE.read_text())["services"]["minio"]["image"]
+    dockerfile = (ROOT / "infra" / "minio" / "Dockerfile").read_text()
+
+    assert f"ARG MINIO_IMAGE={image}\n" in dockerfile
