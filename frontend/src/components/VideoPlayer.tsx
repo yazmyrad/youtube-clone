@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
 import { useViewHeartbeat } from "../hooks/useViewHeartbeat";
+import { PlayerControls, type Quality } from "./player/PlayerControls";
+import { useMediaState } from "./player/useMediaState";
 import {
   PlaybackUnavailable,
   createHlsErrorHandler,
@@ -21,6 +23,7 @@ const FAILURE_TEXT: Record<PlayerFailure, string> = {
 
 type Stop = () => void;
 type OnFailed = (failure: PlayerFailure) => void;
+type OnQuality = (quality: Quality) => void;
 
 function fetchGrantFor(videoId: string) {
   return () => requestPlayback(api, videoId);
@@ -32,6 +35,7 @@ function playWithHlsJs(
   first: PlaybackGrant,
   Hls: typeof import("hls.js").default,
   onFailed: OnFailed,
+  onQuality: OnQuality,
 ): Stop {
   let token = tokenOf(first.url) ?? "";
   const hls = new Hls({
@@ -49,6 +53,22 @@ function playWithHlsJs(
   const onPlay = () => renewal.onPlay();
   const handleError = createHlsErrorHandler(hls, video, renewal, onFailed);
 
+  // The renditions for the settings menu, and which one Auto is playing.
+  const reportQuality = () => {
+    const levels = hls.levels ?? [];
+    const playing = levels[hls.currentLevel]?.height ?? null;
+    onQuality({
+      heights: levels.map((level) => level.height),
+      selected: hls.autoLevelEnabled ? -1 : hls.currentLevel,
+      playing,
+      select: (index) => {
+        hls.currentLevel = index;
+        reportQuality();
+      },
+    });
+  };
+  hls.on(Hls.Events.MANIFEST_PARSED, reportQuality);
+  hls.on(Hls.Events.LEVEL_SWITCHED, reportQuality);
   hls.on(Hls.Events.ERROR, (_event, data) => handleError(data));
   hls.on(Hls.Events.FRAG_LOADED, () => renewal.onProgress());
   video.addEventListener("play", onPlay);
@@ -110,14 +130,25 @@ export function VideoPlayer({
   videoId,
   poster,
   onEnded,
+  onNext,
+  theater = false,
+  onTheater,
 }: {
   videoId: string;
   poster?: string;
   /** Called when the video plays to its end, as for moving on in a playlist. */
   onEnded?: () => void;
+  /** The Next button (and SHIFT+N); none without it. */
+  onNext?: () => void;
+  /** Theater mode: the player takes the page's width. */
+  theater?: boolean;
+  onTheater?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<PlayerFailure | null>(null);
+  const [quality, setQuality] = useState<Quality | null>(null);
+  const media = useMediaState(videoRef);
   useViewHeartbeat(videoRef, videoId);
 
   useEffect(() => {
@@ -140,6 +171,7 @@ export function VideoPlayer({
     };
 
     setFailure(null);
+    setQuality(null);
 
     async function start(element: HTMLVideoElement) {
       const [grant, { default: Hls }] = await Promise.all([
@@ -148,7 +180,7 @@ export function VideoPlayer({
       ]);
       if (closed) return;
       if (Hls.isSupported()) {
-        stopPlayer = playWithHlsJs(element, videoId, grant, Hls, onFailed);
+        stopPlayer = playWithHlsJs(element, videoId, grant, Hls, onFailed, setQuality);
       } else if (element.canPlayType("application/vnd.apple.mpegurl")) {
         stopPlayer = playNatively(element, videoId, grant, onFailed);
       } else {
@@ -164,17 +196,33 @@ export function VideoPlayer({
   }, [videoId]);
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
+    <div
+      ref={containerRef}
+      data-player
+      className={`relative w-full overflow-hidden bg-black select-none ${
+        theater ? "h-[min(56.25vw,calc(100vh-169px))]" : "aspect-video rounded-xl"
+      }`}
+    >
       {/* Stays mounted under a failure, for the next video this player is given. */}
       <video
         ref={videoRef}
         poster={poster}
-        controls={failure === null}
         autoPlay
         playsInline
         onEnded={onEnded}
         className="size-full"
       />
+      {failure === null && (
+        <PlayerControls
+          video={videoRef}
+          container={containerRef}
+          state={media}
+          quality={quality}
+          theater={theater}
+          onTheater={onTheater}
+          onNext={onNext}
+        />
+      )}
       {failure && (
         <p
           role="alert"

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Avatar } from "../components/Avatar";
@@ -12,6 +13,7 @@ import { SubscribeButton } from "../components/SubscribeButton";
 import { UpNext } from "../components/UpNext";
 import { channelPath, formatAge, formatSubscribers, watchPath } from "../components/format";
 import { useChannel } from "../hooks/useChannel";
+import { useFeedFirstPage } from "../hooks/useFeed";
 import { usePlaylist } from "../hooks/usePlaylists";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { VideoPlayer } from "../components/VideoPlayer";
@@ -86,7 +88,40 @@ function Details({ video }: { video: VideoDetails }) {
   );
 }
 
-function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | null }) {
+const THEATER_KEY = "player.theater";
+
+/** Theater mode, remembered across videos and visits as YouTube does. */
+function useTheater(): [boolean, () => void] {
+  const [theater, setTheater] = useState(() => {
+    try {
+      return localStorage.getItem(THEATER_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () =>
+    setTheater((value) => {
+      try {
+        localStorage.setItem(THEATER_KEY, value ? "0" : "1");
+      } catch {
+        // Not remembered, then.
+      }
+      return !value;
+    });
+  return [theater, toggle];
+}
+
+function Watch({
+  videoId,
+  playlistId,
+  theater,
+  onTheater,
+}: {
+  videoId: string;
+  playlistId: string | null;
+  theater: boolean;
+  onTheater: () => void;
+}) {
   const video = useVideo(videoId);
   const navigate = useNavigate();
   // A playlist the caller can't see, or a broken link, just plays the video alone.
@@ -95,6 +130,9 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   const renewPlaylist = useRenewThumbnails(playlistQuery);
   const next = playlist ? nextInPlaylist(playlist, videoId) : null;
   const playNext = next && playlist ? () => void navigate(watchPath(next, playlist.id)) : undefined;
+  // Next: the playlist's next video, or else the first one Up next lists.
+  const upNext = useFeedFirstPage().data?.find((item) => item.id !== videoId);
+  const goNext = playNext ?? (upNext ? () => void navigate(watchPath(upNext.id)) : undefined);
 
   if (video.isError) {
     if (video.error instanceof VideoNotFound) return <NotFoundPage />;
@@ -106,6 +144,16 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   }
 
   const message = video.data ? statusMessage(video.data.status) : null;
+  const player = video.data && playable(video.data) && (
+    <VideoPlayer
+      videoId={videoId}
+      poster={video.data.thumbnail_url ?? undefined}
+      onEnded={playNext}
+      onNext={goNext}
+      theater={theater}
+      onTheater={onTheater}
+    />
+  );
   const main = (
     <div className="min-w-0 flex-1">
       {video.isPending && <div className="aspect-video w-full rounded-xl bg-hover" />}
@@ -115,29 +163,27 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
           {message}
         </div>
       )}
-      {video.data && playable(video.data) && (
-        <VideoPlayer
-          videoId={videoId}
-          poster={video.data.thumbnail_url ?? undefined}
-          onEnded={playNext}
-        />
-      )}
+      {!theater && player}
       {video.data && <Details video={video.data} />}
       {video.data && playable(video.data) && <Comments video={video.data} />}
     </div>
   );
   // As on YouTube: the player and details on the left, the playlist and Up next on the right,
   // or below them on narrow screens.
+  // Theater mode: the player spans the page on a black band, everything else below it.
   return (
-    <div className="mx-auto flex max-w-[1754px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
-      {main}
-      <aside className="space-y-4 lg:w-100 lg:shrink-0">
-        {playlist && (
-          <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
-        )}
-        <UpNext videoId={videoId} />
-      </aside>
-    </div>
+    <>
+      {theater && player && <div className="bg-black">{player}</div>}
+      <div className="mx-auto flex max-w-[1754px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
+        {main}
+        <aside className="space-y-4 lg:w-100 lg:shrink-0">
+          {playlist && (
+            <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
+          )}
+          <UpNext videoId={videoId} />
+        </aside>
+      </div>
+    </>
   );
 }
 
@@ -145,7 +191,16 @@ export function WatchPage() {
   const [params] = useSearchParams();
   const videoId = params.get("v");
   const playlistId = params.get("list");
+  const [theater, toggleTheater] = useTheater();
   if (!videoId) return <NotFoundPage />;
   // A new video starts from a clean page, not with the last one's details on screen.
-  return <Watch key={videoId} videoId={videoId} playlistId={playlistId} />;
+  return (
+    <Watch
+      key={videoId}
+      videoId={videoId}
+      playlistId={playlistId}
+      theater={theater}
+      onTheater={toggleTheater}
+    />
+  );
 }

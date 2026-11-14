@@ -18,6 +18,19 @@
   --color-brand: #ff0033;
   --color-danger: #b91c1c;
   --color-danger-soft: #fdecec;
+
+  /* The player's feedback for a key or click: a bubble that grows and fades. */
+  --animate-player-flash: player-flash 0.5s ease-out forwards;
+  @keyframes player-flash {
+    from {
+      opacity: 0.9;
+      scale: 0.9;
+    }
+    to {
+      opacity: 0;
+      scale: 1.3;
+    }
+  }
 }
 
 /* YouTube's dark theme, when the system asks for one. The tokens above are CSS variables, so

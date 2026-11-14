@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => {
     static supported = true;
     static instances: FakeHls[] = [];
     static isSupported = () => FakeHls.supported;
-    static Events = { ERROR: "hlsError", FRAG_LOADED: "hlsFragLoaded" };
+    static Events = {
+      ERROR: "hlsError",
+      FRAG_LOADED: "hlsFragLoaded",
+      MANIFEST_PARSED: "hlsManifestParsed",
+      LEVEL_SWITCHED: "hlsLevelSwitched",
+    };
 
     handlers = new Map<string, (event: string, data: unknown) => void>();
     loadSource = vi.fn();
@@ -111,7 +116,7 @@ describe("with hls.js", () => {
     const hls = onlyHls();
     expect(hls.loadSource).toHaveBeenCalledExactlyOnceWith("/hls/first/v1/master.m3u8");
     expect(hls.attachMedia).toHaveBeenCalledExactlyOnceWith(video());
-    expect(video().controls).toBe(true);
+    expect(container.querySelector("[data-player-controls]")).not.toBeNull();
   });
 
   it("sends later requests with the renewed token", async () => {
@@ -158,7 +163,7 @@ describe("with hls.js", () => {
 
     expect(hls.destroy).toHaveBeenCalledTimes(1);
     expect(alertText()).toContain("available");
-    expect(video().controls).toBe(false);
+    expect(container.querySelector("[data-player-controls]")).toBeNull();
   });
 
   it("destroys the player on unmount", async () => {
