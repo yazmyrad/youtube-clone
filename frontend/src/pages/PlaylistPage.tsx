@@ -73,7 +73,7 @@ function Header({ playlist, own }: { playlist: Playlist; own: boolean }) {
         )}
       </div>
       {remove.isError && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-danger">
           {remove.error.message}
         </p>
       )}
@@ -93,7 +93,7 @@ function Items({ playlist, own }: { playlist: Playlist; own: boolean }) {
   return (
     <div className="min-w-0 flex-1">
       {items.isError && (
-        <p role="alert" className="mb-2 text-sm text-red-700">
+        <p role="alert" className="mb-2 text-sm text-danger">
           {items.error.message}
         </p>
       )}
@@ -175,7 +175,7 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
   if (playlist.isError) {
     if (playlist.error instanceof PlaylistNotFound) return <NotFoundPage />;
     return (
-      <p role="alert" className="p-6 text-center text-sm text-red-700">
+      <p role="alert" className="p-6 text-center text-sm text-danger">
         Couldn't load this playlist.
       </p>
     );

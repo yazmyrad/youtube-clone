@@ -43,7 +43,7 @@ function NewPlaylist({ videoId, onDone }: { videoId: string; onDone: () => void 
         </select>
       </label>
       {create.isError && (
-        <p role="alert" className="text-xs text-red-700">
+        <p role="alert" className="text-xs text-danger">
           {create.error.message}
         </p>
       )}
@@ -102,7 +102,7 @@ function SaveDialog({ videoId, onClose }: { videoId: string; onClose: () => void
         </div>
         {playlists.isPending && <p className="px-4 py-2 text-sm text-ink-muted">Loading...</p>}
         {playlists.isError && (
-          <p role="alert" className="px-4 py-2 text-sm text-red-700">
+          <p role="alert" className="px-4 py-2 text-sm text-danger">
             Couldn't load your playlists.
           </p>
         )}
@@ -128,7 +128,7 @@ function SaveDialog({ videoId, onClose }: { videoId: string; onClose: () => void
           </ul>
         )}
         {toggle.isError && (
-          <p role="alert" className="px-4 text-xs text-red-700">
+          <p role="alert" className="px-4 text-xs text-danger">
             {toggle.error.message}
           </p>
         )}

@@ -27,7 +27,7 @@ function StatusBadge({ status }: { status: OwnerVideo["status"] }) {
     case "ready":
       return <span className={`${base} bg-green-100 text-green-800`}>Ready</span>;
     case "failed":
-      return <span className={`${base} bg-red-100 text-red-800`}>Failed</span>;
+      return <span className={`${base} bg-danger-soft text-danger`}>Failed</span>;
   }
 }
 
@@ -42,7 +42,7 @@ export function MyVideos() {
   if (videos.isPending) return null;
   if (videos.isError) {
     return (
-      <p role="alert" className="text-sm text-red-700">
+      <p role="alert" className="text-sm text-danger">
         Couldn't load your videos.
       </p>
     );
@@ -54,7 +54,7 @@ export function MyVideos() {
   return (
     <>
       {remove.isError && (
-        <p role="alert" className="mb-2 text-sm text-red-700">
+        <p role="alert" className="mb-2 text-sm text-danger">
           {remove.error.message}
         </p>
       )}
@@ -76,7 +76,7 @@ export function MyVideos() {
                 {VISIBILITY[video.visibility]} · {new Date(video.created_at).toLocaleDateString()}
               </p>
               {video.status === "failed" && video.failure_reason && (
-                <p className="text-sm text-red-700">{video.failure_reason}</p>
+                <p className="text-sm text-danger">{video.failure_reason}</p>
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">

@@ -165,7 +165,7 @@ export function UploadForm({ onUploaded }: { onUploaded?: (video: OwnerVideo) =>
           />
         </label>
         {error && (
-          <p role="alert" className="mt-3 text-sm text-red-700">
+          <p role="alert" className="mt-3 text-sm text-danger">
             {error}
           </p>
         )}
@@ -231,7 +231,7 @@ export function UploadForm({ onUploaded }: { onUploaded?: (video: OwnerVideo) =>
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

@@ -36,7 +36,7 @@ export function SubscribeButton({ channel }: { channel: Channel }) {
         {channel.is_subscribed ? "Subscribed" : "Subscribe"}
       </button>
       {subscription.isError && (
-        <p role="alert" className="text-xs text-red-700">
+        <p role="alert" className="text-xs text-danger">
           {subscription.error.message}
         </p>
       )}

@@ -99,7 +99,7 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
   if (video.isError) {
     if (video.error instanceof VideoNotFound) return <NotFoundPage />;
     return (
-      <p role="alert" className="p-6 text-center text-sm text-red-700">
+      <p role="alert" className="p-6 text-center text-sm text-danger">
         Couldn't load this video.
       </p>
     );

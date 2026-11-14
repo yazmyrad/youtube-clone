@@ -76,7 +76,7 @@ export function AuthForm({
     <form onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-4">
       {children}
       {error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

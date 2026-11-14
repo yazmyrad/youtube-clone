@@ -23,7 +23,7 @@ function Row({ user, self }: { user: AdminUser; self: boolean }) {
           @{user.username} · {user.email}
         </p>
         {change.isError && (
-          <p role="alert" className="mt-1 text-xs text-red-700">
+          <p role="alert" className="mt-1 text-xs text-danger">
             {change.error.message}
           </p>
         )}
@@ -54,7 +54,7 @@ function Row({ user, self }: { user: AdminUser; self: boolean }) {
           disabled={locked}
           onClick={() => change.mutate({ userId: user.id, change: { is_active: !user.is_active } })}
           className={`h-8 rounded-full px-3 text-sm font-medium disabled:opacity-40 ${
-            user.is_active ? "text-red-700 hover:bg-red-50" : "text-accent hover:bg-accent-soft"
+            user.is_active ? "text-danger hover:bg-danger-soft" : "text-accent hover:bg-accent-soft"
           }`}
         >
           {user.is_active ? "Disable" : "Enable"}
@@ -70,7 +70,7 @@ function Users({ q, me }: { q: string; me: string }) {
   if (users.isPending) return <div aria-busy="true" className="h-40" />;
   if (!users.data) {
     return (
-      <p role="alert" className="py-8 text-sm text-red-700">
+      <p role="alert" className="py-8 text-sm text-danger">
         Couldn't load users.
       </p>
     );

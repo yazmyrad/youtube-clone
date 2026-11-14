@@ -14,9 +14,33 @@
   --color-accent: #065fd4;
   --color-accent-soft: #def1ff;
   --color-brand: #ff0033;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fdecec;
+}
+
+/* YouTube's dark theme, when the system asks for one. The tokens above are CSS variables, so
+   every utility built on them follows. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #0f0f0f;
+    --color-ink: #f1f1f1;
+    --color-ink-muted: #aaaaaa;
+    --color-hover: #272727;
+    --color-hover-strong: #3f3f3f;
+    --color-line: #3f3f3f;
+    --color-accent: #3ea6ff;
+    --color-accent-soft: #263850;
+    --color-danger: #ff8a80;
+    --color-danger-soft: #3b1d1d;
+  }
 }
 
 @layer base {
+  /* Native controls (inputs, selects, scrollbars) match the theme. */
+  :root {
+    color-scheme: light dark;
+  }
+
   body {
     background-color: var(--color-page);
     color: var(--color-ink);

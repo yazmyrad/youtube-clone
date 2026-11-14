@@ -65,7 +65,7 @@ function ReportForm({ videoId, onClose }: { videoId: string; onClose: () => void
           />
         </label>
         {report.isError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-danger">
             {report.error.message}
           </p>
         )}

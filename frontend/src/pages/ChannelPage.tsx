@@ -158,7 +158,7 @@ function ChannelView({ username, current }: { username: string; current: Tab }) 
   if (channel.isError) {
     if (channel.error instanceof ChannelNotFound) return <NotFoundPage />;
     return (
-      <p role="alert" className="p-6 text-center text-sm text-red-700">
+      <p role="alert" className="p-6 text-center text-sm text-danger">
         Couldn't load this channel.
       </p>
     );

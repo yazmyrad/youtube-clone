@@ -28,7 +28,7 @@ function HideForm({ videoId, onClose }: { videoId: string; onClose: () => void }
           />
         </label>
         {decide.isError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-danger">
             {decide.error.message}
           </p>
         )}
@@ -43,7 +43,7 @@ function HideForm({ videoId, onClose }: { videoId: string; onClose: () => void }
           <button
             type="submit"
             disabled={reason.trim() === "" || decide.isPending}
-            className="rounded-full px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+            className="rounded-full px-4 py-2 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-40"
           >
             Hide
           </button>
@@ -63,7 +63,7 @@ export function HideButton({ videoId }: { videoId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-9 items-center rounded-full bg-hover px-4 text-sm font-medium text-red-700 hover:bg-hover-strong"
+        className="flex h-9 items-center rounded-full bg-hover px-4 text-sm font-medium text-danger hover:bg-hover-strong"
       >
         Hide
       </button>

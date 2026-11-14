@@ -49,7 +49,7 @@ function Entry({ entry, onThumbnailError }: { entry: QueueEntry; onThumbnailErro
           · {video.visibility} · first reported {formatAge(entry.first_reported_at)}
         </p>
         <p className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded bg-red-50 px-2 py-0.5 font-medium text-red-700">
+          <span className="rounded bg-danger-soft px-2 py-0.5 font-medium text-danger">
             {entry.open_reports} open {entry.open_reports === 1 ? "report" : "reports"}
           </span>
           {Object.entries(entry.reasons).map(([reason, count]) => (
@@ -91,7 +91,7 @@ function Entry({ entry, onThumbnailError }: { entry: QueueEntry; onThumbnailErro
           )}
         </div>
         {decide.isError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-danger">
             {decide.error.message}
           </p>
         )}

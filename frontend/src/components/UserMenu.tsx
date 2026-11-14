@@ -58,7 +58,7 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
             Sign out
           </button>
           {failed && (
-            <p role="alert" className="px-4 pt-1 text-sm text-red-700">
+            <p role="alert" className="px-4 pt-1 text-sm text-danger">
               Couldn't sign out. Please try again.
             </p>
           )}

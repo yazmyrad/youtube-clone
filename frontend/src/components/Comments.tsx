@@ -76,7 +76,7 @@ function CommentForm({ videoId }: { videoId: string }) {
           className="w-full resize-y border-b border-line bg-transparent py-1 text-sm outline-none focus:border-ink"
         />
         {add.isError && (
-          <p role="alert" className="mt-1 text-sm text-red-700">
+          <p role="alert" className="mt-1 text-sm text-danger">
             {add.error.message}
           </p>
         )}
@@ -106,7 +106,7 @@ export function Comments({ video }: { video: VideoDetails }) {
       </h2>
       <CommentForm videoId={video.id} />
       {comments.isError && (
-        <p role="alert" className="mt-4 text-sm text-red-700">
+        <p role="alert" className="mt-4 text-sm text-danger">
           Couldn't load the comments.
         </p>
       )}

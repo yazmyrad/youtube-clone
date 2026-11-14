@@ -48,7 +48,7 @@ export function ReactionButtons({ video }: { video: VideoDetails }) {
         </button>
       </div>
       {react.isError && (
-        <p role="alert" className="text-xs text-red-700">
+        <p role="alert" className="text-xs text-danger">
           {react.error.message}
         </p>
       )}
