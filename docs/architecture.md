@@ -44,7 +44,10 @@ Source of truth for the design (see `CLAUDE.md`). Changes to this document or to
 
 ```text
                     Internet
-                       │ :80 (+ :443 with --domain)
+                       │ :80, or :80 and :443 with --domain
+                 ┌─────▼─────┐
+                 │  (caddy)  │  --domain only: TLS, Let's Encrypt, HSTS
+                 └─────┬─────┘
                  ┌─────▼─────┐
                  │   nginx   │  SPA, /api, /docs, /hls, /thumbs, /uploads
                  └─┬───────┬─┘
@@ -60,7 +63,8 @@ Source of truth for the design (see `CLAUDE.md`). Changes to this document or to
 
 | Service | Role | Network exposure |
 |---|---|---|
-| nginx | Serves the built SPA, routes requests, enforces rate limits and headers, authorizes media requests | The only published port |
+| caddy | `--domain` mode only (`compose.domain.yaml`): ends TLS with a Let's Encrypt certificate it renews itself, redirects HTTP to HTTPS, adds HSTS | Publishes 80 and 443; nginx then publishes nothing |
+| nginx | Serves the built SPA, routes requests, enforces rate limits and headers, authorizes media requests | The only published port without `--domain` |
 | api | FastAPI: thin routers → services → models | Internal |
 | worker | Claims jobs, transcodes, cleans up storage | Internal, no internet egress |
 | postgres | All metadata and the job queue | Internal |
@@ -541,7 +545,7 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 
 `/docs` needs a looser CSP than the SPA unless the Swagger assets are self-hosted. We self-host them, which also makes `/docs` work without internet access.
 
-**Known limitation: IP-only mode.** The default deployment serves plain HTTP on the VM's IP, because a clean VM has no domain for a trusted certificate. Credentials and tokens are not encrypted in transit in this mode, and the Secure cookie flag is off because it would break login. `./install.sh --domain example.com` turns on Let's Encrypt HTTPS, Secure cookies and HSTS. This mode is for evaluation; production use needs a domain.
+**Known limitation: IP-only mode.** The default deployment serves plain HTTP on the VM's IP, because a clean VM has no domain for a trusted certificate. Credentials and tokens are not encrypted in transit in this mode, and the Secure cookie flag is off because it would break login. `./install.sh --domain example.com` turns on Let's Encrypt HTTPS, Secure cookies and HSTS: Caddy ends TLS in front of nginx, which trusts the client address and the https scheme only from Caddy's fixed address, and the API checks Origin against `PUBLIC_ORIGIN`. `--no-domain` switches back. This mode is for evaluation; production use needs a domain.
 
 ## 7. Definition of done
 
