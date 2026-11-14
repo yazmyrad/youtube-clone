@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.security import hash_refresh_token
 from app.models import RefreshToken, User
 from tests.helpers import PASSWORD, CreateUser
@@ -188,3 +189,33 @@ async def test_logout_requires_same_origin(
 
     assert response.status_code == 403
     assert (await _token_row(session, refresh_token)).revoked_at is None
+
+
+@pytest.mark.parametrize(
+    ("origin", "allowed"),
+    [
+        ("https://videos.example.com", True),
+        ("http://test", False),  # The request's own scheme and host no longer count.
+        ("http://videos.example.com", False),
+        ("https://evil.example", False),
+    ],
+)
+async def test_behind_tls_the_public_origin_is_the_one_allowed(
+    api: httpx.AsyncClient,
+    refresh_token: str,
+    monkeypatch: pytest.MonkeyPatch,
+    origin: str,
+    allowed: bool,
+) -> None:
+    """`--domain` mode: TLS ends in front of nginx, so the request itself says http."""
+    monkeypatch.setenv("PUBLIC_ORIGIN", "https://videos.example.com")
+    get_settings.cache_clear()
+    token = refresh_token
+
+    response = await api.post(
+        "/api/auth/logout",
+        headers={"Origin": origin, "Cookie": f"refresh_token={token}"},
+    )
+
+    assert (response.status_code != 403) is allowed, response.text
+    get_settings.cache_clear()

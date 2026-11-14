@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     playback_ttl: timedelta = timedelta(minutes=10)
     # Off by default: the IP-only deploy serves plain HTTP. `--domain` mode turns it on.
     cookie_secure: bool = False
+    # The site's address as browsers see it, such as https://example.com. `--domain` mode sets
+    # it, because there TLS ends in front of nginx and the request's own scheme is http. Unset,
+    # the Origin check uses the request's scheme and Host.
+    public_origin: str | None = Field(default=None, pattern=r"^https?://[^/\s]+$")
 
     minio_endpoint: str = "http://minio:9000"
     # The scoped app user from infra/minio/init.sh, never the root account.
