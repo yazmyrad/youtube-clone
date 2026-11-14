@@ -285,3 +285,11 @@ async def test_output_stops_at_the_declared_duration(tmp_path: Path) -> None:
     playlist = (result.hls_dir / "360p" / "index.m3u8").read_text().splitlines()
     durations = [float(line[8:].rstrip(",")) for line in playlist if line.startswith("#EXTINF:")]
     assert sum(durations) <= 2 + media.DURATION_MARGIN_SECONDS + 0.5
+
+
+@pytest.mark.parametrize(
+    ("duration", "at"),
+    [(90.0, 30.0), (600.0, 60.0), (6.0, 2.0), (3.0, 0.5), (1.0, 0.0), (0.2, 0.0)],
+)
+def test_the_thumbnail_comes_from_a_third_of_the_way_in(duration: float, at: float) -> None:
+    assert media.thumbnail_at(duration) == pytest.approx(at)

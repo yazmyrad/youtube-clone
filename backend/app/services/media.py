@@ -245,6 +245,12 @@ def _write_master(hls_dir: Path, renditions: list[Rendition], duration: float) -
     return master
 
 
+def thumbnail_at(duration: float) -> float:
+    """Where the thumbnail comes from: a third of the way in, as openings are often black or
+    a title, but early enough to leave frames to pick from, and never past a minute."""
+    return max(0.0, min(duration / 3, 60.0, duration - 2.5))
+
+
 async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
     """Writes `hls/` and `thumbnail.jpg` under `output`. Cancelling kills ffmpeg."""
     renditions = renditions_for(info)
@@ -263,11 +269,12 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
     smallest = renditions[0]
     await _encode(
         [
-            "-ss", str(min(1.0, info.duration / 2)),
+            "-ss", f"{thumbnail_at(info.duration):.3f}",
             *_input_args(source, info),
             "-map", f"0:{info.video_stream}",
             "-frames:v", "1",
-            "-vf", f"scale={smallest.width}:{smallest.height}",
+            # The most representative of the next 48 frames, not whichever comes first.
+            "-vf", f"thumbnail=48,scale={smallest.width}:{smallest.height}",
             "-q:v", "3",
             "-update", "1",
             str(thumbnail),
