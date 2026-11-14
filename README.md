@@ -1,8 +1,23 @@
 # YouTube clone
 
-A video sharing site in the style of YouTube: upload, transcoding to HLS, playback with signed
-URLs, likes, comments, a home feed and search. FastAPI, PostgreSQL, MinIO, an ffmpeg worker and
-a React front end, behind nginx. The design is in [docs/architecture.md](docs/architecture.md).
+A video sharing site in the style of YouTube, deployed to a clean Ubuntu machine with one
+command. FastAPI, PostgreSQL, MinIO, an ffmpeg worker and a React front end, behind nginx. The
+design, schema, permission matrix and the checks behind every claim below are in
+[docs/architecture.md](docs/architecture.md).
+
+## What it does
+
+- **Videos:** upload with progress, transcoding to HLS at 360p and 720p with a thumbnail, and
+  playback with short-lived signed URLs. Public, unlisted and private videos, and private ones
+  shared with chosen users.
+- **Watching:** a home feed, search, the watch page with Up next, likes and dislikes, comments,
+  and deduplicated view counts.
+- **Channels:** channel pages with videos and playlists, subscriptions and a subscriptions feed.
+- **Playlists:** create, reorder, play in order; saving from the watch page.
+- **History:** watch history with where you left off.
+- **Moderation:** reporting, a moderators' queue, hiding and restoring with an audit log, and
+  admin user management (roles, disabling).
+- **Look:** YouTube's layout, letter avatars, and a dark theme that follows the system.
 
 ## Run it
 
@@ -16,6 +31,10 @@ That is the only step. The script installs Docker if needed, generates secrets i
 builds and starts every service, applies migrations, creates the storage buckets, and fills
 the site with demo data. It ends by printing the site's address. Running it again is safe:
 data, secrets and demo passwords are kept.
+
+On a fresh Ubuntu 24.04 VM with 4 CPUs and 8 GB, from `git clone` to the printed address took
+under three minutes, with no other step; the smoke test and the demo data check then passed
+there. CI repeats the install on fresh machines on every push.
 
 | Option | Effect |
 |---|---|
@@ -53,6 +72,31 @@ title cards generated with ffmpeg during install, so the repository holds no vid
 install needs no download for them. They go through the same upload and transcoding pipeline
 as any upload. Log in with any account from `demo-credentials.txt`.
 
+## How it fits together
+
+```text
+browser ─► nginx ─┬─► SPA (built React app)
+  (Caddy first,   ├─► /api ─► api (FastAPI) ─► PostgreSQL (data and the job queue)
+   with --domain) ├─► /hls, /thumbs ─► MinIO, after nginx asks the API to check the token
+                  └─► /uploads ─► MinIO (presigned POST)
+                         worker ◄── job queue: ffprobe, ffmpeg to HLS, thumbnail ──► MinIO
+```
+
+Only nginx (or Caddy, with `--domain`) is reachable from outside. The API is layered as thin
+routers, services with the logic, and models; every role and visibility rule lives in
+`backend/app/core/permissions.py`. The job queue is a PostgreSQL table claimed with
+`SELECT ... FOR UPDATE SKIP LOCKED`.
+
+### Security in brief
+
+- Private video files are never public: playback and thumbnails need a short-lived HMAC token
+  issued after a permission check, which nginx has the API verify on every media request.
+- Argon2 passwords; 15-minute access tokens kept in memory; refresh tokens rotated with reuse
+  detection in an HttpOnly, SameSite=Strict cookie.
+- Rate limits per client in nginx; a strict CSP and security headers; uploads validated by
+  ffprobe, not by name; the worker has no internet access.
+- `install.sh` generates every secret; `scripts/check-secrets.sh` checks that git holds none.
+
 ## Develop
 
 The Makefile runs a separate development stack with hot reload; `make` lists every target.
@@ -67,11 +111,37 @@ make down    # stop, keeping data
 
 ## Tests
 
+CI runs all of these on every push (`.github/workflows/ci.yml`).
+
 - `make check`: backend tests against real PostgreSQL and MinIO, and frontend tests.
 - `make smoke`: checks the running stack from outside, through nginx, including playback
   protection.
+- `scripts/test-install.sh`: runs `install.sh`, the smoke test and the demo data check, then
+  runs `install.sh` again and checks that data and secrets survive.
 - `scripts/test-clean-install.sh`: runs `install.sh` in a bare Ubuntu container and checks
   the result, demo data included.
 - `scripts/test-domain.sh`: runs `install.sh --domain localhost` and checks HTTPS, the
   redirect, HSTS, Secure cookies and that nginx sees each client's own address.
 - `scripts/check-secrets.sh`: checks that git holds no secrets, in its files or its history.
+
+## How it was built
+
+With Claude Code, following the plan in `docs/architecture.md` one step at a time.
+
+- `CLAUDE.md`: the project rules: the fixed stack, layering, where permission checks live, one
+  feature per commit with its migration and tests, Conventional Commits, and asking before
+  any change to the schema or the architecture document.
+- `.claude/commands/`: `/feature` (plan, then migration, service, router and test per commit,
+  then review), `/review` and `/commit`.
+- `.claude/skills/`: `add-endpoint`, `db-migration` and `deploy-check`, the recipes for the
+  work that repeats.
+- `.claude/agents/`: an `architect` for design, a `test-writer`, a `reviewer` run on every
+  step's diff, and a `security-auditor` run after auth, upload and playback work and before
+  submission. Their findings, and what was fixed, are in the commit messages.
+- `.claude/settings.json`: a hook that runs ruff after every edit.
+
+## Submission checklist
+
+- The full repository with `.git` and unsquashed history; history is never rewritten.
+- The raw Claude Code session files: `~/.claude/projects/<project>/*.jsonl`.
+- `CLAUDE.md` and `.claude/` as they are.
