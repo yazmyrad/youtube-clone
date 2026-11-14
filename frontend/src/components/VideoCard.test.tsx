@@ -61,3 +61,15 @@ it("shows how much was watched, and nothing when nothing was", () => {
   expect(render(<VideoRowCard video={video} progress={0} />)).not.toContain("progress");
   expect(render(<VideoRowCard video={video} />)).not.toContain('data-testid="progress"');
 });
+
+it.each([
+  ["grid", VideoGridCard],
+  ["row", VideoRowCard],
+])("the %s card opens a Short in the Shorts player, marked as one", (_, Card) => {
+  const html = render(<Card video={{ ...video, is_short: true }} />);
+
+  expect(html).toContain('href="/shorts/a7f3"');
+  expect(html).not.toContain('href="/watch?v=a7f3"');
+  expect(html).toContain("Shorts");
+  expect(html).not.toContain("4:05");
+});

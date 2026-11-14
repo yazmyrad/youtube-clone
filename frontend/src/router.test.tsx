@@ -73,3 +73,9 @@ it("has no staff pages for a plain user", () => {
   expect(render("/moderation")).toContain("The link may be broken");
   expect(render("/admin/users")).toContain("The link may be broken");
 });
+
+it("opens the Shorts player", () => {
+  expect(render("/shorts")).not.toContain("The link may be broken");
+  expect(render("/shorts/a7f3")).not.toContain("The link may be broken");
+  expect(render("/@ana/shorts")).not.toContain("The link may be broken");
+});

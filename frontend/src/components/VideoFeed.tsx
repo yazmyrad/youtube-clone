@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { useRenewThumbnails, type Renewable } from "../hooks/useRenewThumbnails";
 import { LoadMore, type Pages } from "./LoadMore";
@@ -33,10 +33,15 @@ export function VideoFeed({
   query,
   heading,
   empty,
+  interlude,
+  interludeAfter = 8,
 }: {
   query: FeedQuery;
   heading: ReactNode;
   empty: ReactNode;
+  /** A full-width row inside the grid, such as YouTube's Shorts shelf. */
+  interlude?: ReactNode;
+  interludeAfter?: number;
 }) {
   const renewThumbnails = useRenewThumbnails(query);
 
@@ -69,9 +74,17 @@ export function VideoFeed({
     <>
       {heading}
       <div className={GRID}>
-        {videos.map((video) => (
-          <VideoGridCard key={video.id} video={video} onThumbnailError={renewThumbnails} />
+        {videos.map((video, index) => (
+          <Fragment key={video.id}>
+            {interlude && index === Math.min(interludeAfter, videos.length) && (
+              <div className="col-span-full">{interlude}</div>
+            )}
+            <VideoGridCard video={video} onThumbnailError={renewThumbnails} />
+          </Fragment>
         ))}
+        {interlude && videos.length <= interludeAfter && (
+          <div className="col-span-full">{interlude}</div>
+        )}
       </div>
       <LoadMore pages={query} />
     </>

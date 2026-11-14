@@ -6,7 +6,14 @@ import { isModerator } from "../hooks/useModeration";
 import { useMySubscriptions, type SubscribedChannel } from "../hooks/useSubscriptions";
 import { Avatar } from "./Avatar";
 import { channelPath } from "./format";
-import { AccountIcon, FlagIcon, HistoryIcon, HomeIcon, SubscriptionsIcon } from "./icons";
+import {
+  AccountIcon,
+  FlagIcon,
+  HistoryIcon,
+  HomeIcon,
+  ShortsIcon,
+  SubscriptionsIcon,
+} from "./icons";
 
 interface Entry {
   to: string;
@@ -16,6 +23,7 @@ interface Entry {
 
 const ENTRIES: Entry[] = [
   { to: "/", label: "Home", Icon: HomeIcon },
+  { to: "/shorts", label: "Shorts", Icon: ShortsIcon },
   { to: "/feed/subscriptions", label: "Subscriptions", Icon: SubscriptionsIcon },
   { to: "/feed/history", label: "History", Icon: HistoryIcon },
 ];

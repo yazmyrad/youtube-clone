@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import type { components } from "../api/schema";
 import { Avatar } from "./Avatar";
-import { channelPath, formatAge, formatDuration, formatViews } from "./format";
+import { channelPath, formatAge, formatDuration, formatViews, shortPath } from "./format";
 
 export type VideoCardData = components["schemas"]["VideoCardOut"];
 
@@ -21,6 +21,11 @@ interface GridCardProps extends CardProps {
   badge?: string;
 }
 
+/** Shorts open in the Shorts player, as on YouTube; everything else on the watch page. */
+function videoHref(video: VideoCardData): string {
+  return video.is_short ? shortPath(video.id) : `/watch?v=${video.id}`;
+}
+
 function Thumbnail({ video, onThumbnailError, progress }: CardProps) {
   return (
     <div className="relative aspect-video overflow-hidden rounded-xl bg-hover">
@@ -32,7 +37,7 @@ function Thumbnail({ video, onThumbnailError, progress }: CardProps) {
         className="size-full object-cover"
       />
       <span className="absolute right-1.5 bottom-1.5 rounded bg-black/80 px-1 text-xs font-medium text-white">
-        {formatDuration(video.duration_seconds)}
+        {video.is_short ? "Shorts" : formatDuration(video.duration_seconds)}
       </span>
       {progress !== undefined && progress > 0 && (
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/40">
@@ -70,7 +75,7 @@ export function VideoGridCard({
   showChannel = true,
   badge,
 }: GridCardProps) {
-  const href = `/watch?v=${video.id}`;
+  const href = videoHref(video);
   return (
     <article>
       <Link to={href} tabIndex={-1} aria-hidden>
@@ -107,7 +112,7 @@ export function VideoGridCard({
 
 /** A row in search results: thumbnail on the left, details on the right. */
 export function VideoRowCard({ video, onThumbnailError, progress }: CardProps) {
-  const href = `/watch?v=${video.id}`;
+  const href = videoHref(video);
   return (
     <article className="flex flex-col gap-3 sm:flex-row sm:gap-4">
       <Link to={href} tabIndex={-1} aria-hidden className="shrink-0 sm:w-90">
@@ -135,7 +140,7 @@ export function VideoRowCard({ video, onThumbnailError, progress }: CardProps) {
 
 /** A row in the watch page's Up next column: a small thumbnail and the details beside it. */
 export function VideoCompactCard({ video, onThumbnailError }: CardProps) {
-  const href = `/watch?v=${video.id}`;
+  const href = videoHref(video);
   return (
     <article className="flex gap-2">
       <Link to={href} tabIndex={-1} aria-hidden className="w-42 shrink-0">

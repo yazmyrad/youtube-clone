@@ -11,6 +11,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlaylistPage } from "./pages/PlaylistPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SearchPage } from "./pages/SearchPage";
+import { ShortsPage } from "./pages/ShortsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { UploadPage } from "./pages/UploadPage";
 import { WatchPage } from "./pages/WatchPage";
@@ -23,6 +24,8 @@ export function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/results" element={<SearchPage />} />
+        <Route path="/shorts" element={<ShortsPage />} />
+        <Route path="/shorts/:id" element={<ShortsPage />} />
         <Route path="/feed/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/feed/history" element={<HistoryPage />} />
         <Route path="/moderation" element={<ModerationPage />} />

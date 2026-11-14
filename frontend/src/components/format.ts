@@ -60,3 +60,8 @@ export function watchPath(videoId: string, playlistId?: string): string {
 export function videoCount(count: number): string {
   return count === 1 ? "1 video" : `${count.toLocaleString("en")} videos`;
 }
+
+/** A Short's own page, YouTube style: "/shorts/…". */
+export function shortPath(videoId: string): string {
+  return `/shorts/${encodeURIComponent(videoId)}`;
+}

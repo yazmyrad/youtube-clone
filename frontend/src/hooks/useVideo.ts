@@ -32,12 +32,13 @@ export function statusMessage(status: VideoStatus): string | null {
   }
 }
 
-export function useVideo(videoId: string) {
+/** Off while `enabled` is false, as for a Short scrolled out of view. */
+export function useVideo(videoId: string, enabled = true) {
   const { user, isLoading } = useAuth();
   return useQuery({
     queryKey: videoKey(videoId, user?.username ?? null),
     // Otherwise the answer for a signed-out visitor is fetched first, and thrown away.
-    enabled: !isLoading,
+    enabled: enabled && !isLoading,
     queryFn: async ({ signal }) => {
       const { data, error, response } = await api.GET("/api/videos/{video_id}", {
         params: { path: { video_id: videoId } },

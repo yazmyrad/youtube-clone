@@ -9,6 +9,8 @@ import { HomePage } from "./HomePage";
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", () => ({ api: { GET: get } }));
+// The shelf loads its own Shorts; ShortsShelf.test covers it.
+vi.mock("../components/ShortsShelf", () => ({ ShortsShelf: () => null }));
 
 const card = (id: string, title: string) => ({
   id,

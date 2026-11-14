@@ -103,3 +103,10 @@ export const FlagIcon = () => (
     <path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z" />
   </Icon>
 );
+
+/** A tall frame with a play mark: the Shorts entry in the guide. */
+export const ShortsIcon = () => (
+  <Icon>
+    <path d="M8 2h8a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8zm2 4.5 5 3.5-5 3.5v-7z" />
+  </Icon>
+);

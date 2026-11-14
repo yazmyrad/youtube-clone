@@ -3,6 +3,7 @@ import { Link, NavLink, useParams } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { LoadMore } from "../components/LoadMore";
 import { PlaylistCard } from "../components/PlaylistCard";
+import { ShortCard } from "../components/ShortCard";
 import { SubscribeButton } from "../components/SubscribeButton";
 import { VideoGridCard } from "../components/VideoCard";
 import { GRID } from "../components/VideoFeed";
@@ -16,6 +17,7 @@ import {
   type ChannelVideo,
 } from "../hooks/useChannel";
 import { useChannelPlaylists } from "../hooks/usePlaylists";
+import { useChannelShorts } from "../hooks/useShorts";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
 import { NotFoundPage } from "./NotFoundPage";
 
@@ -27,6 +29,7 @@ const BADGES: Record<ChannelVideo["visibility"], string | undefined> = {
 
 const TABS = [
   { tab: "videos", label: "Videos" },
+  { tab: "shorts", label: "Shorts" },
   { tab: "playlists", label: "Playlists" },
 ] as const;
 type Tab = (typeof TABS)[number]["tab"];
@@ -116,6 +119,40 @@ function Videos({ username }: { username: string }) {
   );
 }
 
+function Shorts({ username }: { username: string }) {
+  const shorts = useChannelShorts(username);
+  const renewThumbnails = useRenewThumbnails(shorts);
+
+  if (shorts.isPending) return <div aria-busy="true" className="h-40" />;
+  if (!shorts.data) {
+    return (
+      <p role="alert" className="p-16 text-center text-ink-muted">
+        Couldn't load Shorts.
+      </p>
+    );
+  }
+  const items = shorts.data.pages.flatMap((page) => page.items);
+  if (items.length === 0) {
+    return <p className="p-16 text-center text-ink-muted">This channel has no Shorts.</p>;
+  }
+  return (
+    <>
+      <h2 className="sr-only">Shorts</h2>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {items.map((video) => (
+          <ShortCard
+            key={video.id}
+            video={video}
+            badge={BADGES[video.visibility]}
+            onThumbnailError={renewThumbnails}
+          />
+        ))}
+      </div>
+      <LoadMore pages={shorts} />
+    </>
+  );
+}
+
 function Playlists({ username }: { username: string }) {
   const playlists = useChannelPlaylists(username);
   const renewThumbnails = useRenewThumbnails(playlists);
@@ -183,11 +220,9 @@ function ChannelView({ username, current }: { username: string; current: Tab }) 
         ))}
       </nav>
       <div className="mt-6">
-        {current === "videos" ? (
-          <Videos username={channel.data.username} />
-        ) : (
-          <Playlists username={channel.data.username} />
-        )}
+        {current === "videos" && <Videos username={channel.data.username} />}
+        {current === "shorts" && <Shorts username={channel.data.username} />}
+        {current === "playlists" && <Playlists username={channel.data.username} />}
       </div>
     </div>
   );
