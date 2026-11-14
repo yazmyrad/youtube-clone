@@ -13,7 +13,7 @@ from app.core.pagination import decode_cursor, encode_cursor
 from app.core.permissions import ensure_can_subscribe
 from app.models import Subscription, User
 from app.services import videos
-from app.services.videos import VideoCard
+from app.services.videos import VideoCard, VideoSort
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,8 @@ class ChannelDetails:
     subscribers_count: int
     avatar_url: str | None
     banner_url: str | None
+    videos_count: int
+    views_count: int
     created_at: datetime
     is_subscribed: bool
 
@@ -54,6 +56,7 @@ async def get_channel(session: AsyncSession, viewer: User | None, username: str)
     subscribed = viewer is not None and (
         await session.get(Subscription, (viewer.id, channel.id)) is not None
     )
+    videos_count, views_count = await videos.channel_totals(session, channel)
     return ChannelDetails(
         username=channel.username,
         display_name=channel.display_name,
@@ -61,23 +64,54 @@ async def get_channel(session: AsyncSession, viewer: User | None, username: str)
         subscribers_count=channel.subscribers_count,
         avatar_url=channel.avatar_url,
         banner_url=channel.banner_url,
+        videos_count=videos_count,
+        views_count=views_count,
         created_at=channel.created_at,
         is_subscribed=subscribed,
     )
 
 
 async def list_channel_videos(
-    session: AsyncSession, viewer: User | None, username: str, *, cursor: str | None, limit: int
+    session: AsyncSession,
+    viewer: User | None,
+    username: str,
+    *,
+    cursor: str | None,
+    limit: int,
+    sort: VideoSort = VideoSort.latest,
 ) -> tuple[list[VideoCard], str | None]:
     channel = await get_channel_user(session, username)
-    return await videos.list_channel_videos(session, viewer, channel, cursor=cursor, limit=limit)
+    return await videos.list_channel_videos(
+        session, viewer, channel, cursor=cursor, limit=limit, sort=sort
+    )
 
 
 async def list_channel_shorts(
-    session: AsyncSession, viewer: User | None, username: str, *, cursor: str | None, limit: int
+    session: AsyncSession,
+    viewer: User | None,
+    username: str,
+    *,
+    cursor: str | None,
+    limit: int,
+    sort: VideoSort = VideoSort.latest,
 ) -> tuple[list[VideoCard], str | None]:
     channel = await get_channel_user(session, username)
-    return await videos.list_channel_shorts(session, viewer, channel, cursor=cursor, limit=limit)
+    return await videos.list_channel_shorts(
+        session, viewer, channel, cursor=cursor, limit=limit, sort=sort
+    )
+
+
+async def search_channel(
+    session: AsyncSession,
+    viewer: User | None,
+    username: str,
+    *,
+    q: str,
+    cursor: str | None,
+    limit: int,
+) -> tuple[list[VideoCard], str | None]:
+    channel = await get_channel_user(session, username)
+    return await videos.search_channel(session, viewer, channel, q=q, cursor=cursor, limit=limit)
 
 
 async def adjust_subscribers(session: AsyncSession, channel_id: uuid.UUID, delta: int) -> int:

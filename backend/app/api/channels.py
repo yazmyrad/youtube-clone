@@ -1,4 +1,6 @@
-from fastapi import APIRouter, status
+from typing import Annotated
+
+from fastapi import APIRouter, Query, status
 
 from app.core.pagination import DEFAULT_VIDEO_PAGE, KeysetCursor, PageLimit
 from app.core.permissions import CurrentUser, OptionalUser, SessionDep
@@ -10,8 +12,14 @@ from app.schemas.channels import (
 )
 from app.schemas.errors import ErrorOut
 from app.schemas.playlists import PlaylistPage, PlaylistSummaryOut
+from app.schemas.videos import SearchText
 from app.services import channels as channels_service
 from app.services import playlists as playlists_service
+from app.services.videos import VideoSort
+
+SortQuery = Annotated[
+    VideoSort, Query(description="latest, popular (most viewed) or oldest, as on YouTube")
+]
 
 router = APIRouter(
     prefix="/channels",
@@ -29,7 +37,7 @@ async def get_channel(username: str, session: SessionDep, viewer: OptionalUser) 
 @router.get(
     "/{username}/videos",
     response_model=ChannelVideoPage,
-    summary="A channel's videos, newest first; the owner also sees private and unlisted ones",
+    summary="A channel's videos; the owner also sees private and unlisted ones",
 )
 async def list_channel_videos(
     username: str,
@@ -37,9 +45,10 @@ async def list_channel_videos(
     viewer: OptionalUser,
     cursor: KeysetCursor = None,
     limit: PageLimit = DEFAULT_VIDEO_PAGE,
+    sort: SortQuery = VideoSort.latest,
 ) -> ChannelVideoPage:
     cards, next_cursor = await channels_service.list_channel_videos(
-        session, viewer, username, cursor=cursor, limit=limit
+        session, viewer, username, cursor=cursor, limit=limit, sort=sort
     )
     return ChannelVideoPage(
         items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor
@@ -49,7 +58,7 @@ async def list_channel_videos(
 @router.get(
     "/{username}/shorts",
     response_model=ChannelVideoPage,
-    summary="A channel's Shorts, newest first; the owner also sees private and unlisted ones",
+    summary="A channel's Shorts; the owner also sees private and unlisted ones",
 )
 async def list_channel_shorts(
     username: str,
@@ -57,9 +66,31 @@ async def list_channel_shorts(
     viewer: OptionalUser,
     cursor: KeysetCursor = None,
     limit: PageLimit = DEFAULT_VIDEO_PAGE,
+    sort: SortQuery = VideoSort.latest,
 ) -> ChannelVideoPage:
     cards, next_cursor = await channels_service.list_channel_shorts(
-        session, viewer, username, cursor=cursor, limit=limit
+        session, viewer, username, cursor=cursor, limit=limit, sort=sort
+    )
+    return ChannelVideoPage(
+        items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor
+    )
+
+
+@router.get(
+    "/{username}/search",
+    response_model=ChannelVideoPage,
+    summary="Find a channel's videos and Shorts by title, newest first",
+)
+async def search_channel(
+    username: str,
+    session: SessionDep,
+    viewer: OptionalUser,
+    q: Annotated[SearchText, Query(description="Part of the title, at least 2 characters")],
+    cursor: KeysetCursor = None,
+    limit: PageLimit = DEFAULT_VIDEO_PAGE,
+) -> ChannelVideoPage:
+    cards, next_cursor = await channels_service.search_channel(
+        session, viewer, username, q=q, cursor=cursor, limit=limit
     )
     return ChannelVideoPage(
         items=[ChannelVideoOut.model_validate(card) for card in cards], next_cursor=next_cursor

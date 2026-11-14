@@ -187,6 +187,16 @@
           "username": {
             "title": "Username",
             "type": "string"
+          },
+          "videos_count": {
+            "description": "Public videos and Shorts",
+            "title": "Videos Count",
+            "type": "integer"
+          },
+          "views_count": {
+            "description": "Views of those, all together",
+            "title": "Views Count",
+            "type": "integer"
           }
         },
         "required": [
@@ -196,6 +206,8 @@
           "subscribers_count",
           "avatar_url",
           "banner_url",
+          "videos_count",
+          "views_count",
           "created_at",
           "is_subscribed"
         ],
@@ -1975,6 +1987,16 @@
         "title": "VideoOwnerPage",
         "type": "object"
       },
+      "VideoSort": {
+        "description": "A channel's sort chips, as on YouTube.",
+        "enum": [
+          "latest",
+          "popular",
+          "oldest"
+        ],
+        "title": "VideoSort",
+        "type": "string"
+      },
       "VideoStatus": {
         "enum": [
           "uploading",
@@ -2632,9 +2654,9 @@
         ]
       }
     },
-    "/api/channels/{username}/shorts": {
+    "/api/channels/{username}/search": {
       "get": {
-        "operationId": "list_channel_shorts_api_channels__username__shorts_get",
+        "operationId": "search_channel_api_channels__username__search_get",
         "parameters": [
           {
             "in": "path",
@@ -2642,6 +2664,20 @@
             "required": true,
             "schema": {
               "title": "Username",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Part of the title, at least 2 characters",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Part of the title, at least 2 characters",
+              "maxLength": 100,
+              "minLength": 2,
+              "pattern": "^[^\\x00]*$",
+              "title": "Q",
               "type": "string"
             }
           },
@@ -2712,7 +2748,104 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "A channel's Shorts, newest first; the owner also sees private and unlisted ones",
+        "summary": "Find a channel's videos and Shorts by title, newest first",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
+    "/api/channels/{username}/shorts": {
+      "get": {
+        "operationId": "list_channel_shorts_api_channels__username__shorts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "username",
+            "required": true,
+            "schema": {
+              "title": "Username",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,16}_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "latest, popular (most viewed) or oldest, as on YouTube",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/VideoSort",
+              "default": "latest",
+              "description": "latest, popular (most viewed) or oldest, as on YouTube"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelVideoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "A channel's Shorts; the owner also sees private and unlisted ones",
         "tags": [
           "channels"
         ]
@@ -2911,6 +3044,17 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "description": "latest, popular (most viewed) or oldest, as on YouTube",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/VideoSort",
+              "default": "latest",
+              "description": "latest, popular (most viewed) or oldest, as on YouTube"
+            }
           }
         ],
         "responses": {
@@ -2950,7 +3094,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "A channel's videos, newest first; the owner also sees private and unlisted ones",
+        "summary": "A channel's videos; the owner also sees private and unlisted ones",
         "tags": [
           "channels"
         ]

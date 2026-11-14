@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from sqlalchemy import ColumnElement, Row, Select, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
@@ -9,7 +10,12 @@ from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound
-from app.core.pagination import decode_cursor, encode_cursor
+from app.core.pagination import (
+    decode_count_cursor,
+    decode_cursor,
+    encode_count_cursor,
+    encode_cursor,
+)
 from app.core.permissions import (
     can_show_thumbnail,
     channel_videos,
@@ -241,25 +247,52 @@ async def _listed_page(
     return await _card_page(session, listed_videos(), *criteria, cursor=cursor, limit=limit)
 
 
+class VideoSort(StrEnum):
+    """A channel's sort chips, as on YouTube."""
+
+    latest = "latest"
+    popular = "popular"
+    oldest = "oldest"
+
+
 async def _card_page(
-    session: AsyncSession, *criteria: ColumnElement[bool], cursor: str | None, limit: int
+    session: AsyncSession,
+    *criteria: ColumnElement[bool],
+    cursor: str | None,
+    limit: int,
+    sort: VideoSort = VideoSort.latest,
 ) -> tuple[list[VideoCard], str | None]:
-    """Ready videos matching `criteria`, newest first, with keyset pagination. The criteria
-    decide who may see them."""
+    """Ready videos matching `criteria`, newest first unless `sort` says otherwise, with keyset
+    pagination. The criteria decide who may see them. Views keep counting while someone pages
+    through the most viewed, so a video can move between pages there; YouTube's does too."""
     query = (
         select(Video)
         .options(joinedload(Video.owner, innerjoin=True))
         .where(*criteria)
-        .order_by(Video.published_at.desc(), Video.id.desc())
         .limit(limit + 1)
     )
-    if cursor:
-        query = query.where(tuple_(Video.published_at, Video.id) < decode_cursor(cursor))
+    if sort is VideoSort.popular:
+        query = query.order_by(Video.views_count.desc(), Video.id.desc())
+        if cursor:
+            query = query.where(tuple_(Video.views_count, Video.id) < decode_count_cursor(cursor))
+    elif sort is VideoSort.oldest:
+        query = query.order_by(Video.published_at.asc(), Video.id.asc())
+        if cursor:
+            query = query.where(tuple_(Video.published_at, Video.id) > decode_cursor(cursor))
+    else:
+        query = query.order_by(Video.published_at.desc(), Video.id.desc())
+        if cursor:
+            query = query.where(tuple_(Video.published_at, Video.id) < decode_cursor(cursor))
     videos = list(await session.scalars(query))
     next_cursor = None
     if len(videos) > limit:
         videos = videos[:limit]
-        next_cursor = encode_cursor(videos[-1].published_at, videos[-1].id)
+        last = videos[-1]
+        next_cursor = (
+            encode_count_cursor(last.views_count, last.id)
+            if sort is VideoSort.popular
+            else encode_cursor(last.published_at, last.id)
+        )
     return [to_card(video) for video in videos], next_cursor
 
 
@@ -288,20 +321,69 @@ async def list_subscription_feed(
 
 
 async def list_channel_videos(
-    session: AsyncSession, viewer: User | None, channel: User, *, cursor: str | None, limit: int
+    session: AsyncSession,
+    viewer: User | None,
+    channel: User,
+    *,
+    cursor: str | None,
+    limit: int,
+    sort: VideoSort = VideoSort.latest,
 ) -> tuple[list[VideoCard], str | None]:
     """The Videos tab: Shorts are on their own tab."""
     return await _card_page(
-        session, channel_videos(viewer, channel), not_short(), cursor=cursor, limit=limit
+        session,
+        channel_videos(viewer, channel),
+        not_short(),
+        cursor=cursor,
+        limit=limit,
+        sort=sort,
     )
 
 
 async def list_channel_shorts(
-    session: AsyncSession, viewer: User | None, channel: User, *, cursor: str | None, limit: int
+    session: AsyncSession,
+    viewer: User | None,
+    channel: User,
+    *,
+    cursor: str | None,
+    limit: int,
+    sort: VideoSort = VideoSort.latest,
 ) -> tuple[list[VideoCard], str | None]:
     return await _card_page(
-        session, channel_videos(viewer, channel), is_short(), cursor=cursor, limit=limit
+        session, channel_videos(viewer, channel), is_short(), cursor=cursor, limit=limit, sort=sort
     )
+
+
+async def search_channel(
+    session: AsyncSession,
+    viewer: User | None,
+    channel: User,
+    *,
+    q: str,
+    cursor: str | None,
+    limit: int,
+) -> tuple[list[VideoCard], str | None]:
+    """The channel's search box: its videos and Shorts with `q` in the title, as its page shows
+    them to `viewer`."""
+    return await _card_page(
+        session,
+        channel_videos(viewer, channel),
+        Video.title.icontains(q, autoescape=True),
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+async def channel_totals(session: AsyncSession, channel: User) -> tuple[int, int]:
+    """Public videos and their views, as the channel's About shows them to everyone."""
+    count, views = (
+        await session.execute(
+            select(func.count(), func.coalesce(func.sum(Video.views_count), 0)).where(
+                Video.owner_id == channel.id, listed_videos()
+            )
+        )
+    ).one()
+    return count, views
 
 
 async def list_my_videos(

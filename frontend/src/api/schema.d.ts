@@ -143,6 +143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{username}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find a channel's videos and Shorts by title, newest first */
+        get: operations["search_channel_api_channels__username__search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/{username}/shorts": {
         parameters: {
             query?: never;
@@ -150,7 +167,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A channel's Shorts, newest first; the owner also sees private and unlisted ones */
+        /** A channel's Shorts; the owner also sees private and unlisted ones */
         get: operations["list_channel_shorts_api_channels__username__shorts_get"];
         put?: never;
         post?: never;
@@ -185,7 +202,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A channel's videos, newest first; the owner also sees private and unlisted ones */
+        /** A channel's videos; the owner also sees private and unlisted ones */
         get: operations["list_channel_videos_api_channels__username__videos_get"];
         put?: never;
         post?: never;
@@ -843,6 +860,16 @@ export interface components {
             subscribers_count: number;
             /** Username */
             username: string;
+            /**
+             * Videos Count
+             * @description Public videos and Shorts
+             */
+            videos_count: number;
+            /**
+             * Views Count
+             * @description Views of those, all together
+             */
+            views_count: number;
         };
         /** ChannelVideoOut */
         ChannelVideoOut: {
@@ -1635,6 +1662,12 @@ export interface components {
             next_cursor: string | null;
         };
         /**
+         * VideoSort
+         * @description A channel's sort chips, as on YouTube.
+         * @enum {string}
+         */
+        VideoSort: "latest" | "popular" | "oldest";
+        /**
          * VideoStatus
          * @enum {string}
          */
@@ -2057,11 +2090,58 @@ export interface operations {
             };
         };
     };
+    search_channel_api_channels__username__search_get: {
+        parameters: {
+            query: {
+                /** @description Part of the title, at least 2 characters */
+                q: string;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelVideoPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_channel_shorts_api_channels__username__shorts_get: {
         parameters: {
             query?: {
                 cursor?: string | null;
                 limit?: number;
+                /** @description latest, popular (most viewed) or oldest, as on YouTube */
+                sort?: components["schemas"]["VideoSort"];
             };
             header?: never;
             path: {
@@ -2221,6 +2301,8 @@ export interface operations {
             query?: {
                 cursor?: string | null;
                 limit?: number;
+                /** @description latest, popular (most viewed) or oldest, as on YouTube */
+                sort?: components["schemas"]["VideoSort"];
             };
             header?: never;
             path: {

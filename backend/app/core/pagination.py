@@ -28,3 +28,13 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
     """`cursor` has already passed `KeysetCursor`'s pattern."""
     microseconds, item_id = cursor.split("_")
     return _EPOCH + int(microseconds) * _MICROSECOND, uuid.UUID(item_id)
+
+
+def encode_count_cursor(count: int, item_id: uuid.UUID) -> str:
+    """For lists sorted by a count, such as the most viewed: the same shape as a time cursor."""
+    return f"{count}_{item_id}"
+
+
+def decode_count_cursor(cursor: str) -> tuple[int, uuid.UUID]:
+    count, item_id = cursor.split("_")
+    return int(count), uuid.UUID(item_id)

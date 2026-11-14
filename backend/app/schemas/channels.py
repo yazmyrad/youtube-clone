@@ -17,6 +17,8 @@ class ChannelOut(BaseModel):
     subscribers_count: int
     avatar_url: str | None = Field(description="Square WebP; null for the letter avatar")
     banner_url: str | None = Field(description="Wide WebP; null for none")
+    videos_count: int = Field(description="Public videos and Shorts")
+    views_count: int = Field(description="Views of those, all together")
     created_at: datetime
     is_subscribed: bool = Field(description="Whether the caller subscribes; false if anonymous")
 

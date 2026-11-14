@@ -458,8 +458,10 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 
 | Method and path | Permission | Purpose |
 |---|---|---|
-| `GET /channels/{username}` | any | Channel details, subscriber count |
-| `GET /channels/{username}/videos` | any (more for owner) | Channel videos |
+| `GET /channels/{username}` | any | Channel details: subscriber count, public videos and their total views, avatar and banner |
+| `GET /channels/{username}/videos?sort=` | any (more for owner) | Channel videos, `latest` (default), `popular` or `oldest` |
+| `GET /channels/{username}/shorts?sort=` | any (more for owner) | Channel Shorts, sorted the same way |
+| `GET /channels/{username}/search?q=` | any (more for owner) | The channel's videos and Shorts by title |
 | `GET /channels/{username}/playlists` | any (more for owner) | Channel playlists |
 | `PUT /channels/{username}/subscription` | auth | Subscribe |
 | `DELETE /channels/{username}/subscription` | auth | Unsubscribe |
