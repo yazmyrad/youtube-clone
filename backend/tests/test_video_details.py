@@ -116,7 +116,7 @@ async def test_returns_only_the_public_fields(
         "height",
         "is_short",
     }
-    assert body["channel"] == {"username": "alice", "display_name": "Alice"}
+    assert body["channel"] == {"username": "alice", "display_name": "Alice", "avatar_url": None}
     assert body["views_count"] == 0
     assert body["likes_count"] == body["dislikes_count"] == body["comments_count"] == 0
 

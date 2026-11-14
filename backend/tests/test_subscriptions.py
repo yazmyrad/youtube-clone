@@ -198,7 +198,7 @@ async def test_my_subscriptions_newest_first(
     assert response.status_code == 200, response.text
     items = response.json()["items"]
     assert [item["username"] for item in items] == ["dave", "alice"]
-    assert set(items[0]) == {"username", "display_name", "subscribed_at"}
+    assert set(items[0]) == {"username", "display_name", "avatar_url", "subscribed_at"}
 
 
 async def test_my_subscriptions_pages_cover_every_channel_once(

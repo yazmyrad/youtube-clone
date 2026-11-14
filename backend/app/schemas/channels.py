@@ -15,6 +15,8 @@ class ChannelOut(BaseModel):
     display_name: str
     description: str
     subscribers_count: int
+    avatar_url: str | None = Field(description="Square WebP; null for the letter avatar")
+    banner_url: str | None = Field(description="Wide WebP; null for none")
     created_at: datetime
     is_subscribed: bool = Field(description="Whether the caller subscribes; false if anonymous")
 
@@ -42,6 +44,7 @@ class SubscribedChannelOut(BaseModel):
 
     username: str
     display_name: str
+    avatar_url: str | None = Field(description="Square WebP; null for the letter avatar")
     subscribed_at: datetime
 
 

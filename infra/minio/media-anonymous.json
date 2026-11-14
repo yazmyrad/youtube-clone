@@ -5,7 +5,11 @@
       "Effect": "Allow",
       "Principal": {"AWS": ["*"]},
       "Action": ["s3:GetObject"],
-      "Resource": ["arn:aws:s3:::media/hls/*", "arn:aws:s3:::media/thumbs/*"]
+      "Resource": [
+        "arn:aws:s3:::media/hls/*",
+        "arn:aws:s3:::media/thumbs/*",
+        "arn:aws:s3:::media/channels/*"
+      ]
     }
   ]
 }

@@ -14,6 +14,10 @@ class AppError(Exception):
         self.detail = detail
 
 
+class BadRequest(AppError):
+    status_code = status.HTTP_400_BAD_REQUEST
+
+
 class Unauthorized(AppError):
     status_code = status.HTTP_401_UNAUTHORIZED
     headers = {"WWW-Authenticate": "Bearer"}  # noqa: RUF012 - read-only class constant
@@ -29,6 +33,14 @@ class NotFound(AppError):
 
 class Conflict(AppError):
     status_code = status.HTTP_409_CONFLICT
+
+
+class PayloadTooLarge(AppError):
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+
+
+class UnsupportedMediaType(AppError):
+    status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
 
 
 class ServiceUnavailable(AppError):

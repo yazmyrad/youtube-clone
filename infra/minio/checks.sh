@@ -27,14 +27,14 @@ export MC_HOST_app="http://${MINIO_APP_ACCESS_KEY}:${MINIO_APP_SECRET_KEY}@minio
 id="check-$(date +%s)-$$"
 cleanup() {
     mc rm -q "app/uploads/raw/$id/source" "app/media/hls/$id/master.m3u8" \
-        "app/media/thumbs/$id.jpg" "app/media/other/$id" >/dev/null 2>&1 || true
+        "app/media/thumbs/$id.jpg" "app/media/channels/$id.webp" "app/media/other/$id" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 put() { printf 'x' | mc pipe -q "$1"; }
 
 # The app user reads and writes objects in both buckets.
-for key in "uploads/raw/$id/source" "media/hls/$id/master.m3u8" "media/thumbs/$id.jpg" "media/other/$id"; do
+for key in "uploads/raw/$id/source" "media/hls/$id/master.m3u8" "media/thumbs/$id.jpg" "media/channels/$id.webp" "media/other/$id"; do
     check "app user can write $key" put "app/$key"
     check "app user can read $key" mc cat "app/$key"
 done
@@ -47,9 +47,12 @@ deny "app user can't create buckets" mc mb "app/check-$id"
 deny "app user can't change bucket policy" mc anonymous set public app/uploads
 deny "app user can't use the admin API" mc admin user list app
 
-# Anonymous: only GetObject under media/hls/ and media/thumbs/.
+# Anonymous: only GetObject under media/hls/, media/thumbs/ and media/channels/.
 anon 200 GET "/media/hls/$id/master.m3u8"
 anon 200 GET "/media/thumbs/$id.jpg"
+anon 200 GET "/media/channels/$id.webp"
+anon 403 GET "/media/?list-type=2&prefix=channels/"
+anon 403 PUT "/media/channels/$id.webp"
 anon 403 GET "/media/other/$id"
 anon 403 GET "/media/"
 anon 403 GET "/media/?list-type=2&prefix=hls/"

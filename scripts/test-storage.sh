@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks MinIO buckets and permissions on a running stack: the scoped app user is limited to
-# objects, and anonymous access is GetObject on media/hls/ and media/thumbs/ only.
+# objects, and anonymous access is GetObject on media/hls/, media/thumbs/ and media/channels/ only.
 # Usage: scripts/test-storage.sh [compose command...]   (default: docker compose)
 set -euo pipefail
 

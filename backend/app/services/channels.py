@@ -22,6 +22,8 @@ class ChannelDetails:
     display_name: str
     description: str
     subscribers_count: int
+    avatar_url: str | None
+    banner_url: str | None
     created_at: datetime
     is_subscribed: bool
 
@@ -36,6 +38,7 @@ class SubscriptionState:
 class SubscribedChannel:
     username: str
     display_name: str
+    avatar_url: str | None
     subscribed_at: datetime
 
 
@@ -56,6 +59,8 @@ async def get_channel(session: AsyncSession, viewer: User | None, username: str)
         display_name=channel.display_name,
         description=channel.description,
         subscribers_count=channel.subscribers_count,
+        avatar_url=channel.avatar_url,
+        banner_url=channel.banner_url,
         created_at=channel.created_at,
         is_subscribed=subscribed,
     )
@@ -132,7 +137,7 @@ async def list_my_subscriptions(
 ) -> tuple[list[SubscribedChannel], str | None]:
     """The channels `user` subscribes to, most recently subscribed first."""
     query = (
-        select(User.username, User.display_name, User.id, Subscription.created_at)
+        select(User, Subscription.created_at)
         .join(Subscription, Subscription.channel_id == User.id)
         .where(Subscription.subscriber_id == user.id)
         .order_by(Subscription.created_at.desc(), User.id.desc())
@@ -144,11 +149,14 @@ async def list_my_subscriptions(
     page = rows[:limit]
     next_cursor = None
     if len(rows) > limit:
-        last = page[-1]
-        next_cursor = encode_cursor(last.created_at, last.id)
+        channel, subscribed_at = page[-1]
+        next_cursor = encode_cursor(subscribed_at, channel.id)
     return [
         SubscribedChannel(
-            username=r.username, display_name=r.display_name, subscribed_at=r.created_at
+            username=channel.username,
+            display_name=channel.display_name,
+            avatar_url=channel.avatar_url,
+            subscribed_at=subscribed_at,
         )
-        for r in page
+        for channel, subscribed_at in page
     ], next_cursor

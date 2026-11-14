@@ -115,6 +115,16 @@ async def upload_media(key: str, source: Path, content_type: str) -> None:
     await asyncio.to_thread(_put, get_settings().media_bucket, key, source, content_type)
 
 
+def _put_bytes(key: str, data: bytes, content_type: str) -> None:
+    get_client().put_object(
+        Bucket=get_settings().media_bucket, Key=key, Body=data, ContentType=content_type
+    )
+
+
+async def put_media_bytes(key: str, data: bytes, content_type: str) -> None:
+    await asyncio.to_thread(_put_bytes, key, data, content_type)
+
+
 async def upload_raw(key: str, source: Path) -> None:
     """Puts a source file where a browser upload would land. Only the seed uses this."""
     await asyncio.to_thread(

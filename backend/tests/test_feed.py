@@ -42,7 +42,7 @@ async def test_card_fields(
         "duration_seconds": 5,
         "views_count": 7,
         "published_at": "2026-01-01T12:00:00.123456Z",
-        "channel": {"username": "alice", "display_name": "Alice"},
+        "channel": {"username": "alice", "display_name": "Alice", "avatar_url": None},
         "is_short": False,
     }
 

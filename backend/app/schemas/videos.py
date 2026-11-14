@@ -67,6 +67,7 @@ class ChannelBriefOut(BaseModel):
 
     username: str
     display_name: str
+    avatar_url: str | None = Field(description="Square WebP; null for the letter avatar")
 
 
 class VideoDetailsOut(BaseModel):

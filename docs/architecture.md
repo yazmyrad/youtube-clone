@@ -73,7 +73,7 @@ Source of truth for the design (see `CLAUDE.md`). Changes to this document or to
 
 Nginx routes only `/api/`, `/docs`, `/openapi.json`, `/hls/`, `/thumbs/`, `= /uploads/`, and SPA paths. The API's `/internal/` routes and MinIO's own paths have no public route.
 
-**Storage layout.** `uploads` bucket: `raw/{video_id}/source`. `media` bucket: `hls/{video_id}/master.m3u8`, `hls/{video_id}/{360p,720p}/index.m3u8`, `hls/{video_id}/{360p,720p}/seg_NNNNN.ts`, `thumbs/{video_id}.jpg`.
+**Storage layout.** `uploads` bucket: `raw/{video_id}/source`. `media` bucket: `hls/{video_id}/master.m3u8`, `hls/{video_id}/{360p,720p}/index.m3u8`, `hls/{video_id}/{360p,720p}/seg_NNNNN.ts`, `thumbs/{video_id}.jpg`, `channels/{user_id}/{avatar,banner}-{token}.webp`.
 
 ### Upload
 
@@ -117,7 +117,9 @@ Player ─ GET /hls/{exp}.{sig}/{id}/720p/seg_00001.ts ─► nginx
 
 **Thumbnails** use the same check through `/thumbs/{exp}.{sig}/{id}.jpg` and a separate `thumb:` signing scope. Expiry is rounded to the next hour boundary plus one hour, which keeps URLs stable for browser caching. Thumbnail URLs are included only in responses to users who may see the video.
 
-**How nginx reads from MinIO.** Plain nginx cannot sign S3 requests. The `media` bucket therefore allows anonymous `GetObject` on `hls/*` and `thumbs/*` only (no listing), and it's reachable only on the internal storage network, where the only other members are `api` and `worker`. From outside, the only way to these objects is through nginx's `auth_request`. The `uploads` bucket has no anonymous access. Requests from `api` and `worker` use a scoped MinIO user, not the root account.
+**How nginx reads from MinIO.** Plain nginx cannot sign S3 requests. The `media` bucket therefore allows anonymous `GetObject` on `hls/*`, `thumbs/*` and `channels/*` only (no listing), and it's reachable only on the internal storage network, where the only other members are `api` and `worker`. From outside, the only way to these objects is through nginx's `auth_request`. The `uploads` bucket has no anonymous access. Requests from `api` and `worker` use a scoped MinIO user, not the root account.
+
+**Channel images.** Avatars and banners are as public as the channel page, so `/channel-images/{user_id}/{avatar|banner}-{token}.webp` has no token check. Its location accepts only that exact shape. The API decodes each upload with Pillow (only the declared format's decoder, refused above 25 MP before decoding, at most two at once), then crops it and re-encodes it to WebP. So what's stored is only pixels the API wrote: no EXIF location, no trailing bytes, no polyglot. Each upload gets a new random name and the old object is deleted, so a URL's content never changes and is cached as `immutable`.
 
 **Known limitations, accepted on purpose:**
 
@@ -428,6 +430,8 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 | `POST /auth/logout` | refresh cookie | Revoke the token family |
 | `GET /users/me` | auth | Current user |
 | `PATCH /users/me` | auth | Edit display name, description |
+| `PUT /users/me/images/{avatar,banner}` | auth | Set the channel's avatar or banner: the image is the body (JPEG, PNG or WebP, ≤ 6 MB, ≤ 25 MP), re-encoded to WebP and cropped to 256×256 or 2048×340 |
+| `DELETE /users/me/images/{avatar,banner}` | auth | Remove it |
 
 ### Home
 

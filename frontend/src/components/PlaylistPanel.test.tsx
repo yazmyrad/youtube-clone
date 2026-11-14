@@ -12,7 +12,7 @@ const card = (id: string, title: string) => ({
   views_count: 3,
   published_at: "2026-01-02T03:04:05Z",
   thumbnail_url: `/thumbs/${id}.jpg`,
-  channel: { username: "carol", display_name: "Carol" },
+  channel: { username: "carol", display_name: "Carol", avatar_url: null },
   is_short: false,
 });
 
@@ -21,7 +21,7 @@ const playlist: Playlist = {
   title: "Rust picks",
   description: "",
   visibility: "public",
-  channel: { username: "ana", display_name: "Ana Codes" },
+  channel: { username: "ana", display_name: "Ana Codes", avatar_url: null },
   video_count: 3,
   thumbnail_url: "/thumbs/a.jpg",
   created_at: "2026-01-01T00:00:00Z",

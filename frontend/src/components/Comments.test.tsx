@@ -7,7 +7,7 @@ const comment = (body: string) => ({
   id: "c1",
   body,
   created_at: "2026-01-02T03:04:05Z",
-  author: { username: "ana", display_name: "Ana" },
+  author: { username: "ana", display_name: "Ana", avatar_url: null },
 });
 
 it("shows a comment's markup as plain text", () => {

@@ -18,6 +18,8 @@ class MeOut(BaseModel):
     description: str
     role: UserRole
     subscribers_count: int
+    avatar_url: str | None = Field(description="Square WebP; null for the letter avatar")
+    banner_url: str | None = Field(description="Wide WebP; null for none")
     created_at: datetime
 
 

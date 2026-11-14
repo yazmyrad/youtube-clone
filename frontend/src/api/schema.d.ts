@@ -488,6 +488,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/me/images/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set your channel's avatar or banner, cropped to its shape */
+        put: operations["set_channel_image_api_users_me_images__kind__put"];
+        post?: never;
+        /** Remove your channel's avatar or banner (safe to repeat) */
+        delete: operations["remove_channel_image_api_users_me_images__kind__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/me/playlists": {
         parameters: {
             query?: never;
@@ -782,6 +800,11 @@ export interface components {
          * @description The channel a video belongs to, as shown next to the video.
          */
         ChannelBriefOut: {
+            /**
+             * Avatar Url
+             * @description Square WebP; null for the letter avatar
+             */
+            avatar_url: string | null;
             /** Display Name */
             display_name: string;
             /** Username */
@@ -792,6 +815,16 @@ export interface components {
          * @description A channel's page header. A channel is a user, addressed by username.
          */
         ChannelOut: {
+            /**
+             * Avatar Url
+             * @description Square WebP; null for the letter avatar
+             */
+            avatar_url: string | null;
+            /**
+             * Banner Url
+             * @description Wide WebP; null for none
+             */
+            banner_url: string | null;
             /**
              * Created At
              * Format: date-time
@@ -955,6 +988,11 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /**
+         * ImageKind
+         * @enum {string}
+         */
+        ImageKind: "avatar" | "banner";
         /** LoginIn */
         LoginIn: {
             /**
@@ -967,6 +1005,16 @@ export interface components {
         };
         /** MeOut */
         MeOut: {
+            /**
+             * Avatar Url
+             * @description Square WebP; null for the letter avatar
+             */
+            avatar_url: string | null;
+            /**
+             * Banner Url
+             * @description Wide WebP; null for none
+             */
+            banner_url: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1332,6 +1380,11 @@ export interface components {
         };
         /** SubscribedChannelOut */
         SubscribedChannelOut: {
+            /**
+             * Avatar Url
+             * @description Square WebP; null for the letter avatar
+             */
+            avatar_url: string | null;
             /** Display Name */
             display_name: string;
             /**
@@ -3228,6 +3281,120 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_channel_image_api_users_me_images__kind__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["ImageKind"];
+            };
+            cookie?: never;
+        };
+        /** @description The image file itself as the body: JPEG, PNG or WebP, up to 6 MB */
+        requestBody: {
+            content: {
+                "image/jpeg": string;
+                "image/png": string;
+                "image/webp": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Content Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_channel_image_api_users_me_images__kind__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["ImageKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
             };
             /** @description Unauthorized */
             401: {

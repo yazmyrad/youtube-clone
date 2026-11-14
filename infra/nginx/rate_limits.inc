@@ -24,6 +24,8 @@ map $request_method $api_write_client {
     default $binary_remote_addr;
 }
 limit_req_zone $api_write_client zone=api_writes:10m rate=120r/m;
+# Channel avatars and banners: each is decoded and re-encoded on the API.
+limit_req_zone $api_write_client zone=images:10m rate=10r/m;
 # Open uploads per client: each may stream up to 2 GB.
 limit_conn_zone $binary_remote_addr zone=upload_conns:10m;
 

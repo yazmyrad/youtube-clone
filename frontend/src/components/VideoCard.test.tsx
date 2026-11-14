@@ -12,7 +12,7 @@ const video: VideoCardData = {
   views_count: 1234,
   published_at: "2026-01-02T03:04:05Z",
   thumbnail_url: "/thumbs/a7f3.jpg?sig=x",
-  channel: { username: "ana", display_name: "Ana" },
+  channel: { username: "ana", display_name: "Ana", avatar_url: null },
   is_short: false,
 };
 

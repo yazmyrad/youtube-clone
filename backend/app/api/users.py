@@ -1,7 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
+from app.core.errors import PayloadTooLarge, UnsupportedMediaType
 from app.core.pagination import (
     DEFAULT_SUBSCRIPTION_PAGE,
     DEFAULT_VIDEO_PAGE,
@@ -14,11 +15,13 @@ from app.schemas.errors import ErrorOut
 from app.schemas.playlists import OwnPlaylistOut, OwnPlaylistPage
 from app.schemas.users import MeOut, MeUpdateIn
 from app.schemas.videos import HistoryEntryOut, HistoryPage, VideoOwnerOut, VideoOwnerPage
+from app.services import channel_images
 from app.services import channels as channels_service
 from app.services import history as history_service
 from app.services import playlists as playlists_service
 from app.services import users as users_service
 from app.services import videos as videos_service
+from app.services.channel_images import ImageKind
 
 router = APIRouter(
     prefix="/users",
@@ -132,3 +135,62 @@ async def clear_history(user: CurrentUser, session: SessionDep) -> None:
 )
 async def remove_history_entry(video_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> None:
     await history_service.remove_entry(session, user, video_id)
+
+
+_IMAGE_BODY = {
+    "requestBody": {
+        "required": True,
+        "description": "The image file itself as the body: JPEG, PNG or WebP, up to 6 MB",
+        "content": {
+            content_type: {"schema": {"type": "string", "format": "binary"}}
+            for content_type in channel_images.ACCEPTED_TYPES
+        },
+    }
+}
+_IMAGE_ERRORS: dict[int | str, dict[str, object]] = {
+    status.HTTP_400_BAD_REQUEST: {"model": ErrorOut},
+    status.HTTP_413_CONTENT_TOO_LARGE: {"model": ErrorOut},
+    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: {"model": ErrorOut},
+}
+
+
+async def _image_body(request: Request) -> bytes:
+    """At most one byte over the limit is read, so a huge body costs nothing to refuse."""
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > channel_images.MAX_IMAGE_BYTES:
+            raise PayloadTooLarge("The image is too large: at most 6 MB")
+    return bytes(data)
+
+
+def _content_type(request: Request) -> str:
+    return request.headers.get("content-type", "").split(";")[0].strip().lower()
+
+
+@router.put(
+    "/me/images/{kind}",
+    response_model=MeOut,
+    responses=_IMAGE_ERRORS,
+    openapi_extra=_IMAGE_BODY,
+    summary="Set your channel's avatar or banner, cropped to its shape",
+)
+async def set_channel_image(
+    kind: ImageKind, request: Request, user: CurrentUser, session: SessionDep
+) -> MeOut:
+    content_type = _content_type(request)
+    if content_type not in channel_images.ACCEPTED_TYPES:
+        raise UnsupportedMediaType("Upload a JPEG, PNG or WebP image")
+    data = await _image_body(request)
+    return MeOut.model_validate(
+        await channel_images.set_image(session, user, kind, data, content_type)
+    )
+
+
+@router.delete(
+    "/me/images/{kind}",
+    response_model=MeOut,
+    summary="Remove your channel's avatar or banner (safe to repeat)",
+)
+async def remove_channel_image(kind: ImageKind, user: CurrentUser, session: SessionDep) -> MeOut:
+    return MeOut.model_validate(await channel_images.remove_image(session, user, kind))

@@ -58,7 +58,7 @@ async def test_add_and_list(
     assert created.status_code == 201, created.text
     comment = created.json()
     assert comment["body"] == "First!"
-    assert comment["author"] == {"username": "bobby", "display_name": "Bobby"}
+    assert comment["author"] == {"username": "bobby", "display_name": "Bobby", "avatar_url": None}
     assert set(comment) == {"id", "body", "created_at", "author"}
     listed = (await api.get(_url(video_id))).json()
     assert listed == {"items": [comment], "next_cursor": None}

@@ -106,6 +106,18 @@
       "ChannelBriefOut": {
         "description": "The channel a video belongs to, as shown next to the video.",
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Square WebP; null for the letter avatar",
+            "title": "Avatar Url"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -117,7 +129,8 @@
         },
         "required": [
           "username",
-          "display_name"
+          "display_name",
+          "avatar_url"
         ],
         "title": "ChannelBriefOut",
         "type": "object"
@@ -125,6 +138,30 @@
       "ChannelOut": {
         "description": "A channel's page header. A channel is a user, addressed by username.",
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Square WebP; null for the letter avatar",
+            "title": "Avatar Url"
+          },
+          "banner_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Wide WebP; null for none",
+            "title": "Banner Url"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -157,6 +194,8 @@
           "display_name",
           "description",
           "subscribers_count",
+          "avatar_url",
+          "banner_url",
           "created_at",
           "is_subscribed"
         ],
@@ -474,6 +513,14 @@
         "title": "HistoryPage",
         "type": "object"
       },
+      "ImageKind": {
+        "enum": [
+          "avatar",
+          "banner"
+        ],
+        "title": "ImageKind",
+        "type": "string"
+      },
       "LoginIn": {
         "additionalProperties": false,
         "properties": {
@@ -497,6 +544,30 @@
       },
       "MeOut": {
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Square WebP; null for the letter avatar",
+            "title": "Avatar Url"
+          },
+          "banner_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Wide WebP; null for none",
+            "title": "Banner Url"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -539,6 +610,8 @@
           "description",
           "role",
           "subscribers_count",
+          "avatar_url",
+          "banner_url",
           "created_at"
         ],
         "title": "MeOut",
@@ -1310,6 +1383,18 @@
       },
       "SubscribedChannelOut": {
         "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Square WebP; null for the letter avatar",
+            "title": "Avatar Url"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -1327,6 +1412,7 @@
         "required": [
           "username",
           "display_name",
+          "avatar_url",
           "subscribed_at"
         ],
         "title": "SubscribedChannelOut",
@@ -4360,6 +4446,170 @@
           }
         ],
         "summary": "Remove one video from your watch history (safe to repeat)",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/me/images/{kind}": {
+      "delete": {
+        "operationId": "remove_channel_image_api_users_me_images__kind__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ImageKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove your channel's avatar or banner (safe to repeat)",
+        "tags": [
+          "users"
+        ]
+      },
+      "put": {
+        "operationId": "set_channel_image_api_users_me_images__kind__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ImageKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "description": "The image file itself as the body: JPEG, PNG or WebP, up to 6 MB",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set your channel's avatar or banner, cropped to its shape",
         "tags": [
           "users"
         ]

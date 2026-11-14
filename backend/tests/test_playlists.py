@@ -57,7 +57,11 @@ async def test_create_is_private_by_default(
     assert body["title"] == "Watch later"
     assert body["visibility"] == "private"
     assert body["description"] == ""
-    assert body["channel"] == {"username": "alice", "display_name": body["channel"]["display_name"]}
+    assert body["channel"] == {
+        "username": "alice",
+        "display_name": body["channel"]["display_name"],
+        "avatar_url": None,
+    }
     assert (body["video_count"], body["thumbnail_url"], body["items"]) == (0, None, [])
 
 
