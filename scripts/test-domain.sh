@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests `./install.sh --domain`: HTTPS through Caddy, HTTP redirected, HSTS, Secure cookies,
-# the Origin check behind TLS, nginx publishing no port, and the client's address reaching
-# nginx unforgeable. `localhost` makes Caddy use its own CA, so no real domain is needed.
+# the Origin check behind TLS, nginx publishing no port, the client's address reaching
+# nginx unforgeable, redirects staying on HTTPS, and `--no-domain` going back. `localhost`
+# makes Caddy use its own CA, so no real domain is needed.
 # Needs ports 80 and 443 free and no existing stack; removes everything it creates.
 # Usage: scripts/test-domain.sh
 set -euo pipefail
@@ -27,6 +28,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+for bad in 1.2.3.4 foo https://videos.example.com/; do
+    if ./install.sh --no-seed --domain "$bad" >/dev/null 2>&1; then
+        fail "--domain accepted $bad"
+    fi
+done
+[ ! -e .env ] || fail "a rejected --domain still wrote .env"
+
 ./install.sh --no-seed --domain LocalHost
 
 site=https://localhost
@@ -47,6 +55,14 @@ grep -qi '^strict-transport-security: max-age=31536000' "$work/headers" && pass 
     || fail "no HSTS"
 grep -qi '^x-frame-options: deny' "$work/headers" && pass "nginx's headers still arrive" \
     || fail "nginx's headers are lost"
+
+# A trailing slash makes the API redirect; it must stay on https, or a POST would lose its
+# Origin on the way.
+location="$(curl_tls -o /dev/null -w '%{redirect_url}' "$site/api/videos/")"
+case "$location" in
+    http://*) fail "a redirect leaves HTTPS: $location" ;;
+    *) pass "redirects stay on HTTPS (${location:-none})" ;;
+esac
 
 if "${DOCKER[@]}" compose port nginx 8080 >/dev/null 2>&1; then
     fail "nginx publishes a port"
@@ -82,6 +98,13 @@ esac
 [ "$(curl_tls -o /dev/null -w '%{http_code}' "$site/api/health")" = 200 ] \
     && grep -q "https://localhost" "$work/rerun" && pass "a plain rerun keeps HTTPS" \
     || fail "a rerun dropped HTTPS"
+
+./install.sh --no-seed --no-domain > "$work/back"
+[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost/api/health)" = 200 ] \
+    && pass "--no-domain goes back to plain HTTP on port 80" || fail "--no-domain left no HTTP site"
+[ -z "$("${DOCKER[@]}" ps -q --filter label=com.docker.compose.service=caddy)" ] \
+    && pass "--no-domain removes Caddy" || fail "Caddy still runs after --no-domain"
+grep -q '^DOMAIN=' .env && fail "--no-domain kept DOMAIN in .env" || pass "--no-domain clears .env"
 
 [ "$failures" -eq 0 ] || { printf '%d check(s) failed\n' "$failures"; exit 1; }
 printf 'all checks passed\n'

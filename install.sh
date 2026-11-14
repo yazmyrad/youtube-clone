@@ -7,9 +7,10 @@ cd "$(dirname "$(readlink -f "$0")")"
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-usage="usage: ./install.sh [--no-seed] [--domain example.com]"
+usage="usage: ./install.sh [--no-seed] [--domain example.com | --no-domain]"
 SEED=1
 DOMAIN_ARG=""
+NO_DOMAIN=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-seed) SEED=0 ;;
@@ -19,16 +20,23 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --domain=*) DOMAIN_ARG="${1#--domain=}" ;;
+        --no-domain) NO_DOMAIN=1 ;;
         -h | --help) echo "$usage"; exit 0 ;;
         *) die "unknown argument: $1 ($usage)" ;;
     esac
     shift
 done
+[ -z "$DOMAIN_ARG" ] || [ "$NO_DOMAIN" = 0 ] || die "--domain and --no-domain together ($usage)"
 if [ -n "$DOMAIN_ARG" ]; then
-    # A bare host name: no scheme, port or path. Lowercase, as browsers send it.
-    DOMAIN_ARG="$(printf '%s' "$DOMAIN_ARG" | tr 'A-Z' 'a-z')"
-    printf '%s' "$DOMAIN_ARG" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$' \
-        || die "--domain takes a host name such as example.com, without http:// or a path"
+    # A host name with a dot, as certificates need (or localhost, for testing): no scheme,
+    # port, path or IP address. Lowercase, as browsers send it.
+    DOMAIN_ARG="$(printf '%s' "$DOMAIN_ARG" | tr '[:upper:]' '[:lower:]')"
+    label='[a-z0-9]([a-z0-9-]*[a-z0-9])?'
+    { [ "$DOMAIN_ARG" = localhost ] || {
+        [ "${#DOMAIN_ARG}" -le 253 ] \
+            && printf '%s' "$DOMAIN_ARG" | grep -qE "^$label(\.$label)+\$" \
+            && ! printf '%s' "$DOMAIN_ARG" | grep -qE '^[0-9.]+$'
+    }; } || die "--domain takes a domain name such as videos.example.com, not an IP address, URL or path"
 fi
 
 SUDO=()
@@ -120,19 +128,33 @@ grep -q '^MINIO_APP_ACCESS_KEY=' .env || echo "MINIO_APP_ACCESS_KEY=app" >> .env
 
 # `--domain`: HTTPS through Caddy (compose.domain.yaml). Recorded in .env, so a plain rerun
 # and every `docker compose` command keep it; remove these lines from .env to go back.
-if [ -n "$DOMAIN_ARG" ]; then
+if [ -n "$DOMAIN_ARG" ] || [ "$NO_DOMAIN" = 1 ]; then
     sed -i '/^DOMAIN=/d; /^COMPOSE_FILE=/d' .env
+fi
+if [ -n "$DOMAIN_ARG" ]; then
     printf 'DOMAIN=%s\nCOMPOSE_FILE=compose.yaml:compose.domain.yaml\n' "$DOMAIN_ARG" >> .env
-    log "HTTPS for $DOMAIN_ARG: it must point at this machine, with ports 80 and 443 open"
+    log "HTTPS for $DOMAIN_ARG: it must point at this machine, with ports 80, 443 and 443/udp open"
+elif [ "$NO_DOMAIN" = 1 ]; then
+    log "Back to plain HTTP on port ${HTTP_PORT:-80}"
 fi
 domain="$(sed -n 's/^DOMAIN=//p' .env)"
+compose_file="$(sed -n 's/^COMPOSE_FILE=//p' .env)"
+[ -z "$domain" ] || [ -n "$compose_file" ] \
+    || die ".env has DOMAIN but no COMPOSE_FILE; rerun with --domain $domain or --no-domain"
+# Compose prefers the shell's variables over .env: make .env the only source of these.
+if [ -n "$domain" ]; then
+    export DOMAIN="$domain" COMPOSE_FILE="$compose_file"
+else
+    unset DOMAIN COMPOSE_FILE
+fi
 
 # Compose prefers a shell variable over .env, so make .env the single source of the port.
 port="$(sed -n 's/^HTTP_PORT=//p' .env)"
 export HTTP_PORT="$port"
 
 log "Building and starting services (the first run takes a few minutes)"
-"${DOCKER[@]}" compose up -d --build --wait --wait-timeout 300 \
+# --remove-orphans: after --no-domain, Caddy would otherwise keep ports 80 and 443.
+"${DOCKER[@]}" compose up -d --build --remove-orphans --wait --wait-timeout 300 \
     || { "${DOCKER[@]}" compose ps -a; "${DOCKER[@]}" compose logs --tail=30; die "services did not become healthy"; }
 
 if [ -z "$domain" ]; then

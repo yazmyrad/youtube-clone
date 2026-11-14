@@ -218,4 +218,3 @@ async def test_behind_tls_the_public_origin_is_the_one_allowed(
     )
 
     assert (response.status_code != 403) is allowed, response.text
-    get_settings.cache_clear()

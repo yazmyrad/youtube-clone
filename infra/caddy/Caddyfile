@@ -7,7 +7,10 @@
 
 {$DOMAIN} {
 	# Browsers that saw the site once refuse plain HTTP to it from then on.
-	header Strict-Transport-Security "max-age=31536000"
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
 	# Sets X-Forwarded-For to the client, replacing anything the client sent; nginx trusts
 	# it from this address only.
 	reverse_proxy nginx:8080

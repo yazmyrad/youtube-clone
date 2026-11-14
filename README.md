@@ -22,6 +22,7 @@ data, secrets and demo passwords are kept.
 | `--no-seed` | Start with an empty site, without demo data |
 | `HTTP_PORT=8081 ./install.sh` | Serve on another port than 80 (first run only; it is saved in `.env`) |
 | `--domain example.com` | HTTPS with a Let's Encrypt certificate, HSTS and Secure cookies (see below) |
+| `--no-domain` | Back to plain HTTP after `--domain` |
 
 ### HTTPS with a domain
 
@@ -29,10 +30,11 @@ data, secrets and demo passwords are kept.
 ./install.sh --domain videos.example.com
 ```
 
-Point the domain's DNS at the machine and open ports 80 and 443 first. Caddy then sits in
-front of nginx, gets and renews the certificate, redirects HTTP to HTTPS and adds HSTS; the
-site is at `https://videos.example.com`. The choice is saved in `.env`, so a plain rerun keeps
-it; delete the `DOMAIN=` and `COMPOSE_FILE=` lines there to go back to plain HTTP.
+Point the domain's DNS at the machine and open ports 80, 443 and 443/udp first. Caddy then
+sits in front of nginx, gets and renews the certificate, redirects HTTP to HTTPS and adds
+HSTS; the site is at `https://videos.example.com`. The choice is saved in `.env`, so a plain
+rerun keeps it, and so does `docker compose` run from the repository root.
+`./install.sh --no-domain` goes back to plain HTTP.
 
 ### This is a demo environment
 
