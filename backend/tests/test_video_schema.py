@@ -136,3 +136,23 @@ async def test_access_entries_go_with_the_user(
     await session.execute(delete(User).where(User.id == shared_video[1].id))
     await session.commit()
     assert await _access_rows(session) == 0
+
+
+@pytest.mark.parametrize(("width", "height"), [(0, 720), (1280, 0), (-1, 720)])
+async def test_size_must_be_positive(
+    session: AsyncSession, owner: User, width: int, height: int
+) -> None:
+    session.add(_video(owner, width=width, height=height))
+
+    with pytest.raises(IntegrityError, match="ck_videos_size_positive"):
+        await session.commit()
+    await session.rollback()
+
+
+async def test_size_is_unknown_until_processed(session: AsyncSession, owner: User) -> None:
+    video = _video(owner)
+    session.add(video)
+    await session.commit()
+    await session.refresh(video)
+
+    assert (video.width, video.height) == (None, None)

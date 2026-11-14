@@ -196,6 +196,7 @@ Indexes: `(user_id)`, `(family_id)`, `(expires_at)` for cleanup.
 | `raw_key` | text | nullable; cleared when the raw file is deleted |
 | `hls_prefix`, `thumbnail_key` | text | nullable until `ready` |
 | `duration_seconds` | integer | nullable until `ready`, CHECK > 0 |
+| `width`, `height` | integer | nullable until processed, CHECK both > 0; a ready video taller than wide and at most 180 s is a Short |
 | `source_size_bytes` | bigint | nullable, CHECK ≥ 0 |
 | `views_count` | bigint | NOT NULL, default 0, CHECK ≥ 0 |
 | `likes_count`, `dislikes_count`, `comments_count` | integer | NOT NULL, default 0, CHECK ≥ 0 |
@@ -211,6 +212,7 @@ Table CHECK: `status <> 'ready' OR (hls_prefix, thumbnail_key, duration_seconds,
 | `(published_at DESC, id DESC) WHERE visibility='public' AND status='ready' AND hidden_at IS NULL AND deleted_at IS NULL` | Home feed, keyset pagination |
 | GIN `title gin_trgm_ops`, same WHERE clause | Search |
 | `(owner_id, published_at DESC, id DESC) WHERE status='ready' AND deleted_at IS NULL` | Channel page, subscriptions feed |
+| `(published_at DESC, id DESC) WHERE` listed `AND height > width AND duration_seconds <= 180` | Shorts feed |
 | `(owner_id, created_at DESC) WHERE deleted_at IS NULL` | The owner's own video list |
 | `(created_at) WHERE status='uploading'` | Abandoned upload sweep |
 | `(deleted_at) WHERE deleted_at IS NOT NULL` | Object deletion sweep |

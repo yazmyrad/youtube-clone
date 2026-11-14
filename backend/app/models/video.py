@@ -38,9 +38,15 @@ class VideoStatus(enum.StrEnum):
 
 
 # Shared by the feed and search indexes: what anyone may see in a listing.
-LISTED = text(
+LISTED_SQL = (
     "visibility = 'public' AND status = 'ready' AND hidden_at IS NULL AND deleted_at IS NULL"
 )
+LISTED = text(LISTED_SQL)
+# A Short, as YouTube decides: taller than wide, and at most three minutes.
+SHORT_SQL = "height > width AND duration_seconds <= 180"
+SHORT = text(SHORT_SQL)
+# The Shorts feed's index predicate; queries use this same literal SQL to match it.
+LISTED_SHORT = text(f"{LISTED_SQL} AND {SHORT_SQL}")
 # Ready and not deleted, in any visibility: the channel index's predicate.
 PUBLISHED = text("status = 'ready' AND deleted_at IS NULL")
 
@@ -50,6 +56,7 @@ class Video(Base):
     __table_args__ = (
         CheckConstraint("btrim(title) <> ''", name="title_not_blank"),
         CheckConstraint("duration_seconds > 0", name="duration_positive"),
+        CheckConstraint("width > 0 AND height > 0", name="size_positive"),
         CheckConstraint("source_size_bytes >= 0", name="source_size_non_negative"),
         CheckConstraint("views_count >= 0", name="views_count_non_negative"),
         CheckConstraint("likes_count >= 0", name="likes_count_non_negative"),
@@ -75,6 +82,13 @@ class Video(Base):
             postgresql_using="gin",
             postgresql_ops={"title": "gin_trgm_ops"},
             postgresql_where=LISTED,
+        ),
+        # The Shorts feed.
+        Index(
+            "ix_videos_shorts",
+            text("published_at DESC"),
+            text("id DESC"),
+            postgresql_where=LISTED_SHORT,
         ),
         # Channel page and subscriptions feed.
         Index(
@@ -121,6 +135,9 @@ class Video(Base):
     hls_prefix: Mapped[str | None] = mapped_column(Text)
     thumbnail_key: Mapped[str | None] = mapped_column(Text)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    # The picture's size, as the worker found it; null until processed.
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
     source_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     views_count: Mapped[int] = mapped_column(BigInteger, server_default="0")
     likes_count: Mapped[int] = mapped_column(Integer, server_default="0")
