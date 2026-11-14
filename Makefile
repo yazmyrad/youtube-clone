@@ -9,7 +9,7 @@ BIN := .venv/bin
 # Runs a command in backend/ with the dev connection settings loaded.
 IN_BACKEND := cd backend && set -a && . ./.env && set +a &&
 
-.PHONY: help setup env venv frontend-deps frontend-check api-types dev up down rebuild logs ps shell nginx-reload \
+.PHONY: help setup env venv frontend-deps frontend-check secrets api-types dev up down rebuild logs ps shell nginx-reload \
 	require-db test-db db-shell db-reset migrate migration downgrade migrations \
 	run-local test test-storage test-upload seed smoke lint fix check
 
@@ -129,4 +129,7 @@ api-types: ## Regenerate the frontend's API types from the backend's OpenAPI doc
 frontend-check: ## Typecheck, test and build the frontend
 	cd frontend && npm run -s typecheck && npm test -s && npm run -s build
 
-check: lint test frontend-check ## Lint and test, as required before every commit
+secrets: ## Check that git tracks no secrets (D62)
+	scripts/check-secrets.sh
+
+check: secrets lint test frontend-check ## Lint and test, as required before every commit

@@ -8,6 +8,13 @@ permissions:
   contents: read
 
 jobs:
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: No secrets tracked (D62)
+        run: scripts/check-secrets.sh
+
   backend:
     runs-on: ubuntu-24.04
     defaults:
