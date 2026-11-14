@@ -79,8 +79,9 @@ class VideoCard:
 
 
 async def create_video(
-    session: AsyncSession, owner: User, data: VideoCreateIn
+    session: AsyncSession, owner: User, data: VideoCreateIn, *, enforce_limits: bool = True
 ) -> tuple[Video, PresignedUpload]:
+    """`enforce_limits=False` is for the demo seed only; no API route passes it."""
     # Serializes one user's requests, so concurrent ones can't all pass the count below.
     # NO KEY UPDATE, the weaker lock, doesn't block inserts that reference this user.
     await session.execute(
@@ -100,9 +101,12 @@ async def create_video(
         ).all()
     )
     uploading = counts.get(VideoStatus.uploading, 0)
-    if uploading >= MAX_ACTIVE_UPLOADS:
+    if enforce_limits and uploading >= MAX_ACTIVE_UPLOADS:
         raise Conflict(f"You can have at most {MAX_ACTIVE_UPLOADS} uploads in progress")
-    if uploading + counts.get(VideoStatus.processing, 0) >= MAX_UNFINISHED_VIDEOS:
+    if (
+        enforce_limits
+        and uploading + counts.get(VideoStatus.processing, 0) >= MAX_UNFINISHED_VIDEOS
+    ):
         raise Conflict(
             f"You can have at most {MAX_UNFINISHED_VIDEOS} videos uploading or processing. "
             "Wait for one to finish"

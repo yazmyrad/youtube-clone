@@ -50,7 +50,7 @@ trap 'psql "DROP TABLE IF EXISTS install_rerun_check;" || true' EXIT
 
 [ "$(sha256sum .env)" = "$secrets_before" ] || fail "install.sh changed .env on rerun"
 [ "$(sha256sum demo-credentials.txt)" = "$demo_before" ] || fail "install.sh changed demo passwords on rerun"
-[ "$(psql "SELECT count(*) FROM users WHERE email LIKE '%@demo.example.com';")" = 8 ] \
+[ "$(psql "SELECT count(*) FROM users WHERE email LIKE '%@demo.example.com';")" = 9 ] \
     || fail "install.sh seeded the demo accounts twice"
 [ "$(psql 'SELECT marker FROM install_rerun_check;')" = "$marker" ] || fail "database data was lost on rerun"
 printf 'ok    rerun kept secrets and data\n'

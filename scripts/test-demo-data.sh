@@ -31,7 +31,7 @@ while read -r role username email password; do
     [ "$status" = 200 ] || fail "demo account $username ($role) can't log in: $status"
     accounts=$((accounts + 1))
 done < "$credentials"
-[ "$accounts" -ge 8 ] || fail "expected at least 8 demo accounts, found $accounts"
+[ "$accounts" -ge 9 ] || fail "expected at least 9 demo accounts, found $accounts"
 pass "all $accounts demo accounts can log in"
 
 # One video at a time on one CPU: allow a few minutes on a slow VM.
@@ -44,6 +44,10 @@ while :; do
     sleep 5
 done
 pass "all $expected demo videos are processed and on the home feed"
+
+shorts="$(curl -fsS --max-time 20 "$base/api/videos/shorts?limit=50" | grep -o '"is_short":true' | wc -l | tr -d ' ')"
+[ "$shorts" -ge 9 ] || fail "only $shorts demo Shorts are in the Shorts feed"
+pass "all $shorts demo Shorts are in the Shorts feed"
 
 [ "$(curl -fsS --max-time 20 "$base/api/search/videos?q=on%20the%20Sun" | grep -o '"id"' | wc -l | tr -d ' ')" -ge 2 ] \
     || fail "search doesn't find the demo videos"

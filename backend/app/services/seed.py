@@ -73,6 +73,8 @@ class DemoVideo:
     days_ago: float
     views: int
     source: DemoSource | None = None
+    # Vertical: a Short. Its stand-in title card is vertical too.
+    short: bool = False
 
     @property
     def full_description(self) -> str:
@@ -113,6 +115,34 @@ NASA_TERMS = (
     "(nasa.gov/nasa-brand-center/images-and-media). NASA does not endorse this site."
 )
 BLENDER_TERMS = "License: Creative Commons Attribution 3.0 (creativecommons.org/licenses/by/3.0)."
+COMMONS_PAGE = "https://commons.wikimedia.org/wiki/File:"
+COMMONS_FILES = "https://upload.wikimedia.org/wikipedia/commons/transcoded/"
+NOAA_TERMS = (
+    "Public domain: imagery from NOAA satellites, processed by CSU/CIRA; via Wikimedia Commons."
+)
+SVS_TERMS = (
+    "Public domain: NASA's Scientific Visualization Studio, via Wikimedia Commons. "
+    "NASA does not endorse this site."
+)
+CC0_TERMS = "License: Creative Commons CC0 1.0, a public domain dedication."
+CC_BY_4_TERMS = (
+    "License: Creative Commons Attribution 4.0 (creativecommons.org/licenses/by/4.0). "
+    "Converted for streaming."
+)
+CC_BY_3_TERMS = (
+    "License: Creative Commons Attribution 3.0 (creativecommons.org/licenses/by/3.0). "
+    "Converted for streaming."
+)
+
+
+def _commons(file: str, name: str, path: str, sha256: str, credit: str, terms: str) -> DemoSource:
+    """A file on Wikimedia Commons, in its 1080p VP9 rendition, which Commons makes itself."""
+    return DemoSource(
+        file=file,
+        url=f"{COMMONS_FILES}{path}/{path.rsplit('/', 1)[-1]}.1080p.vp9.webm",
+        sha256=sha256,
+        credit=f"Source: {COMMONS_PAGE}{name}\nCredit: {credit}\n{terms}",
+    )
 
 
 def _nasa(file: str, nasa_id: str, sha256: str, credit: str) -> DemoSource:
@@ -175,6 +205,45 @@ CHANNELS = (
                     "60638cd60c7fd1b4fdb54b11ae577f6db740568f07fe8a18adbbf45edc4b7e37",
                     "NASA's Michoud Assembly Facility",
                 ),
+            ),
+            DemoVideo(
+                "How Close Apophis Will Pass in 2029",
+                "#shorts",
+                "On April 13, 2029, asteroid Apophis will pass closer to Earth than some of our "
+                "satellites. A short animation of its path.",
+                23,
+                1.5,
+                71_400,
+                _commons(
+                    "apophis.webm",
+                    "Asteroid_Apophis_2029_Earth_Flyby_%E2%80%93_Animations_(SVS20414_-_Apophis_"
+                    "Distance_Animation_Vertical_4k).webm",
+                    "2/2e/Asteroid_Apophis_2029_Earth_Flyby_%E2%80%93_Animations_%28SVS20414_-_"
+                    "Apophis_Distance_Animation_Vertical_4k%29.webm",
+                    "1b38ba39524370100a84a81a1813144bb1b28282e38dd6dec04a524f12683f9b",
+                    "NASA's Scientific Visualization Studio",
+                    SVS_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Reading an Exoplanet's Air",
+                "#shorts",
+                "How starlight passing through a distant planet's atmosphere tells astronomers "
+                "what it's made of.",
+                13,
+                5,
+                18_900,
+                _commons(
+                    "exoplanet.webm",
+                    "Viewing_an_Exoplanet_Transmission_Spectrum_(SVS14946_-_GasGiant_Vertical).webm",
+                    "b/b4/Viewing_an_Exoplanet_Transmission_Spectrum_%28SVS14946_-_GasGiant_"
+                    "Vertical%29.webm",
+                    "b83ca7a5182aca63008e1094c5b49b64b37c0aeec9931a45bb198d91836f2b54",
+                    "NASA's Scientific Visualization Studio",
+                    SVS_TERMS,
+                ),
+                short=True,
             ),
         ),
     ),
@@ -296,6 +365,142 @@ CHANNELS = (
                     "a04f85d50e774d4dbebf8cce13b63f7862cd6ee2b5a91d26330c7867a4ca9a86",
                     "NASA's Goddard Space Flight Center",
                 ),
+            ),
+            DemoVideo(
+                "Hurricane Melissa, Seen From Space",
+                "#shorts",
+                "Days of Hurricane Melissa as a major storm, in one timelapse from weather "
+                "satellites.",
+                17,
+                0.5,
+                240_000,
+                _commons(
+                    "melissa.webm",
+                    "Hurricane_Melissa%E2%80%99s_Life_as_a_Major_Storm_(CIRA_2025-10-29_-_"
+                    "nolabels_portrait).webm",
+                    "b/bf/Hurricane_Melissa%E2%80%99s_Life_as_a_Major_Storm_%28CIRA_2025-10-29_-_"
+                    "nolabels_portrait%29.webm",
+                    "a83290608f855f98af14a100a4ee7948fe01f5763e6e2387965aad2c13e6be66",
+                    "GOES imagery: CSU/CIRA & NOAA",
+                    NOAA_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Saharan Dust Crossing the Atlantic",
+                "#shorts",
+                "A plume of Saharan dust drifts thousands of kilometres across the Atlantic over "
+                "several days.",
+                15,
+                2.5,
+                54_100,
+                _commons(
+                    "saharan-dust.webm",
+                    "Multi-Day_Timelapse_of_Saharan_Dust_Traversing_the_Atlantic_(CIRA_2024-06-26_-"
+                    "_nolabels_portrait).webm",
+                    "d/d6/Multi-Day_Timelapse_of_Saharan_Dust_Traversing_the_Atlantic_%28CIRA_"
+                    "2024-06-26_-_nolabels_portrait%29.webm",
+                    "e607de04c79ec5e3b377eab5dc9121577ea905632722e61dc855b4bb0c94ab46",
+                    "GOES imagery: CSU/CIRA & NOAA",
+                    NOAA_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Three Weeks of Western Wildfires",
+                "#shorts",
+                "Three weeks of wildfires and their smoke across the western United States, from "
+                "orbit.",
+                14,
+                7,
+                12_300,
+                _commons(
+                    "wildfires.webm",
+                    "Three-Week_Timelapse_of_Wildfires_in_the_Western_U_S_(CIRA_2026-07-08_-_"
+                    "nolabels_portrait).webm",
+                    "5/5d/Three-Week_Timelapse_of_Wildfires_in_the_Western_U_S_%28CIRA_2026-07-08"
+                    "_-_nolabels_portrait%29.webm",
+                    "de154b69960c94f71aeb1a6008a768dcdfc5a6f425eae4f9edf565f30f7e486b",
+                    "JPSS imagery: CSU/CIRA & NOAA/NESDIS",
+                    NOAA_TERMS,
+                ),
+                short=True,
+            ),
+        ),
+    ),
+    DemoChannel(
+        "wild_water",
+        "Wild Water",
+        "Waterfalls, birds and other short moments outdoors. Freely licensed clips.",
+        "0e6b74",
+        (
+            DemoVideo(
+                "Watagataki Falls",
+                "#shorts",
+                "Fifteen seconds at Watagataki Falls. Sound on.",
+                15,
+                1.2,
+                33_800,
+                _commons(
+                    "watagataki.webm",
+                    "Watagataki_Falls_(Video).webm",
+                    "8/86/Watagataki_Falls_%28Video%29.webm",
+                    "837872973d4c71e8ebc5ed8b2eecfd40dac955001c33c5f84cde63b95a2dcaa1",
+                    "Yoshi Canopus",
+                    CC0_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Cascade de Syratu",
+                "#shorts",
+                "A waterfall in the forest, filmed straight up.",
+                16,
+                3.3,
+                21_700,
+                _commons(
+                    "syratu.webm",
+                    "Cascade_de_Syratu.webm",
+                    "9/94/Cascade_de_Syratu.webm",
+                    "dc02d7daaa41e047d9555b9fe9de4be572197b208a77d041933c9ddf9fb5d9a0",
+                    "Arie m den toom",
+                    CC_BY_4_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Waterfall on Nimrod Stream",
+                "#shorts",
+                "Mt Nimrod Scenic Reserve, New Zealand.",
+                12,
+                5.5,
+                9_400,
+                _commons(
+                    "nimrod.webm",
+                    "Mt_Nimrod_Scenic_Reserve_-_Waterfall_on_Nimrod_Stream_(video).webm",
+                    "9/9f/Mt_Nimrod_Scenic_Reserve_-_Waterfall_on_Nimrod_Stream_%28video%29.webm",
+                    "0ba54b546c689f360927ebdee8c53cd25cba323744ca1b32ef57673a1562eba2",
+                    "David Nind",
+                    CC0_TERMS,
+                ),
+                short=True,
+            ),
+            DemoVideo(
+                "Seagull vs. Pigeons",
+                "#shorts",
+                "Who gets the bread? Place your bets.",
+                15,
+                9.5,
+                402_000,
+                _commons(
+                    "seagull.webm",
+                    "Seagull_and_pigeons_eating_bread.webm",
+                    "4/4d/Seagull_and_pigeons_eating_bread.webm",
+                    "53b7f6f0229ac1761aae851526f620ebf74817e3d2313a2596f8b9290f12b30b",
+                    "Atomicdragon136",
+                    CC_BY_3_TERMS,
+                ),
+                short=True,
             ),
         ),
     ),
@@ -481,6 +686,7 @@ async def _add_videos(
                 color=channel.color,
                 tone_hz=TONES_HZ[index % len(TONES_HZ)],
                 seconds=demo.seconds,
+                vertical=demo.short,
             )
             media = await downloaded(media_dir, demo.source)
             if demo.source is not None and media is None:
@@ -601,7 +807,9 @@ async def _add_video(
     data = VideoCreateIn(
         title=demo.title, description=demo.full_description, visibility=VideoVisibility.public
     )
-    video, _ = await videos.create_video(session, owner, data)
+    # A channel's demo videos go up while the worker still processes the first ones, so the
+    # per-account cap on unfinished uploads, meant for people, doesn't apply.
+    video, _ = await videos.create_video(session, owner, data, enforce_limits=False)
     if media is not None:
         await storage.upload_raw(storage.raw_key(video.id), media)
     else:

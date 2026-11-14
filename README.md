@@ -68,17 +68,20 @@ and `infra/nginx/real_ip_tls.inc` together.
 
 ### Demo data
 
-Four channels with twelve real videos, three viewer accounts that have liked, commented,
-subscribed and made playlists, and an admin. The videos are freely licensed, and each one's
-description credits its source and license:
+Five channels with twelve real videos and nine Shorts, three viewer accounts that have liked,
+commented, subscribed and made playlists, and an admin. The videos are freely licensed, and
+each one's description credits its source and license:
 
 - **Launch Pad, Sun Watch, Blue Planet Lab:** rockets, solar flares, Earth, the Moon and Mars,
   from [NASA's public archive](https://images.nasa.gov) (public domain; NASA endorses nothing
   here).
 - **Open Movie Night:** the trailers of Sintel and Big Buck Bunny, open movies by the Blender
   Foundation (CC BY 3.0).
+- **Shorts:** vertical clips from [Wikimedia Commons](https://commons.wikimedia.org): NOAA
+  satellite timelapses and NASA visualizations (public domain), and, on **Wild Water**,
+  waterfalls and birds (CC0 and CC BY).
 
-Install downloads them, about 115 MB, and checks each against a SHA-256 pinned in
+Install downloads them, about 170 MB, and checks each against a SHA-256 pinned in
 `backend/app/services/seed.py`, so the repository holds no video files. A video that can't be
 downloaded (no internet, a host down) gets a generated title card instead, and install still
 succeeds. The downloads are kept in a Docker volume, so a rerun doesn't fetch them again.

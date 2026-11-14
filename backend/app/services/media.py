@@ -296,6 +296,8 @@ FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
 TITLE_CARD_TIMEOUT_SECONDS = 120
 # DejaVu Sans Bold at 72 px averages about 45 px a character; 1280 px less the margins.
 TITLE_LINE_CHARS = 24
+# A vertical card is 720 wide instead of 1280: fewer characters fit on a line.
+VERTICAL_TITLE_LINE_CHARS = 13
 TITLE_LINE_HEIGHT = 92
 
 
@@ -307,19 +309,31 @@ class TitleCard:
     color: str  # RRGGBB
     tone_hz: int
     seconds: int
+    # 720x1280, so it is a Short like the video it stands in for.
+    vertical: bool = False
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return (720, 1280) if self.vertical else (1280, 720)
 
 
-def _title_lines(title: str) -> list[str]:
+def line_chars(vertical: bool) -> int:
+    return VERTICAL_TITLE_LINE_CHARS if vertical else TITLE_LINE_CHARS
+
+
+def _title_lines(title: str, vertical: bool = False) -> list[str]:
     """Breaks a title so each line fits the frame at the title's font size."""
-    return textwrap.wrap(title, TITLE_LINE_CHARS) or [""]
+    return textwrap.wrap(title, line_chars(vertical)) or [""]
 
 
 async def render_title_card(card: TitleCard, path: Path) -> None:
-    """Writes a 720p H.264/AAC clip: the title on a solid color, the channel and a topic tag.
+    """Writes a 720p H.264/AAC clip, landscape or vertical: the title on a solid color, the
+    channel and a topic tag.
 
     Text goes through files with expansion off, so no title can break out of the filter
     syntax or run drawtext's %{...} functions."""
-    lines = _title_lines(card.title)
+    lines = _title_lines(card.title, card.vertical)
+    width, height = card.size
     texts = {f"title{i}": line for i, line in enumerate(lines)}
     texts |= {"channel": card.channel, "tag": card.tag}
     bold, regular, mono = (
@@ -331,7 +345,7 @@ async def render_title_card(card: TitleCard, path: Path) -> None:
         return f"drawtext=fontfile={font}:textfile={file}:expansion=none:{style}"
 
     # One drawtext per line, each centered: this ffmpeg can't center lines within a block.
-    top = (720 - len(lines) * TITLE_LINE_HEIGHT) // 2
+    top = (height - len(lines) * TITLE_LINE_HEIGHT) // 2
     titles = [
         text(name, bold, f"fontcolor=white:fontsize=72:x=(w-tw)/2:y={top + i * TITLE_LINE_HEIGHT}")
         for i, name in enumerate(n for n in texts if n.startswith("title"))
@@ -350,7 +364,7 @@ async def render_title_card(card: TitleCard, path: Path) -> None:
         await _run(
             [
                 "ffmpeg", "-nostdin", "-v", "error", "-y",
-                "-f", "lavfi", "-i", f"color=c=0x{card.color}:s=1280x720:r=24:d={seconds}",
+                "-f", "lavfi", "-i", f"color=c=0x{card.color}:s={width}x{height}:r=24:d={seconds}",
                 "-f", "lavfi", "-i", f"sine=f={card.tone_hz}:d={seconds}",
                 "-vf", video, "-af", "volume=0.2",
                 "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",

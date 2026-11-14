@@ -220,9 +220,9 @@ async def test_a_failed_run_leaves_nothing_so_the_next_run_starts_over(
 
 def test_every_demo_title_fits_the_frame() -> None:
     for demo in ALL_VIDEOS:
-        lines = media._title_lines(demo.title)
+        lines = media._title_lines(demo.title, demo.short)
         assert " ".join(lines) == demo.title
-        assert all(len(line) <= media.TITLE_LINE_CHARS for line in lines), demo.title
+        assert all(len(line) <= media.line_chars(demo.short) for line in lines), demo.title
         assert len(lines) <= 3, demo.title
 
 
@@ -276,11 +276,14 @@ async def test_adds_the_demo_playlists_in_order(
         assert tuple(titles) == demo.videos
 
 
-def test_each_demo_channel_fits_under_the_unfinished_video_cap() -> None:
-    """The seed adds a channel's videos one after another while the worker still processes
-    the first ones, so a channel with as many as the cap would make install fail."""
-    for channel in seed.CHANNELS:
-        assert len(channel.videos) < videos.MAX_UNFINISHED_VIDEOS, channel.username
+async def test_a_channel_may_have_more_demo_videos_than_the_upload_cap(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    """The seed adds a channel's videos while the worker still processes the first ones, so
+    the cap meant for people must not apply to it, or install would fail."""
+    biggest = max(len(channel.videos) for channel in seed.CHANNELS)
+    assert biggest > videos.MAX_UNFINISHED_VIDEOS
+    assert await run_seed(session, tmp_path) is not None
 
 
 def test_every_demo_video_is_real_and_credited() -> None:
@@ -361,3 +364,12 @@ async def test_older_demo_data_is_left_alone(
 
     assert await run_seed(session, tmp_path) is None
     assert await session.scalar(select(func.count()).select_from(User)) == 1
+
+
+def test_the_demo_shorts_are_shorts() -> None:
+    shorts = [video for video in ALL_VIDEOS if video.short]
+    assert len(shorts) >= 8
+    for video in shorts:
+        assert video.source is not None
+        assert video.source.file.endswith(".webm")
+        assert video.seconds <= 180, video.title
