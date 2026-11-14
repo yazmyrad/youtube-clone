@@ -23,7 +23,7 @@ from app.models import (
     VideoStatus,
     VideoVisibility,
 )
-from app.services import media, seed, storage
+from app.services import media, seed, storage, videos
 from app.services.media import TitleCard
 from app.workers.seed import format_credentials
 from tests.conftest import TEST_BUCKET
@@ -271,3 +271,10 @@ async def test_adds_the_demo_playlists_in_order(
             .order_by(PlaylistItem.position)
         )
         assert tuple(titles) == demo.videos
+
+
+def test_each_demo_channel_fits_under_the_unfinished_video_cap() -> None:
+    """The seed adds a channel's videos one after another while the worker still processes
+    the first ones, so a channel with as many as the cap would make install fail."""
+    for channel in seed.CHANNELS:
+        assert len(channel.videos) < videos.MAX_UNFINISHED_VIDEOS, channel.username

@@ -110,6 +110,8 @@ services:
     # Docker refuses to start a container asking for more CPUs than the host has.
     cpus: "${WORKER_CPUS:-1}"
     mem_limit: 2g
+    # ffmpeg sizes its thread pools from the host's CPU count, not this container's share.
+    pids_limit: 4096
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -141,6 +143,8 @@ services:
     # Renders clips with ffmpeg while the site is up: same limits as the worker.
     cpus: "${WORKER_CPUS:-1}"
     mem_limit: 2g
+    # ffmpeg sizes its thread pools from the host's CPU count, not this container's share.
+    pids_limit: 4096
     depends_on:
       migrate:
         condition: service_completed_successfully
