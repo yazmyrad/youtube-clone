@@ -25,7 +25,8 @@ tar --exclude=.git --exclude=.env --exclude=.env.dev --exclude='demo-credentials
     trap "docker compose down -v --remove-orphans >/dev/null 2>&1 || true" EXIT
     ./install.sh
     [ "$(stat -c %a .env)" = 600 ] || { echo "FAIL  .env is not mode 600" >&2; exit 1; }
-    scripts/smoke.sh http://127.0.0.1:18081
+    # Before smoke: its last check uses up the login rate limit (D58).
     scripts/test-demo-data.sh http://127.0.0.1:18081 demo-credentials.txt
+    scripts/smoke.sh http://127.0.0.1:18081
 '
 printf 'clean install test passed\n'

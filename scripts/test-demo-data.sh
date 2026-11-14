@@ -21,8 +21,13 @@ pass "the demo credentials file is private"
 accounts=0
 while read -r role username email password; do
     [ "$role" = ROLE ] && continue
-    status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H 'Content-Type: application/json' \
-        -d "{\"email\":\"$email\",\"password\":\"$password\"}" "$base/api/auth/login")"
+    for _ in 1 2; do
+        status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$email\",\"password\":\"$password\"}" "$base/api/auth/login")"
+        # Rate limited (D58): do as a client should, and wait the minute it asks for.
+        [ "$status" = 429 ] || break
+        sleep 61
+    done
     [ "$status" = 200 ] || fail "demo account $username ($role) can't log in: $status"
     accounts=$((accounts + 1))
 done < "$credentials"

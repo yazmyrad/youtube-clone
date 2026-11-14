@@ -35,9 +35,10 @@ published="$("${DOCKER[@]}" ps --filter label=com.docker.compose.project=youtube
 [ "$published" = nginx ] || fail "published services should be only nginx, got: '$published'"
 printf 'ok    only nginx publishes a port\n'
 
+# Before smoke: its last check uses up the login rate limit (D58).
+scripts/test-demo-data.sh "http://127.0.0.1:${port}" demo-credentials.txt
 scripts/smoke.sh "http://127.0.0.1:${port}" "${DOCKER[@]}" compose
 scripts/test-storage.sh "${DOCKER[@]}" compose
-scripts/test-demo-data.sh "http://127.0.0.1:${port}" demo-credentials.txt
 
 secrets_before="$(sha256sum .env)"
 demo_before="$(sha256sum demo-credentials.txt)"

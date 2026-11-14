@@ -64,11 +64,11 @@ case "$location" in
     *) pass "redirects stay on HTTPS (${location:-none})" ;;
 esac
 
-if "${DOCKER[@]}" compose port nginx 8080 >/dev/null 2>&1; then
-    fail "nginx publishes a port"
-else
-    pass "only Caddy is published"
-fi
+published="$("${DOCKER[@]}" ps --filter label=com.docker.compose.project=youtube-clone \
+    --format '{{.Label "com.docker.compose.service"}} {{.Ports}}' \
+    | { grep -e '->' || true; } | cut -d' ' -f1 | sort -u)"
+[ "$published" = caddy ] && pass "only Caddy is published" \
+    || fail "published services should be only caddy, got: '$published'"
 
 json=(-H 'Content-Type: application/json')
 curl_tls -o /dev/null "${json[@]}" "$site/api/auth/register" \
