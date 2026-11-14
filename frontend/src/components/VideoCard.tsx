@@ -132,3 +132,28 @@ export function VideoRowCard({ video, onThumbnailError, progress }: CardProps) {
     </article>
   );
 }
+
+/** A row in the watch page's Up next column: a small thumbnail and the details beside it. */
+export function VideoCompactCard({ video, onThumbnailError }: CardProps) {
+  const href = `/watch?v=${video.id}`;
+  return (
+    <article className="flex gap-2">
+      <Link to={href} tabIndex={-1} aria-hidden className="w-42 shrink-0">
+        <Thumbnail video={video} onThumbnailError={onThumbnailError} />
+      </Link>
+      <div className="min-w-0">
+        <h3 className="line-clamp-2 text-sm leading-snug font-medium">
+          <Link to={href} title={video.title}>
+            {video.title}
+          </Link>
+        </h3>
+        <p className="mt-1 truncate text-xs text-ink-muted">
+          <ChannelLink video={video} />
+        </p>
+        <p className="text-xs text-ink-muted">
+          {formatViews(video.views_count)} · {formatAge(video.published_at)}
+        </p>
+      </div>
+    </article>
+  );
+}

@@ -9,7 +9,8 @@ import { ReactionButtons } from "../components/ReactionButtons";
 import { ReportButton } from "../components/ReportButton";
 import { SaveButton } from "../components/SaveButton";
 import { SubscribeButton } from "../components/SubscribeButton";
-import { channelPath, formatSubscribers, watchPath } from "../components/format";
+import { UpNext } from "../components/UpNext";
+import { channelPath, formatAge, formatSubscribers, watchPath } from "../components/format";
 import { useChannel } from "../hooks/useChannel";
 import { usePlaylist } from "../hooks/usePlaylists";
 import { useRenewThumbnails } from "../hooks/useRenewThumbnails";
@@ -72,9 +73,14 @@ function Details({ video }: { video: VideoDetails }) {
       </div>
       <div className="mt-3 rounded-xl bg-hover p-3 text-sm">
         <p className="font-medium">
-          {video.views_count.toLocaleString()} views · {new Date(published).toLocaleDateString()}
+          {video.views_count.toLocaleString("en")} {video.views_count === 1 ? "view" : "views"}{" "}
+          <time dateTime={published} title={new Date(published).toLocaleString()} className="ml-2">
+            {formatAge(published)}
+          </time>
         </p>
-        {video.description && <p className="mt-2 wrap-anywhere whitespace-pre-wrap">{video.description}</p>}
+        {video.description && (
+          <p className="mt-2 wrap-anywhere whitespace-pre-wrap">{video.description}</p>
+        )}
       </div>
     </>
   );
@@ -120,11 +126,17 @@ function Watch({ videoId, playlistId }: { videoId: string; playlistId: string | 
       {video.data && playable(video.data) && <Comments video={video.data} />}
     </div>
   );
-  if (!playlist) return <div className="mx-auto max-w-5xl px-4 py-6">{main}</div>;
+  // As on YouTube: the player and details on the left, the playlist and Up next on the right,
+  // or below them on narrow screens.
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start">
+    <div className="mx-auto flex max-w-[1754px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
       {main}
-      <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
+      <aside className="space-y-4 lg:w-100 lg:shrink-0">
+        {playlist && (
+          <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
+        )}
+        <UpNext videoId={videoId} />
+      </aside>
     </div>
   );
 }

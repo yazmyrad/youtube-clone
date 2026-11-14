@@ -11,6 +11,7 @@ import {
 } from "../hooks/useComments";
 import type { VideoDetails } from "../hooks/useVideo";
 import { Avatar } from "./Avatar";
+import { formatAge } from "./format";
 
 export function CommentItem({ comment }: { comment: Comment }) {
   return (
@@ -23,9 +24,13 @@ export function CommentItem({ comment }: { comment: Comment }) {
       <div className="min-w-0">
         <p className="text-xs">
           <span className="font-medium">@{comment.author.username}</span>{" "}
-          <span className="text-ink-muted">
-            {new Date(comment.created_at).toLocaleDateString()}
-          </span>
+          <time
+            dateTime={comment.created_at}
+            title={new Date(comment.created_at).toLocaleString()}
+            className="text-ink-muted"
+          >
+            {formatAge(comment.created_at)}
+          </time>
         </p>
         <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">{comment.body}</p>
       </div>
@@ -96,7 +101,8 @@ export function Comments({ video }: { video: VideoDetails }) {
   return (
     <section className="mt-6">
       <h2 className="mb-4 text-xl font-semibold">
-        {video.comments_count.toLocaleString()} Comments
+        {video.comments_count.toLocaleString("en")}{" "}
+        {video.comments_count === 1 ? "Comment" : "Comments"}
       </h2>
       <CommentForm videoId={video.id} />
       {comments.isError && (
