@@ -68,11 +68,22 @@ and `infra/nginx/real_ip_tls.inc` together.
 
 ### Demo data
 
-Three invented programming channels (CodeBytes, Terminal Tales, Pixel & Pipeline) with twelve
-videos, three viewer accounts that have liked and commented, and an admin. The videos are
-title cards generated with ffmpeg during install, so the repository holds no video files and
-install needs no download for them. They go through the same upload and transcoding pipeline
-as any upload. Log in with any account from `demo-credentials.txt`.
+Four channels with twelve real videos, three viewer accounts that have liked, commented,
+subscribed and made playlists, and an admin. The videos are freely licensed, and each one's
+description credits its source and license:
+
+- **Launch Pad, Sun Watch, Blue Planet Lab:** rockets, solar flares, Earth, the Moon and Mars,
+  from [NASA's public archive](https://images.nasa.gov) (public domain; NASA endorses nothing
+  here).
+- **Open Movie Night:** the trailers of Sintel and Big Buck Bunny, open movies by the Blender
+  Foundation (CC BY 3.0).
+
+Install downloads them, about 115 MB, and checks each against a SHA-256 pinned in
+`backend/app/services/seed.py`, so the repository holds no video files. A video that can't be
+downloaded (no internet, a host down) gets a generated title card instead, and install still
+succeeds. The downloads are kept in a Docker volume, so a rerun doesn't fetch them again.
+The channel and viewer names are made up. The videos go through the same upload and
+transcoding pipeline as any upload. Log in with any account from `demo-credentials.txt`.
 
 ## How it fits together
 

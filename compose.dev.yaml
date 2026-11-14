@@ -24,6 +24,10 @@ services:
     volumes:
       - ./backend/app:/srv/app:ro
 
+  demo-fetch:
+    volumes:
+      - ./backend/app:/srv/app:ro
+
   migrate:
     volumes:
       - ./backend/app:/srv/app:ro

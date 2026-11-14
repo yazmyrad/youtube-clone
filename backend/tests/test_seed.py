@@ -1,6 +1,8 @@
 """Demo data (D01): accounts, videos queued through the real pipeline, consistent counters."""
 
 import asyncio
+import dataclasses
+import hashlib
 from pathlib import Path
 
 import httpx
@@ -158,7 +160,7 @@ async def test_refuses_to_guess_when_only_some_accounts_exist(
     await session.execute(delete(User).where(User.username == "admin"))
     await session.commit()
 
-    with pytest.raises(seed.PartiallySeeded, match="codebytes"):
+    with pytest.raises(seed.PartiallySeeded, match=seed.CHANNELS[0].username):
         await run_seed(session, tmp_path)
 
 
@@ -235,7 +237,8 @@ async def test_viewers_subscribe_and_the_counts_match(
         recount = await session.scalar(
             select(func.count()).select_from(Subscription).where(Subscription.channel_id == user.id)
         )
-        assert user.subscribers_count == recount == len(seed.VIEWERS) - 1, channel.username
+        assert user.subscribers_count == recount, channel.username
+        assert recount >= len(seed.VIEWERS) - 1, channel.username
     for viewer in seed.VIEWERS:
         follows = await session.scalar(
             select(func.count())
@@ -278,3 +281,83 @@ def test_each_demo_channel_fits_under_the_unfinished_video_cap() -> None:
     the first ones, so a channel with as many as the cap would make install fail."""
     for channel in seed.CHANNELS:
         assert len(channel.videos) < videos.MAX_UNFINISHED_VIDEOS, channel.username
+
+
+def test_every_demo_video_is_real_and_credited() -> None:
+    files = [video.source.file for video in ALL_VIDEOS if video.source]
+    assert len(files) == len(ALL_VIDEOS)
+    assert len(set(files)) == len(files)
+    for video in ALL_VIDEOS:
+        source = video.source
+        assert source is not None
+        assert source.url.startswith("https://"), video.title
+        assert len(source.sha256) == 64
+        assert int(source.sha256, 16) >= 0
+        assert "Public domain" in source.credit or "Creative Commons" in source.credit
+        assert source.credit in video.full_description
+        assert len(video.full_description) <= 5000
+
+
+async def test_uses_the_downloaded_video_and_falls_back_to_a_title_card(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    media, work = tmp_path / "media", tmp_path / "work"
+    media.mkdir()
+    work.mkdir()
+    real, damaged, *_ = ALL_VIDEOS
+    real_bytes = b"a real video file"
+    assert real.source is not None and damaged.source is not None
+    (media / real.source.file).write_bytes(real_bytes)
+    (media / damaged.source.file).write_bytes(b"not what the checksum says")
+    patched = {
+        real.source.file: hashlib.sha256(real_bytes).hexdigest(),
+    }
+    sources = {
+        video.title: dataclasses.replace(
+            video, source=dataclasses.replace(video.source, sha256=patched[video.source.file])
+        )
+        if video.source and video.source.file in patched
+        else video
+        for video in ALL_VIDEOS
+    }
+    channels = tuple(
+        dataclasses.replace(c, videos=tuple(sources[v.title] for v in c.videos))
+        for c in seed.CHANNELS
+    )
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(seed, "CHANNELS", channels)
+        await seed.seed(session, fake_clip, work, media)
+
+    raw = {}
+    for video in await session.scalars(select(Video)):
+        body = storage.get_client().get_object(Bucket=TEST_BUCKET, Key=storage.raw_key(video.id))
+        raw[video.title] = body["Body"].read()
+        assert video.description.endswith(sources[video.title].source.credit)
+    assert raw[real.title] == real_bytes
+    assert raw[damaged.title] == f"clip for {damaged.title}".encode()
+
+
+async def test_no_media_dir_means_title_cards(tmp_path: Path) -> None:
+    source = ALL_VIDEOS[0].source
+    assert await seed.downloaded(None, source) is None
+    assert await seed.downloaded(tmp_path, source) is None
+    assert await seed.downloaded(tmp_path, None) is None
+
+
+async def test_older_demo_data_is_left_alone(
+    session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    """An upgrade from an older catalog: its viewers share names with this one's."""
+    viewer = seed.VIEWERS[0]
+    session.add(
+        User(
+            username=viewer.username,
+            email=f"{viewer.username}@{seed.EMAIL_DOMAIN}",
+            password_hash="x",
+            display_name=viewer.display_name,
+        )
+    )
+    await session.commit()
+
+    assert await run_seed(session, tmp_path) is None
+    assert await session.scalar(select(func.count()).select_from(User)) == 1

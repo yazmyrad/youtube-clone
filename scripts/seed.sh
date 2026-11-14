@@ -16,6 +16,12 @@ shift
 tmp="$(mktemp "$out.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 
+# The demo videos, real and freely licensed, downloaded and checked first. Without them (no
+# internet, say) the seed makes title cards instead, so this never stops the install.
+echo "==> Downloading the demo videos (about 115 MB, kept for later runs)"
+"$@" --progress quiet run --rm -T --build demo-fetch >&2 \
+    || echo "WARNING: could not download the demo videos; title cards stand in for them" >&2
+
 # --build: the seed image isn't built by `compose up`, and must match the current code.
 # Quiet progress: compose writes build output to stdout, which holds only the passwords.
 "$@" --progress quiet run --rm -T --build seed > "$tmp" \

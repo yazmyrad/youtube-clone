@@ -31,20 +31,20 @@ while read -r role username email password; do
     [ "$status" = 200 ] || fail "demo account $username ($role) can't log in: $status"
     accounts=$((accounts + 1))
 done < "$credentials"
-[ "$accounts" -ge 7 ] || fail "expected at least 7 demo accounts, found $accounts"
+[ "$accounts" -ge 8 ] || fail "expected at least 8 demo accounts, found $accounts"
 pass "all $accounts demo accounts can log in"
 
-# One small clip at a time on one CPU: allow a few minutes on a slow VM.
+# One video at a time on one CPU: allow a few minutes on a slow VM.
 expected=12
 deadline=$((SECONDS + 600))
 while :; do
-    listed="$(curl -fsS --max-time 20 "$base/api/videos?limit=50" | grep -oE '"username":"(codebytes|terminal_tales|pixel_pipeline)"' | wc -l | tr -d ' ')"
+    listed="$(curl -fsS --max-time 20 "$base/api/videos?limit=50" | grep -oE '"username":"(launch_pad|sun_watch|blue_planet_lab|open_movie_night)"' | wc -l | tr -d ' ')"
     [ "$listed" -ge "$expected" ] && break
     [ "$SECONDS" -lt "$deadline" ] || fail "only $listed of $expected demo videos are on home after 10 minutes"
     sleep 5
 done
 pass "all $expected demo videos are processed and on the home feed"
 
-[ "$(curl -fsS --max-time 20 "$base/api/search/videos?q=in%20100%20Seconds" | grep -o '"id"' | wc -l | tr -d ' ')" -ge 2 ] \
+[ "$(curl -fsS --max-time 20 "$base/api/search/videos?q=on%20the%20Sun" | grep -o '"id"' | wc -l | tr -d ' ')" -ge 2 ] \
     || fail "search doesn't find the demo videos"
 pass "search finds the demo videos"

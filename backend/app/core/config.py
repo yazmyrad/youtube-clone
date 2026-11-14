@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     abandoned_upload_age: timedelta = timedelta(hours=24)
     # Source files and output while a job runs.
     worker_scratch_dir: Path = Path(gettempdir())
+    # The downloaded demo videos (app.workers.fetch_demo_media); unset, title cards stand in.
+    demo_media_dir: Path | None = None
 
 
 @lru_cache

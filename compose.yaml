@@ -132,6 +132,30 @@ services:
 
   # One-shot, only through `compose run seed` (install.sh does that): demo data. The worker
   # image, because the clips are made with ffmpeg. Prints the demo passwords to stdout.
+  # One-shot, run by scripts/seed.sh before `seed`: downloads the demo videos and checks
+  # their SHA-256. The only backend container with internet access, so it gets nothing else:
+  # no database, no storage, no secrets.
+  demo-fetch:
+    <<: *hardening
+    restart: "no"
+    profiles: ["seed"]
+    build:
+      context: backend
+      target: worker
+    command: ["python", "-m", "app.workers.fetch_demo_media"]
+    environment:
+      DEMO_MEDIA_DIR: /var/lib/demo-media
+    networks:
+      - edge
+    volumes:
+      # Kept, so a rerun doesn't download again.
+      - demo-media:/var/lib/demo-media
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
   seed:
     <<: *hardening
     restart: "no"
@@ -140,7 +164,9 @@ services:
       context: backend
       target: worker
     command: ["python", "-m", "app.workers.seed"]
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      DEMO_MEDIA_DIR: /var/lib/demo-media
     # Renders clips with ffmpeg while the site is up: same limits as the worker.
     cpus: "${WORKER_CPUS:-1}"
     mem_limit: 2g
@@ -157,6 +183,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - demo-media:/var/lib/demo-media:ro
     cap_drop:
       - ALL
 
@@ -241,3 +269,4 @@ volumes:
   postgres-data:
   minio-data:
   worker-scratch:
+  demo-media:

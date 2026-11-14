@@ -13,7 +13,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 # A new named volume mounted here takes over this ownership.
-RUN mkdir /var/lib/worker && chown app:app /var/lib/worker
+RUN mkdir /var/lib/worker /var/lib/demo-media && chown app:app /var/lib/worker /var/lib/demo-media
 COPY app ./app
 USER app
 

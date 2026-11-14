@@ -1,4 +1,5 @@
-"""Seeds demo data: `python -m app.workers.seed`. Runs in the worker image, which has ffmpeg.
+"""Seeds demo data: `python -m app.workers.seed`. Runs in the worker image, which has ffmpeg
+for the title cards that stand in for videos `fetch_demo_media` couldn't download.
 
 Prints the new accounts' credentials to stdout and nothing else, so the caller can save
 them to a private file. Prints nothing when the demo data is already there.
@@ -25,11 +26,13 @@ def format_credentials(credentials: list[seed.Credential]) -> str:
 
 
 async def main() -> int:
-    scratch = get_settings().worker_scratch_dir
+    settings = get_settings()
     try:
-        with tempfile.TemporaryDirectory(dir=scratch) as workdir:
+        with tempfile.TemporaryDirectory(dir=settings.worker_scratch_dir) as workdir:
             async with get_sessionmaker()() as session:
-                credentials = await seed.seed(session, render_title_card, Path(workdir))
+                credentials = await seed.seed(
+                    session, render_title_card, Path(workdir), settings.demo_media_dir
+                )
     except seed.PartiallySeeded as exc:
         logger.error("%s. Remove them, or start from an empty database.", exc)
         return 1
