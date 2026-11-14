@@ -28,7 +28,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for bad in 1.2.3.4 foo https://videos.example.com/; do
+for bad in 1.2.3.4 foo https://videos.example.com/ $'ok.example.com\nCOOKIE_SECURE=false'; do
     if ./install.sh --no-seed --domain "$bad" >/dev/null 2>&1; then
         fail "--domain accepted $bad"
     fi

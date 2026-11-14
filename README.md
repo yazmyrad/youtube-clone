@@ -53,7 +53,9 @@ Point the domain's DNS at the machine and open ports 80, 443 and 443/udp first. 
 sits in front of nginx, gets and renews the certificate, redirects HTTP to HTTPS and adds
 HSTS; the site is at `https://videos.example.com`. The choice is saved in `.env`, so a plain
 rerun keeps it, and so does `docker compose` run from the repository root.
-`./install.sh --no-domain` goes back to plain HTTP.
+`./install.sh --no-domain` goes back to plain HTTP. Caddy and nginx talk over a small Docker network,
+`10.213.67.0/29`; if the machine already uses that range, change it in `compose.domain.yaml`
+and `infra/nginx/real_ip_tls.inc` together.
 
 ### This is a demo environment
 

@@ -28,6 +28,10 @@ while [ $# -gt 0 ]; do
 done
 [ -z "$DOMAIN_ARG" ] || [ "$NO_DOMAIN" = 0 ] || die "--domain and --no-domain together ($usage)"
 if [ -n "$DOMAIN_ARG" ]; then
+    # grep checks line by line, so a newline could smuggle a second line into .env.
+    case "$DOMAIN_ARG" in
+        *[[:space:]]*) die "--domain takes a domain name such as videos.example.com" ;;
+    esac
     # A host name with a dot, as certificates need (or localhost, for testing): no scheme,
     # port, path or IP address. Lowercase, as browsers send it.
     DOMAIN_ARG="$(printf '%s' "$DOMAIN_ARG" | tr '[:upper:]' '[:lower:]')"
