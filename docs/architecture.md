@@ -166,6 +166,8 @@ videos 1─* processing_jobs, comments, reports, video_views
 | `role` | user_role | NOT NULL, default `user` |
 | `is_active` | boolean | NOT NULL, default true |
 | `subscribers_count` | integer | NOT NULL, default 0, CHECK ≥ 0 |
+| `avatar_key` | varchar(100) | NULL; `{user_id}/avatar-{token}.webp` in `media/channels/`, NULL for the letter avatar |
+| `banner_key` | varchar(100) | NULL; `{user_id}/banner-{token}.webp`, NULL for no banner |
 | `created_at`, `updated_at` | timestamptz | NOT NULL |
 
 ### `refresh_tokens`

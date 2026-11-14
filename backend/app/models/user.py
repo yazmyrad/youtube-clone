@@ -20,6 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
+# Channel images are public, as the channel page is: nginx serves them from storage unsigned.
+CHANNEL_IMAGES_URL = "/channel-images/"
+
 USERNAME_PATTERN = r"^[a-zA-Z0-9_-]{3,30}$"
 
 
@@ -47,10 +50,22 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     subscribers_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    # "{user_id}/avatar-{token}.webp" under the media bucket's channels/ prefix. A new token on
+    # each upload, so the URL can be cached for good. NULL: the letter avatar or no banner.
+    avatar_key: Mapped[str | None] = mapped_column(String(100))
+    banner_key: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    @property
+    def avatar_url(self) -> str | None:
+        return f"{CHANNEL_IMAGES_URL}{self.avatar_key}" if self.avatar_key else None
+
+    @property
+    def banner_url(self) -> str | None:
+        return f"{CHANNEL_IMAGES_URL}{self.banner_key}" if self.banner_key else None
 
 
 class RefreshToken(Base):
