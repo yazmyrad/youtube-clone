@@ -15,4 +15,4 @@ proxy_hide_header X-Ratelimit-Remaining;
 proxy_intercept_errors on;
 error_page 400 401 403 404 405 412 416 @media_denied;
 error_page 500 502 503 504 @media_unavailable;
-add_header X-Content-Type-Options nosniff always;
+include /etc/nginx/conf.d/security_headers.inc;

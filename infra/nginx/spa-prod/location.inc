@@ -13,7 +13,7 @@ location = /favicon.ico {
 location = /index.html {
     root /usr/share/nginx/html;
     add_header Cache-Control "no-cache" always;
-    add_header X-Content-Type-Options "nosniff" always;
+    include /etc/nginx/conf.d/security_headers.inc;
     # blob: is what hls.js needs, for its media source and its worker.
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
 }
@@ -24,5 +24,5 @@ location /assets/ {
     root /usr/share/nginx/html;
     try_files $uri =404;
     add_header Cache-Control "public, max-age=31536000, immutable";
-    add_header X-Content-Type-Options "nosniff" always;
+    include /etc/nginx/conf.d/security_headers.inc;
 }

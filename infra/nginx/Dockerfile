@@ -1,7 +1,7 @@
 # Configuration only. The dev stack stops here and proxies the site to Vite.
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine AS nginx-base
 
-COPY default.conf proxy_headers.inc media_proxy.inc /etc/nginx/conf.d/
+COPY default.conf proxy_headers.inc media_proxy.inc security_headers.inc rate_limits.inc /etc/nginx/conf.d/
 
 # `frontend` is a named build context, from compose.yaml.
 FROM node:22.22.1-alpine AS spa

@@ -504,5 +504,28 @@ for path in "${traversals[@]}"; do
     no_object "D45 ${path#"$hls"}" "$path"
 done
 
+# --- Headers ---------------------------------------------------------------
+
+for path in / /api/health "/watch?v=$id_a"; do
+    request "$base$path" > /dev/null
+    for header in "x-content-type-options: nosniff" "x-frame-options: deny" \
+        "referrer-policy: same-origin"; do
+        has_header "$header" && pass "$path sends $header" || fail "$path lacks $header"
+    done
+done
+
+# --- D58: login is rate limited, last, so the flood can't block the checks above ---------
+
+limited=""
+for _ in $(seq 1 40); do
+    got="$(request "${json_type[@]}" -d '{"email":"nobody@example.com","password":"wrong password"}' \
+        "$base/api/auth/login")"
+    if [ "$got" = 429 ]; then limited=yes; break; fi
+done
+[ -n "$limited" ] && pass "D58 repeated logins get 429" || fail "D58 login is not rate limited"
+[ -n "$limited" ] && body_has '"detail"' && pass "D58 the refusal is the API's JSON" \
+    || fail "D58 the refusal isn't JSON"
+has_header "retry-after: 60" && pass "D58 says when to retry" || fail "D58 no Retry-After"
+
 [ "$failures" -eq 0 ] || { printf '%d check(s) failed\n' "$failures"; exit 1; }
 printf 'all checks passed\n'
