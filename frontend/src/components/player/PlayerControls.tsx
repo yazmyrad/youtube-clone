@@ -41,6 +41,10 @@ interface Props {
   onNext?: () => void;
 }
 
+/** Keys that scroll the page: the player takes them only when it has focus. */
+const PAGE_KEYS = new Set([" ", "ArrowUp", "ArrowDown", "Home", "End"]);
+const TOGGLES = new Set<PlayerAction["kind"]>(["toggle", "mute", "fullscreen", "theater", "next"]);
+
 /** Idle this long while playing, and the controls and the cursor go. */
 export const HIDE_AFTER_MS = 3000;
 const VOLUME_KEY = "player.volume";
@@ -65,11 +69,14 @@ export function qualityLabel(quality: Quality | null): string {
 
 function ControlButton({
   label,
+  shortcut,
   onClick,
   children,
   pressed,
 }: {
   label: string;
+  /** YouTube's tooltip shows it, as in "Play (k)". */
+  shortcut?: string;
   onClick: () => void;
   children: ReactNode;
   pressed?: boolean;
@@ -78,7 +85,8 @@ function ControlButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      aria-keyshortcuts={shortcut}
+      title={shortcut ? `${label} (${shortcut.toLowerCase()})` : label}
       aria-pressed={pressed}
       onClick={onClick}
       className="grid size-12 shrink-0 place-items-center p-2.5 text-white opacity-90 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-white"
@@ -99,8 +107,11 @@ function ProgressBar({
 }) {
   const bar = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const [dragging, setDragging] = useState(false);
+  // While dragging: where the thumb is. The video seeks once, on release, rather than on every
+  // move, which would make hls.js drop and refetch its buffer dozens of times a second.
+  const [scrub, setScrub] = useState<number | null>(null);
   const { duration, currentTime, bufferedEnd } = state;
+  const shown = scrub ?? currentTime;
   const percent = (time: number) => (duration > 0 ? clamp(time / duration, 0, 1) * 100 : 0);
 
   const timeAt = (clientX: number) => {
@@ -108,32 +119,44 @@ function ProgressBar({
     if (!rect || rect.width === 0 || duration <= 0) return 0;
     return clamp((clientX - rect.left) / rect.width, 0, 1) * duration;
   };
+  const end = (seek: boolean) => {
+    if (scrub === null) return;
+    if (seek) onSeek(scrub);
+    setScrub(null);
+    onScrub(false);
+  };
 
   return (
     <div
       ref={bar}
       role="slider"
+      tabIndex={0}
       aria-label="Seek"
       aria-valuemin={0}
       aria-valuemax={Math.round(duration)}
-      aria-valuenow={Math.round(currentTime)}
-      aria-valuetext={`${formatDuration(currentTime)} of ${formatDuration(duration)}`}
-      className="group/bar relative mx-3 flex h-4 cursor-pointer touch-none items-end"
+      aria-valuenow={Math.round(shown)}
+      aria-valuetext={`${formatDuration(shown)} of ${formatDuration(duration)}`}
+      className="group/bar relative mx-3 flex h-4 cursor-pointer touch-none items-end outline-none focus-visible:ring-2 focus-visible:ring-white"
       onPointerMove={(event) => {
-        setHover(timeAt(event.clientX));
-        if (dragging) onSeek(timeAt(event.clientX));
+        const time = timeAt(event.clientX);
+        if (event.pointerType !== "touch") setHover(time);
+        if (scrub !== null) setScrub(time);
       }}
       onPointerLeave={() => setHover(null)}
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        setDragging(true);
+        setScrub(timeAt(event.clientX));
         onScrub(true);
-        onSeek(timeAt(event.clientX));
       }}
-      onPointerUp={(event) => {
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
-        setDragging(false);
-        onScrub(false);
+      onPointerUp={() => end(true)}
+      onPointerCancel={() => end(false)}
+      onLostPointerCapture={() => end(true)}
+      onKeyDown={(event) => {
+        const step = event.key === "ArrowLeft" ? -5 : event.key === "ArrowRight" ? 5 : 0;
+        if (!step) return;
+        event.preventDefault();
+        onSeek(clamp(currentTime + step, 0, duration));
       }}
     >
       {hover !== null && (
@@ -145,7 +168,7 @@ function ProgressBar({
         </span>
       )}
       <div
-        className={`relative w-full bg-white/20 transition-[height] ${dragging ? "h-[5px]" : "h-[3px] group-hover/bar:h-[5px]"}`}
+        className={`relative w-full bg-white/20 transition-[height] ${scrub !== null ? "h-[5px]" : "h-[3px] group-hover/bar:h-[5px]"}`}
       >
         <div
           className="absolute inset-y-0 left-0 bg-white/40"
@@ -159,11 +182,11 @@ function ProgressBar({
         )}
         <div
           className="absolute inset-y-0 left-0 bg-[#f00]"
-          style={{ width: `${percent(currentTime)}%` }}
+          style={{ width: `${percent(shown)}%` }}
         />
         <div
-          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f00] transition-transform ${dragging ? "scale-100" : "scale-0 group-hover/bar:scale-100"}`}
-          style={{ left: `${percent(currentTime)}%` }}
+          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f00] transition-transform ${scrub !== null ? "scale-100" : "scale-0 group-hover/bar:scale-100 group-focus-visible/bar:scale-100"}`}
+          style={{ left: `${percent(shown)}%` }}
         />
       </div>
     </div>
@@ -187,17 +210,30 @@ function VolumeSlider({
     <div
       ref={track}
       role="slider"
+      tabIndex={0}
       aria-label="Volume"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(volume * 100)}
-      className="relative h-12 w-0 cursor-pointer touch-none overflow-hidden transition-[width] group-hover/volume:mr-2 group-hover/volume:w-14 group-focus-within/volume:mr-2 group-focus-within/volume:w-14"
+      className="relative h-12 w-0 cursor-pointer touch-none overflow-hidden outline-none transition-[width] group-focus-within/volume:mr-2 group-focus-within/volume:w-14 group-hover/volume:mr-2 group-hover/volume:w-14 focus-visible:ring-2 focus-visible:ring-white"
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         event.currentTarget.setPointerCapture?.(event.pointerId);
         onChange(valueAt(event.clientX));
       }}
       onPointerMove={(event) => {
         if (event.buttons & 1) onChange(valueAt(event.clientX));
+      }}
+      onKeyDown={(event) => {
+        const step =
+          event.key === "ArrowLeft" || event.key === "ArrowDown"
+            ? -0.05
+            : event.key === "ArrowRight" || event.key === "ArrowUp"
+              ? 0.05
+              : 0;
+        if (!step) return;
+        event.preventDefault();
+        onChange(clamp(Math.round((volume + step) * 100) / 100, 0, 1));
       }}
     >
       <div className="absolute top-1/2 right-1.5 left-1.5 h-[3px] -translate-y-1/2 bg-white/30">
@@ -228,7 +264,7 @@ function MenuRow({
       role={checked === undefined ? "menuitem" : "menuitemradio"}
       aria-checked={checked}
       onClick={onClick}
-      className="flex h-10 w-full items-center gap-3 px-4 text-left text-sm hover:bg-white/10"
+      className="flex h-10 w-full items-center gap-3 px-4 text-left text-sm outline-none hover:bg-white/10 focus-visible:bg-white/20"
     >
       {checked !== undefined && (
         <span className="size-5 shrink-0">{checked && <CheckGlyph />}</span>
@@ -259,11 +295,17 @@ function SettingsMenu({
   onRate: (rate: number) => void;
   quality: Quality | null;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  // Focus follows the menu, so it works from the keyboard as well as the mouse.
+  useEffect(() => {
+    box.current?.querySelector<HTMLElement>("[role^=menuitem]")?.focus();
+  }, [menu]);
   const back = (title: string) => (
     <button
       type="button"
+      role="menuitem"
       onClick={() => setMenu("main")}
-      className="flex h-11 w-full items-center gap-2 border-b border-white/20 px-2 text-sm font-medium hover:bg-white/10"
+      className="flex h-11 w-full items-center gap-2 border-b border-white/20 px-2 text-sm font-medium outline-none hover:bg-white/10 focus-visible:bg-white/20"
     >
       <span className="size-6">
         <ChevronGlyph back />
@@ -273,9 +315,18 @@ function SettingsMenu({
   );
   return (
     <div
+      ref={box}
       role="menu"
       aria-label="Settings"
       data-player-menu
+      onKeyDown={(event) => {
+        const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+        if (!step) return;
+        event.preventDefault();
+        const items = [...(box.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        items[(at + step + items.length) % items.length]?.focus();
+      }}
       className="absolute right-3 bottom-16 z-20 max-h-[calc(100%-5rem)] w-64 overflow-y-auto rounded-xl bg-[rgba(28,28,28,0.9)] py-2 text-white shadow-lg"
     >
       {menu === "main" && (
@@ -285,11 +336,14 @@ function SettingsMenu({
             value={speedLabel(rate)}
             onClick={() => setMenu("speed")}
           />
-          <MenuRow
-            label="Quality"
-            value={qualityLabel(quality)}
-            onClick={() => setMenu("quality")}
-          />
+          {/* Safari's own HLS playback picks the quality itself: nothing to choose. */}
+          {quality && (
+            <MenuRow
+              label="Quality"
+              value={qualityLabel(quality)}
+              onClick={() => setMenu("quality")}
+            />
+          )}
         </>
       )}
       {menu === "speed" && (
@@ -372,11 +426,16 @@ export function PlayerControls({
   const [scrubbing, setScrubbing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
+  // The pointer resting on the controls, or focus inside the player, keeps them up.
+  const [overControls, setOverControls] = useState(false);
+  const [focused, setFocused] = useState(false);
   const hideTimer = useRef<number | undefined>(undefined);
+  const flashTimer = useRef<number | undefined>(undefined);
   const flashId = useRef(0);
+  const restored = useRef(false);
   const { paused, ended, waiting, currentTime, duration, volume, muted, playbackRate } = state;
 
-  const visible = active || paused || menu !== null || scrubbing;
+  const visible = active || paused || menu !== null || scrubbing || overControls || focused;
 
   const poke = useCallback(() => {
     setActive(true);
@@ -386,16 +445,32 @@ export function PlayerControls({
 
   const show = useCallback((content: ReactNode, side?: Flash["side"]) => {
     flashId.current += 1;
-    setFlash({ id: flashId.current, content, side });
+    const id = flashId.current;
+    setFlash({ id, content, side });
+    // A timer, not animationend: with reduced motion there is no animation to end.
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(
+      () => setFlash((current) => (current?.id === id ? null : current)),
+      600,
+    );
   }, []);
 
   const toggleFullscreen = useCallback(() => {
     const element = container.current;
     if (!element) return;
+    const webkit = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => void;
+    };
+    const target = element as HTMLElement & { webkitRequestFullscreen?: () => void };
     if (document.fullscreenElement) {
       void document.exitFullscreen?.().catch(() => {});
+    } else if (webkit.webkitFullscreenElement) {
+      webkit.webkitExitFullscreen?.();
     } else if (element.requestFullscreen) {
       void element.requestFullscreen().catch(() => {});
+    } else if (target.webkitRequestFullscreen) {
+      target.webkitRequestFullscreen();
     } else {
       // iOS Safari: only the video element itself can go fullscreen.
       (video.current as { webkitEnterFullscreen?: () => void } | null)?.webkitEnterFullscreen?.();
@@ -447,13 +522,15 @@ export function PlayerControls({
           break;
         case "mute":
           element.muted = !element.muted;
+          // Unmuting at zero would stay silent.
+          if (!element.muted && element.volume === 0) element.volume = 0.5;
           show(element.muted ? <VolumeOffGlyph /> : <VolumeHighGlyph />);
           break;
         case "fullscreen":
           toggleFullscreen();
           break;
         case "theater":
-          onTheater?.();
+          if (!document.fullscreenElement) onTheater?.();
           break;
         case "speed":
           element.playbackRate = nextSpeed(element.playbackRate, action.direction);
@@ -476,9 +553,12 @@ export function PlayerControls({
       element.volume = saved.volume;
       element.muted = saved.muted;
     }
+    restored.current = true;
   }, [video]);
 
   useEffect(() => {
+    // Not before the saved value was read back, or the defaults would overwrite it.
+    if (!restored.current) return;
     try {
       localStorage.setItem(VOLUME_KEY, JSON.stringify({ volume, muted }));
     } catch {
@@ -493,12 +573,17 @@ export function PlayerControls({
       if (!action) return;
       if (action.kind === "theater" && !onTheater) return;
       if (action.kind === "next" && !onNext) return;
+      // Keys that scroll the page do so, unless the player has focus, as on YouTube.
+      const inPlayer = container.current?.contains(document.activeElement) ?? false;
+      if (PAGE_KEYS.has(event.key) && !inPlayer) return;
+      // Holding a key repeats seeks and volume steps, not toggles.
+      if (event.repeat && TOGGLES.has(action.kind)) return;
       event.preventDefault();
       run(action);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [run, onTheater, onNext]);
+  }, [run, onTheater, onNext, container]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === container.current);
@@ -515,9 +600,19 @@ export function PlayerControls({
     element.addEventListener("pointerdown", poke, { signal: listeners.signal });
     element.addEventListener(
       "pointerleave",
-      () => {
+      (event) => {
+        // A tap ends with a leave; the controls stay for their usual three seconds.
+        if (event.pointerType === "touch") return;
         window.clearTimeout(hideTimer.current);
         setActive(false);
+      },
+      { signal: listeners.signal },
+    );
+    element.addEventListener("focusin", () => setFocused(true), { signal: listeners.signal });
+    element.addEventListener(
+      "focusout",
+      (event) => {
+        if (!element.contains(event.relatedTarget as Node | null)) setFocused(false);
       },
       { signal: listeners.signal },
     );
@@ -525,6 +620,7 @@ export function PlayerControls({
     return () => {
       listeners.abort();
       window.clearTimeout(hideTimer.current);
+      window.clearTimeout(flashTimer.current);
     };
   }, [container, poke]);
 
@@ -556,6 +652,8 @@ export function PlayerControls({
       <div
         className="absolute inset-0"
         onClick={() => {
+          // Focus, so the page-scrolling keys (space, arrows) belong to the player now.
+          container.current?.focus({ preventScroll: true });
           if (menu) setMenu(null);
           else run({ kind: "toggle" });
         }}
@@ -567,7 +665,7 @@ export function PlayerControls({
           <div
             role="status"
             aria-label="Loading"
-            className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white"
+            className="size-16 animate-spin rounded-full border-4 border-white/30 border-t-white motion-reduce:animate-none"
           />
         </div>
       )}
@@ -587,14 +685,13 @@ export function PlayerControls({
         <div
           key={flash.id}
           aria-hidden
-          className={`pointer-events-none absolute top-1/2 grid size-20 -translate-y-1/2 animate-player-flash place-items-center rounded-full bg-black/60 p-5 text-white ${
+          className={`pointer-events-none absolute top-1/2 grid size-20 -translate-y-1/2 animate-player-flash motion-reduce:animate-none place-items-center rounded-full bg-black/60 p-5 text-white ${
             flash.side === "left"
               ? "left-[15%]"
               : flash.side === "right"
                 ? "right-[15%]"
                 : "left-1/2 -translate-x-1/2"
           }`}
-          onAnimationEnd={() => setFlash((current) => (current?.id === flash.id ? null : current))}
         >
           {flash.content}
         </div>
@@ -614,6 +711,10 @@ export function PlayerControls({
 
       <div
         data-player-controls
+        onPointerEnter={(event) => {
+          if (event.pointerType !== "touch") setOverControls(true);
+        }}
+        onPointerLeave={() => setOverControls(false)}
         className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-12 transition-opacity duration-200 ${
           visible ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
@@ -627,19 +728,21 @@ export function PlayerControls({
         />
         <div className="flex h-12 items-center px-1.5 text-white">
           <ControlButton
-            label={ended ? "Replay" : paused ? "Play (k)" : "Pause (k)"}
+            label={ended ? "Replay" : paused ? "Play" : "Pause"}
+            shortcut="K"
             onClick={() => run({ kind: "toggle" })}
           >
             {ended ? <ReplayGlyph /> : paused ? <PlayGlyph /> : <PauseGlyph />}
           </ControlButton>
           {onNext && (
-            <ControlButton label="Next (SHIFT+n)" onClick={onNext}>
+            <ControlButton label="Next" shortcut="Shift+N" onClick={onNext}>
               <NextGlyph />
             </ControlButton>
           )}
           <div className="group/volume flex items-center">
             <ControlButton
-              label={muted ? "Unmute (m)" : "Mute (m)"}
+              label={muted ? "Unmute" : "Mute"}
+              shortcut="M"
               onClick={() => run({ kind: "mute" })}
             >
               <VolumeIcon />
@@ -664,22 +767,21 @@ export function PlayerControls({
               pressed={menu !== null}
               onClick={() => setMenu((current) => (current ? null : "main"))}
             >
-              <span className={`size-full transition-transform ${menu ? "rotate-30" : ""}`}>
+              <span
+                className={`size-full transition-transform motion-reduce:transition-none ${menu ? "rotate-30" : ""}`}
+              >
                 <SettingsGlyph />
               </span>
             </ControlButton>
           </span>
           {onTheater && !fullscreen && (
-            <ControlButton
-              label={theater ? "Default view (t)" : "Theater mode (t)"}
-              onClick={onTheater}
-              pressed={theater}
-            >
+            <ControlButton label="Theater mode" shortcut="T" onClick={onTheater} pressed={theater}>
               {theater ? <DefaultViewGlyph /> : <TheaterGlyph />}
             </ControlButton>
           )}
           <ControlButton
-            label={fullscreen ? "Exit full screen (f)" : "Full screen (f)"}
+            label={fullscreen ? "Exit full screen" : "Full screen"}
+            shortcut="F"
             onClick={toggleFullscreen}
           >
             {fullscreen ? <ExitFullscreenGlyph /> : <FullscreenGlyph />}

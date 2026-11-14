@@ -154,36 +154,46 @@ function Watch({
       onTheater={onTheater}
     />
   );
-  const main = (
-    <div className="min-w-0 flex-1">
-      {video.isPending && <div className="aspect-video w-full rounded-xl bg-hover" />}
-      {video.data?.hidden_at && <HiddenNotice video={video.data} />}
-      {message !== null && !video.data?.hidden_at && (
-        <div className="grid aspect-video w-full place-items-center rounded-xl bg-black p-6 text-center text-white">
-          {message}
-        </div>
-      )}
-      {!theater && player}
-      {video.data && <Details video={video.data} />}
-      {video.data && playable(video.data) && <Comments video={video.data} />}
-    </div>
-  );
-  // As on YouTube: the player and details on the left, the playlist and Up next on the right,
-  // or below them on narrow screens.
-  // Theater mode: the player spans the page on a black band, everything else below it.
+  // One tree for both layouts, so switching to theater mode never remounts the player, which
+  // would restart the video. Only the grid placement changes: as on YouTube, the player and
+  // details on the left and the playlist and Up next on the right; in theater mode the player
+  // spans the window on a black band, with the rest below. On narrow screens, one column.
   return (
-    <>
-      {theater && player && <div className="bg-black">{player}</div>}
-      <div className="mx-auto flex max-w-[1754px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
-        {main}
-        <aside className="space-y-4 lg:w-100 lg:shrink-0">
+    <div className="overflow-x-clip">
+      <div className="mx-auto grid max-w-[1754px] grid-cols-1 px-4 pt-6 pb-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6 lg:px-6">
+        <div
+          data-testid="player-slot"
+          className={
+            theater
+              ? "-mt-6 ml-[calc(50%-50vw)] w-screen bg-black lg:col-span-2"
+              : "min-w-0 lg:col-start-1 lg:row-start-1"
+          }
+        >
+          {video.isPending && <div className="aspect-video w-full rounded-xl bg-hover" />}
+          {video.data?.hidden_at && <HiddenNotice video={video.data} />}
+          {message !== null && !video.data?.hidden_at && (
+            <div className="grid aspect-video w-full place-items-center rounded-xl bg-black p-6 text-center text-white">
+              {message}
+            </div>
+          )}
+          {player}
+        </div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          {video.data && <Details video={video.data} />}
+          {video.data && playable(video.data) && <Comments video={video.data} />}
+        </div>
+        <aside
+          className={`mt-6 space-y-4 lg:col-start-2 ${
+            theater ? "lg:row-span-2 lg:row-start-2" : "lg:row-span-3 lg:row-start-1 lg:mt-0"
+          }`}
+        >
           {playlist && (
             <PlaylistPanel playlist={playlist} videoId={videoId} onThumbnailError={renewPlaylist} />
           )}
           <UpNext videoId={videoId} />
         </aside>
       </div>
-    </>
+    </div>
   );
 }
 

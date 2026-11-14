@@ -77,7 +77,7 @@ export function actionFor(event: KeyLike): PlayerAction | null {
 /** Keys typed into a field, or pressed on a focused button or link, aren't the player's. */
 export function isForPlayer(target: EventTarget | null, key: string): boolean {
   if (!(target instanceof HTMLElement)) return true;
-  if (target.closest("[aria-modal='true']")) return false;
+  if (target.closest("[aria-modal='true'], dialog, [role='dialog'], [role='menu']")) return false;
   if (target.isContentEditable || target.closest("input, textarea, select")) return false;
   // Space or Enter on a focused button or link presses it, as it would anywhere.
   if ((key === " " || key === "Enter") && target.closest("button, a, [role='button']")) {

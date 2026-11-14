@@ -59,7 +59,8 @@ function playWithHlsJs(
     const playing = levels[hls.currentLevel]?.height ?? null;
     onQuality({
       heights: levels.map((level) => level.height),
-      selected: hls.autoLevelEnabled ? -1 : hls.currentLevel,
+      // The one asked for, -1 for Auto: currentLevel can name the old one until it switches.
+      selected: hls.manualLevel ?? (hls.autoLevelEnabled ? -1 : hls.currentLevel),
       playing,
       select: (index) => {
         hls.currentLevel = index;
@@ -199,7 +200,9 @@ export function VideoPlayer({
     <div
       ref={containerRef}
       data-player
-      className={`relative w-full overflow-hidden bg-black select-none ${
+      // Focusable, so it can hold the keys that would otherwise scroll the page.
+      tabIndex={-1}
+      className={`relative w-full overflow-hidden bg-black outline-none select-none ${
         theater ? "h-[min(56.25vw,calc(100vh-169px))]" : "aspect-video rounded-xl"
       }`}
     >
