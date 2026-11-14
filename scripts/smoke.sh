@@ -154,8 +154,15 @@ auth=(-H "Authorization: Bearer $access_token")
         -c:v libx264 -preset ultrafast -pix_fmt yuv420p "/tmp/$0.mp4" \
         && cat "/tmp/$0.mp4"; status=$?; rm -f "/tmp/$0.mp4"; exit "$status"' "$name" \
     > "$work/clip.mp4" || die "could not generate a test clip"
+# A vertical one too, for Shorts.
+"${compose[@]}" exec -T worker sh -c '
+    ffmpeg -nostdin -v error -y -f lavfi -i testsrc=duration=2:size=240x426:rate=10 \
+        -c:v libx264 -preset ultrafast -pix_fmt yuv420p "/tmp/$0.mp4" \
+        && cat "/tmp/$0.mp4"; status=$?; rm -f "/tmp/$0.mp4"; exit "$status"' "${name}v" \
+    > "$work/vertical.mp4" || die "could not generate a vertical test clip"
 
-upload_video() { # Sets video_id to a new private video whose file is uploaded and queued.
+upload_video() { # [file]; sets video_id to a new private video, its file uploaded and queued.
+    local file="${1:-$work/clip.mp4}"
     local form=() line
     curl -fsS --max-time 20 "${auth[@]}" -H 'Content-Type: application/json' \
         -d '{"title":"Smoke check"}' "$base/api/videos" > "$work/created" \
@@ -165,7 +172,7 @@ upload_video() { # Sets video_id to a new private video whose file is uploaded a
     while IFS= read -r line; do
         form+=(--form-string "$line")
     done < <(json '"\n".join(f"{k}={v}" for k, v in d["upload"]["fields"].items())' < "$work/created")
-    [ "$(request "${form[@]}" -F "file=@$work/clip.mp4" "$base/uploads/")" = 204 ] \
+    [ "$(request "${form[@]}" -F "file=@$file" "$base/uploads/")" = 204 ] \
         || die "upload through nginx failed: $(cat "$work/body")"
     [ "$(request -X POST "${auth[@]}" "$base/api/videos/$video_id/upload/complete")" = 200 ] \
         || die "complete failed: $(cat "$work/body")"
@@ -187,8 +194,10 @@ wait_ready() { # video id; sets play_url once the video can be played
 
 upload_video; id_a="$video_id"
 upload_video; id_b="$video_id"
+upload_video "$work/vertical.mp4"; id_short="$video_id"
 wait_ready "$id_a"; url_a="$play_url"
 wait_ready "$id_b"; url_b="$play_url"
+wait_ready "$id_short"
 
 # --- The main scenario (D02): like and comment on a video that plays ---------
 
@@ -516,6 +525,25 @@ expect "D61 Swagger UI's script is served" 200 "/api/docs-assets/swagger-ui-bund
 expect "D61 the schema is served" 200 "/openapi.json"
 body_has '"/api/moderation/reports"' && pass "D61 the schema lists the API" \
     || fail "D61 the schema lacks routes"
+
+# --- Shorts ----------------------------------------------------------------
+
+expect "publish the vertical video" 200 "/api/videos/$id_short" -X PATCH "${auth[@]}" \
+    "${json_type[@]}" -d '{"visibility":"public"}'
+expect "the vertical video's details" 200 "/api/videos/$id_short"
+[ "$(json '(d["is_short"], d["width"], d["height"])' < "$work/body")" = "(True, 240, 426)" ] \
+    && pass "a vertical video under 3 minutes is a Short, with its size" \
+    || fail "the vertical video's details: $(cat "$work/body")"
+listed "/api/videos/shorts?limit=100" "the Shorts feed"
+grep -qx "$id_short" "$work/listed" && pass "the Short is in the Shorts feed" \
+    || fail "the Short isn't in the Shorts feed"
+grep -qx "$id_a" "$work/listed" && fail "a landscape video is in the Shorts feed" \
+    || pass "the Shorts feed has no landscape video"
+listed "/api/videos?limit=100" "the home feed, for Shorts"
+grep -qx "$id_short" "$work/listed" && fail "the Short is on the home grid" \
+    || pass "the home grid leaves Shorts out"
+expect "the Shorts page is served" 200 "/shorts/$id_short"
+body_has 'id="root"' && pass "the Shorts page is the SPA" || fail "the Shorts page isn't the SPA"
 
 # --- Headers ---------------------------------------------------------------
 
