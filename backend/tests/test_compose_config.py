@@ -9,6 +9,7 @@ COMPOSE_DEV = ROOT / "compose.dev.yaml"
 MAKEFILE = ROOT / "Makefile"
 NGINX_DIR = ROOT / "infra" / "nginx"
 NGINX_CONF = NGINX_DIR / "default.conf"
+COMPOSE_DOMAIN = ROOT / "compose.domain.yaml"
 
 
 class _ComposeLoader(yaml.SafeLoader):
@@ -17,6 +18,9 @@ class _ComposeLoader(yaml.SafeLoader):
 
 _ComposeLoader.add_constructor(
     "!override", lambda loader, node: loader.construct_sequence(node, deep=True)
+)
+_ComposeLoader.add_constructor(
+    "!reset", lambda loader, node: loader.construct_sequence(node, deep=True)
 )
 
 
@@ -167,3 +171,22 @@ def test_services_have_process_and_memory_limits() -> None:
     hardened = [name for name, service in services.items() if "pids_limit" in service]
     assert {"nginx", "api", "worker", "minio"} <= set(hardened)
     assert services["api"]["mem_limit"]
+
+
+def test_domain_mode_publishes_only_caddy_and_trusts_only_its_address() -> None:
+    import ipaddress
+
+    config = yaml.load(COMPOSE_DOMAIN.read_text(), Loader=_ComposeLoader)  # noqa: S506
+    services = config["services"]
+    assert services["nginx"]["ports"] == []
+    caddy_ip = services["caddy"]["networks"]["tls"]["ipv4_address"]
+    trusted = re.findall(
+        r"set_real_ip_from\s+([0-9.]+);", (NGINX_DIR / "real_ip_tls.inc").read_text()
+    )
+    assert trusted == [caddy_ip]
+    [pool] = config["networks"]["tls"]["ipam"]["config"]
+    # Docker hands out addresses only from ip_range, so nothing else can take Caddy's.
+    assert ipaddress.ip_address(caddy_ip) in ipaddress.ip_network(pool["subnet"])
+    assert ipaddress.ip_address(caddy_ip) not in ipaddress.ip_network(pool["ip_range"])
+    assert services["api"]["environment"]["COOKIE_SECURE"] == "true"
+    assert services["api"]["environment"]["PUBLIC_ORIGIN"].startswith("https://")

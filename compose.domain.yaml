@@ -1,0 +1,62 @@
+# `./install.sh --domain example.com` adds this file through COMPOSE_FILE in .env: HTTPS in
+# front of nginx. nginx stops publishing a port; Caddy takes 80 and 443.
+services:
+  nginx:
+    ports: !reset []
+    networks:
+      - edge
+      - tls
+    volumes:
+      - ./infra/nginx/real_ip_tls.inc:/etc/nginx/conf.d/real_ip_tls.conf:ro
+
+  caddy:
+    image: caddy:2.10.0-alpine
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 256m
+    environment:
+      DOMAIN: "${DOMAIN:?run ./install.sh --domain}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account: keep them, or Let's Encrypt's rate limits bite.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      nginx:
+        condition: service_healthy
+    networks:
+      tls:
+        # nginx trusts X-Forwarded-For from this address only (infra/nginx/real_ip_tls.inc).
+        ipv4_address: 10.213.67.2
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+      PUBLIC_ORIGIN: "https://${DOMAIN:?run ./install.sh --domain}"
+
+networks:
+  # Caddy to nginx, and Caddy to the internet for certificates. A fixed subnet, so Caddy's
+  # address is known to nginx.
+  tls:
+    ipam:
+      config:
+        - subnet: 10.213.67.0/29
+          # Others get .4 to .7, so .2 stays free for Caddy whatever starts first.
+          ip_range: 10.213.67.4/30
+
+volumes:
+  caddy-data:
+  caddy-config:

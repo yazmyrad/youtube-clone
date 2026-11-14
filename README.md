@@ -21,6 +21,18 @@ data, secrets and demo passwords are kept.
 |---|---|
 | `--no-seed` | Start with an empty site, without demo data |
 | `HTTP_PORT=8081 ./install.sh` | Serve on another port than 80 (first run only; it is saved in `.env`) |
+| `--domain example.com` | HTTPS with a Let's Encrypt certificate, HSTS and Secure cookies (see below) |
+
+### HTTPS with a domain
+
+```bash
+./install.sh --domain videos.example.com
+```
+
+Point the domain's DNS at the machine and open ports 80 and 443 first. Caddy then sits in
+front of nginx, gets and renews the certificate, redirects HTTP to HTTPS and adds HSTS; the
+site is at `https://videos.example.com`. The choice is saved in `.env`, so a plain rerun keeps
+it; delete the `DOMAIN=` and `COMPOSE_FILE=` lines there to go back to plain HTTP.
 
 ### This is a demo environment
 
@@ -28,7 +40,8 @@ data, secrets and demo passwords are kept.
 
 - It creates demo channels, videos and accounts, **including an admin**. Their passwords are
   random and saved in `demo-credentials.txt`, readable only by the user who ran the script.
-- It serves plain HTTP on the machine's IP address, so logins are not encrypted in transit.
+- Without `--domain`, it serves plain HTTP on the machine's IP address, so logins are not
+  encrypted in transit.
 
 ### Demo data
 
@@ -57,3 +70,6 @@ make down    # stop, keeping data
   protection.
 - `scripts/test-clean-install.sh`: runs `install.sh` in a bare Ubuntu container and checks
   the result, demo data included.
+- `scripts/test-domain.sh`: runs `install.sh --domain localhost` and checks HTTPS, the
+  redirect, HSTS, Secure cookies and that nginx sees each client's own address.
+- `scripts/check-secrets.sh`: checks that git holds no secrets, in its files or its history.

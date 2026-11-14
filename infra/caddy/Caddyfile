@@ -1,0 +1,14 @@
+# `--domain` mode: TLS in front of nginx. Caddy gets and renews the Let's Encrypt
+# certificate itself (the domain must point at this machine, with ports 80 and 443 open),
+# and redirects plain HTTP to HTTPS. For `localhost` it uses its own local CA instead.
+{
+	admin off
+}
+
+{$DOMAIN} {
+	# Browsers that saw the site once refuse plain HTTP to it from then on.
+	header Strict-Transport-Security "max-age=31536000"
+	# Sets X-Forwarded-For to the client, replacing anything the client sent; nginx trusts
+	# it from this address only.
+	reverse_proxy nginx:8080
+}

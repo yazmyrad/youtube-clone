@@ -7,15 +7,29 @@ cd "$(dirname "$(readlink -f "$0")")"
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-usage="usage: ./install.sh [--no-seed]"
+usage="usage: ./install.sh [--no-seed] [--domain example.com]"
 SEED=1
-for arg in "$@"; do
-    case "$arg" in
+DOMAIN_ARG=""
+while [ $# -gt 0 ]; do
+    case "$1" in
         --no-seed) SEED=0 ;;
+        --domain)
+            [ $# -ge 2 ] || die "--domain needs a name ($usage)"
+            DOMAIN_ARG="$2"
+            shift
+            ;;
+        --domain=*) DOMAIN_ARG="${1#--domain=}" ;;
         -h | --help) echo "$usage"; exit 0 ;;
-        *) die "unknown argument: $arg ($usage)" ;;
+        *) die "unknown argument: $1 ($usage)" ;;
     esac
+    shift
 done
+if [ -n "$DOMAIN_ARG" ]; then
+    # A bare host name: no scheme, port or path. Lowercase, as browsers send it.
+    DOMAIN_ARG="$(printf '%s' "$DOMAIN_ARG" | tr 'A-Z' 'a-z')"
+    printf '%s' "$DOMAIN_ARG" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$' \
+        || die "--domain takes a host name such as example.com, without http:// or a path"
+fi
 
 SUDO=()
 if [ "$(id -u)" -ne 0 ]; then
@@ -104,6 +118,15 @@ add_secret MINIO_APP_SECRET_KEY
 grep -q '^MINIO_ROOT_USER=' .env || echo "MINIO_ROOT_USER=minio-root" >> .env
 grep -q '^MINIO_APP_ACCESS_KEY=' .env || echo "MINIO_APP_ACCESS_KEY=app" >> .env
 
+# `--domain`: HTTPS through Caddy (compose.domain.yaml). Recorded in .env, so a plain rerun
+# and every `docker compose` command keep it; remove these lines from .env to go back.
+if [ -n "$DOMAIN_ARG" ]; then
+    sed -i '/^DOMAIN=/d; /^COMPOSE_FILE=/d' .env
+    printf 'DOMAIN=%s\nCOMPOSE_FILE=compose.yaml:compose.domain.yaml\n' "$DOMAIN_ARG" >> .env
+    log "HTTPS for $DOMAIN_ARG: it must point at this machine, with ports 80 and 443 open"
+fi
+domain="$(sed -n 's/^DOMAIN=//p' .env)"
+
 # Compose prefers a shell variable over .env, so make .env the single source of the port.
 port="$(sed -n 's/^HTTP_PORT=//p' .env)"
 export HTTP_PORT="$port"
@@ -112,8 +135,25 @@ log "Building and starting services (the first run takes a few minutes)"
 "${DOCKER[@]}" compose up -d --build --wait --wait-timeout 300 \
     || { "${DOCKER[@]}" compose ps -a; "${DOCKER[@]}" compose logs --tail=30; die "services did not become healthy"; }
 
-curl -fsS --max-time 10 "http://127.0.0.1:${port}/api/health" >/dev/null \
-    || die "services started, but /api/health failed through nginx"
+if [ -z "$domain" ]; then
+    curl -fsS --max-time 10 "http://127.0.0.1:${port}/api/health" >/dev/null \
+        || die "services started, but /api/health failed through nginx"
+else
+    # nginx publishes no port here; check it from Caddy's side, then HTTPS itself.
+    "${DOCKER[@]}" compose exec -T caddy wget -q -O /dev/null http://nginx:8080/api/health \
+        || die "services started, but /api/health failed through nginx"
+    # The first certificate can take a minute; Caddy keeps trying, so this only warns.
+    # `localhost` (for testing) gets Caddy's own CA, which nothing trusts: check it served TLS.
+    trust=()
+    [ "$domain" != localhost ] || trust=(--insecure)
+    ok=""
+    for _ in $(seq 1 30); do
+        if curl -fsS --max-time 10 "${trust[@]}" --resolve "$domain:443:127.0.0.1" \
+            "https://$domain/api/health" >/dev/null 2>&1; then ok=1; break; fi
+        sleep 2
+    done
+    [ -n "$ok" ] || log "WARNING: https://$domain/ has no trusted certificate yet. Check that $domain points here and ports 80 and 443 are open: docker compose logs caddy"
+fi
 
 CREDENTIALS=demo-credentials.txt
 if [ "$SEED" = 1 ]; then
@@ -121,9 +161,13 @@ if [ "$SEED" = 1 ]; then
     scripts/seed.sh "$CREDENTIALS" "${DOCKER[@]}" compose || die "could not add demo data"
 fi
 
-host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-url="http://${host_ip:-localhost}"
-[ "$port" = 80 ] || url="${url}:${port}"
+if [ -n "$domain" ]; then
+    url="https://$domain"
+else
+    host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    url="http://${host_ip:-localhost}"
+    [ "$port" = 80 ] || url="${url}:${port}"
+fi
 
 log "Ready"
 printf '    Site:     %s/\n    API docs: %s/docs\n' "$url" "$url"
