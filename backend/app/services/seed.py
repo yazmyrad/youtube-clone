@@ -42,8 +42,9 @@ from app.models import (
     VideoVisibility,
 )
 from app.schemas.videos import VideoCreateIn
+from app.services import channel_images, storage, videos
 from app.services import channels as channels_service
-from app.services import storage, videos
+from app.services.channel_images import ImageKind
 from app.services.media import TitleCard
 
 logger = logging.getLogger(__name__)
@@ -84,12 +85,23 @@ class DemoVideo:
 
 
 @dataclass(frozen=True)
+class DemoFrame:
+    """A still from one of the channel's own videos: `at` is how far in, from 0 to 1."""
+
+    video: str
+    at: float
+
+
+@dataclass(frozen=True)
 class DemoChannel:
     username: str
     display_name: str
     description: str
     color: str
     videos: tuple[DemoVideo, ...]
+    # Without a verified download, the letter avatar and no banner, as for a new channel.
+    avatar: DemoFrame | None = None
+    banner: DemoFrame | None = None
 
 
 @dataclass(frozen=True)
@@ -246,6 +258,8 @@ CHANNELS = (
                 short=True,
             ),
         ),
+        avatar=DemoFrame("Testing the SLS Rocket Booster", 0.65),
+        banner=DemoFrame("Testing the SLS Rocket Booster", 0.55),
     ),
     DemoChannel(
         "sun_watch",
@@ -299,6 +313,8 @@ CHANNELS = (
                 ),
             ),
         ),
+        avatar=DemoFrame("Firework Flare on the Sun", 0.67),
+        banner=DemoFrame("Firework Flare on the Sun", 0.5),
     ),
     DemoChannel(
         "blue_planet_lab",
@@ -427,6 +443,8 @@ CHANNELS = (
                 short=True,
             ),
         ),
+        avatar=DemoFrame("NASA's Fleet Watching Earth", 0.9),
+        banner=DemoFrame("Hurricanes Jose and Maria from Orbit", 0.5),
     ),
     DemoChannel(
         "wild_water",
@@ -503,6 +521,7 @@ CHANNELS = (
                 short=True,
             ),
         ),
+        avatar=DemoFrame("Watagataki Falls", 0.05),
     ),
     DemoChannel(
         "open_movie_night",
@@ -543,6 +562,8 @@ CHANNELS = (
                 ),
             ),
         ),
+        avatar=DemoFrame("Big Buck Bunny (Official Trailer)", 0.5),
+        banner=DemoFrame("Sintel (Official Trailer)", 0.72),
     ),
 )
 
@@ -616,6 +637,8 @@ COMMENTS = (
 TONES_HZ = (262, 294, 330, 392, 440)
 
 ClipMaker = Callable[[TitleCard, Path], Awaitable[None]]
+# (video, how far in from 0 to 1, where to write the JPEG)
+FrameGrabber = Callable[[Path, float, Path], Awaitable[None]]
 
 
 def _accounts() -> list[DemoAccount]:
@@ -630,11 +653,16 @@ class PartiallySeeded(Exception):
 
 
 async def seed(
-    session: AsyncSession, make_clip: ClipMaker, workdir: Path, media_dir: Path | None = None
+    session: AsyncSession,
+    make_clip: ClipMaker,
+    workdir: Path,
+    media_dir: Path | None = None,
+    grab_frame: FrameGrabber | None = None,
 ) -> list[Credential] | None:
     """Creates the demo data and returns the new accounts' credentials, or None when it is
     already there. Passwords are random and exist only in the return value. `media_dir` holds
-    the downloaded videos; any missing or damaged one gets a title card instead."""
+    the downloaded videos; any missing or damaged one gets a title card instead. With
+    `grab_frame`, channels get an avatar and banner from stills of their own videos."""
     accounts = _accounts()
     names = [account.username for account in accounts]
     existing = set(await session.scalars(select(User.username).where(User.username.in_(names))))
@@ -655,6 +683,8 @@ async def seed(
         video_ids = await _add_videos(session, users, make_clip, workdir, media_dir)
         await _subscribe_viewers(session, users)
         await _add_playlists(session, users, video_ids)
+        if grab_frame is not None:
+            await _add_channel_images(session, users, grab_frame, workdir, media_dir)
     except BaseException:
         # The passwords die with this run, so its accounts must too: otherwise a rerun would
         # find them, do nothing, and leave demo accounts nobody can log in to.
@@ -696,6 +726,42 @@ async def _add_videos(
             video_ids[demo.title] = video_id
             index += 1
     return video_ids
+
+
+async def _add_channel_images(
+    session: AsyncSession,
+    users: dict[str, User],
+    grab_frame: FrameGrabber,
+    workdir: Path,
+    media_dir: Path | None,
+) -> None:
+    """Through the same checks and re-encoding as an upload. Decoration only: a still that
+    can't be made leaves that channel as a new one looks, and seeding goes on."""
+    for channel in CHANNELS:
+        for kind, frame in ((ImageKind.avatar, channel.avatar), (ImageKind.banner, channel.banner)):
+            if frame is None:
+                continue
+            demo = next(video for video in channel.videos if video.title == frame.video)
+            media = await downloaded(media_dir, demo.source)
+            if media is None:
+                continue
+            still = workdir / f"{channel.username}-{kind}.jpg"
+            try:
+                await grab_frame(media, frame.at, still)
+                await channel_images.set_image(
+                    session,
+                    users[channel.username],
+                    kind,
+                    await asyncio.to_thread(still.read_bytes),
+                    "image/jpeg",
+                )
+            except Exception:
+                await session.rollback()
+                logger.warning(
+                    "%s: no %s; it keeps the default", channel.username, kind, exc_info=True
+                )
+            finally:
+                still.unlink(missing_ok=True)
 
 
 async def _add_playlists(
@@ -763,6 +829,11 @@ async def _undo(session: AsyncSession, user_ids: list[uuid.UUID]) -> None:
     await session.execute(delete(User).where(User.id.in_(user_ids)))
     await session.commit()
     settings = get_settings()
+    for user_id in user_ids:
+        with contextlib.suppress(Exception):
+            await storage.delete_prefix(
+                settings.media_bucket, f"{channel_images.CHANNEL_PREFIX}{user_id}/"
+            )
     for video_id in video_ids:
         # Best effort: a leftover object costs disk space, never correctness.
         with contextlib.suppress(Exception):

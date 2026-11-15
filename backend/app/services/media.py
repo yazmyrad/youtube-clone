@@ -291,6 +291,30 @@ async def transcode(source: Path, info: SourceInfo, output: Path) -> Transcoded:
     return Transcoded(hls_dir=hls_dir, master=master, thumbnail=thumbnail)
 
 
+STILL_MIN_WIDTH = 2048
+
+
+async def grab_frame(source: Path, at: float, output: Path) -> None:
+    """A still `at` (0 to 1) of the way through `source`, as JPEG: demo channels' images.
+    Scaled up to the banner's width, as the demo videos are small."""
+    info = await probe(source)
+    await _encode(
+        [
+            "-ss", f"{info.duration * at:.3f}",
+            *_input_args(source, info),
+            "-map", f"0:{info.video_stream}",
+            "-frames:v", "1",
+            "-vf", f"scale='max(iw,{STILL_MIN_WIDTH})':-2:flags=lanczos",
+            "-q:v", "2",
+            "-update", "1",
+            str(output),
+        ]
+    )  # fmt: skip
+    # Past the end, ffmpeg succeeds without writing anything.
+    if not await asyncio.to_thread(output.exists):
+        raise JobError(TRANSCODE_FAILED)
+
+
 # Demo clips. Installed with ffmpeg on Debian and Ubuntu, through fontconfig's dependencies.
 FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
 TITLE_CARD_TIMEOUT_SECONDS = 120

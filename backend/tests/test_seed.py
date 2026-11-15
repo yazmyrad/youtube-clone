@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from PIL import Image
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +30,7 @@ from app.services import media, seed, storage, videos
 from app.services.media import TitleCard
 from app.workers.seed import format_credentials
 from tests.conftest import TEST_BUCKET
-from tests.media_helpers import require_ffmpeg
+from tests.media_helpers import make_clip, require_ffmpeg
 
 ALL_VIDEOS = [video for channel in seed.CHANNELS for video in channel.videos]
 
@@ -373,3 +374,109 @@ def test_the_demo_shorts_are_shorts() -> None:
         assert video.source is not None
         assert video.source.file.endswith(".webm")
         assert video.seconds <= 180, video.title
+
+
+# --- Channel avatars and banners ----------------------------------------------------------
+
+
+def test_channel_images_are_stills_of_the_channels_own_real_videos() -> None:
+    for channel in seed.CHANNELS:
+        by_title = {video.title: video for video in channel.videos}
+        for frame in (channel.avatar, channel.banner):
+            if frame is None:
+                continue
+            assert frame.video in by_title, f"{channel.username}: {frame.video}"
+            assert by_title[frame.video].source is not None
+            assert 0 <= frame.at < 1
+        # A Short's frame is too narrow for a banner.
+        if channel.banner is not None:
+            assert not by_title[channel.banner.video].short
+    assert all(channel.avatar for channel in seed.CHANNELS)
+
+
+async def fake_still(source: Path, at: float, output: Path) -> None:
+    def write() -> None:
+        size = (608, 1080) if b"short" in source.read_bytes() else (1920, 1080)
+        Image.new("RGB", size, (int(at * 255), 90, 160)).save(output, format="JPEG")
+
+    await asyncio.to_thread(write)
+
+
+def _all_downloaded(media_dir: Path) -> tuple[seed.DemoChannel, ...]:
+    """The catalog, with every video "downloaded" into `media_dir` and its checksum to match."""
+    channels = []
+    for channel in seed.CHANNELS:
+        videos_ = []
+        for video in channel.videos:
+            if video.source is None:
+                videos_.append(video)
+                continue
+            data = f"{'short' if video.short else 'video'} {video.title}".encode()
+            (media_dir / video.source.file).write_bytes(data)
+            digest = hashlib.sha256(data).hexdigest()
+            videos_.append(
+                dataclasses.replace(video, source=dataclasses.replace(video.source, sha256=digest))
+            )
+        channels.append(dataclasses.replace(channel, videos=tuple(videos_)))
+    return tuple(channels)
+
+
+async def test_channels_get_an_avatar_and_banner_from_their_videos(
+    api: httpx.AsyncClient, session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    media_dir, work = tmp_path / "media", tmp_path / "work"
+    media_dir.mkdir()
+    work.mkdir()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(seed, "CHANNELS", _all_downloaded(media_dir))
+        await seed.seed(session, fake_clip, work, media_dir, fake_still)
+
+    for channel in seed.CHANNELS:
+        body = (await api.get(f"/api/channels/{channel.username}")).json()
+        assert body["avatar_url"] is not None
+        assert (body["banner_url"] is not None) == (channel.banner is not None)
+    assert _files(work) == []
+
+
+async def test_a_channel_without_its_download_keeps_the_defaults(
+    api: httpx.AsyncClient, session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    await seed.seed(session, fake_clip, tmp_path, tmp_path, fake_still)
+
+    for channel in seed.CHANNELS:
+        body = (await api.get(f"/api/channels/{channel.username}")).json()
+        assert (body["avatar_url"], body["banner_url"]) == (None, None)
+
+
+async def test_a_still_that_fails_doesnt_stop_the_seed(
+    api: httpx.AsyncClient, session: AsyncSession, minio: str, tmp_path: Path
+) -> None:
+    media_dir, work = tmp_path / "media", tmp_path / "work"
+    media_dir.mkdir()
+    work.mkdir()
+    first = seed.CHANNELS[0].username
+
+    async def flaky(source: Path, at: float, output: Path) -> None:
+        if output.name.startswith(first):
+            raise media.JobError("no frame")
+        await fake_still(source, at, output)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(seed, "CHANNELS", _all_downloaded(media_dir))
+        credentials = await seed.seed(session, fake_clip, work, media_dir, flaky)
+
+    assert credentials is not None
+    assert (await api.get(f"/api/channels/{first}")).json()["avatar_url"] is None
+    second = seed.CHANNELS[1].username
+    assert (await api.get(f"/api/channels/{second}")).json()["avatar_url"] is not None
+
+
+async def test_grab_frame_writes_a_still(tmp_path: Path) -> None:
+    require_ffmpeg()
+    clip = make_clip(tmp_path / "clip.mp4", size="640x360", seconds=2)
+    still = tmp_path / "still.jpg"
+
+    await media.grab_frame(clip, 0.5, still)
+
+    with Image.open(still) as image:
+        assert (image.format, image.size) == ("JPEG", (2048, 1152))

@@ -14,7 +14,7 @@ from pathlib import Path
 from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
 from app.services import seed
-from app.services.media import render_title_card
+from app.services.media import grab_frame, render_title_card
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,11 @@ async def main() -> int:
         with tempfile.TemporaryDirectory(dir=settings.worker_scratch_dir) as workdir:
             async with get_sessionmaker()() as session:
                 credentials = await seed.seed(
-                    session, render_title_card, Path(workdir), settings.demo_media_dir
+                    session,
+                    render_title_card,
+                    Path(workdir),
+                    settings.demo_media_dir,
+                    grab_frame,
                 )
     except seed.PartiallySeeded as exc:
         logger.error("%s. Remove them, or start from an empty database.", exc)
