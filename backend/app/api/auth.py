@@ -42,6 +42,11 @@ def account_cookie(user_id: uuid.UUID) -> str:
     return f"refresh_{user_id.hex}"
 
 
+# More than a browser can sign in, to leave room for ended ones, but bounded: each is looked
+# up on every request here.
+MAX_COOKIES = 2 * auth_service.MAX_ACCOUNTS
+
+
 def _account_tokens(request: Request) -> dict[uuid.UUID, str]:
     """The browser's accounts, by the user each cookie is named for. The server still checks
     that each token is that user's: the name is only a label."""
@@ -50,7 +55,15 @@ def _account_tokens(request: Request) -> dict[uuid.UUID, str]:
         match = ACCOUNT_COOKIE.match(name)
         if match and value:
             tokens[uuid.UUID(hex=match.group(1))] = value
+            if len(tokens) == MAX_COOKIES:
+                break
     return tokens
+
+
+def _held(request: Request) -> tuple[str, ...]:
+    """Every refresh token the browser sent, the old single cookie's too."""
+    legacy = request.cookies.get(LEGACY_COOKIE)
+    return (*_account_tokens(request).values(), *([legacy] if legacy else []))
 
 
 def _set_refresh_cookie(response: Response, user_id: uuid.UUID, token: str) -> None:
@@ -102,8 +115,7 @@ async def register(data: RegisterIn, session: SessionDep) -> MeOut:
 async def login(
     data: LoginIn, session: SessionDep, request: Request, response: Response
 ) -> TokenOut:
-    signed_in = frozenset(_account_tokens(request))
-    tokens = await auth_service.login(session, data, signed_in)
+    tokens = await auth_service.login(session, data, _held(request))
     _set_refresh_cookie(response, tokens.user_id, tokens.refresh_token)
     return TokenOut(access_token=tokens.access_token, expires_in=tokens.expires_in)
 
@@ -112,17 +124,14 @@ async def login(
     "/accounts",
     response_model=AccountsOut,
     summary="The accounts signed in in this browser, for the account switcher",
-    description="Rotates nothing. Cookies that no longer sign anyone in are cleared.",
+    description=(
+        "Read only: rotates and clears nothing, as it runs alongside other tabs' refreshes. "
+        "An account whose session ended is just left out."
+    ),
 )
 async def list_accounts(session: SessionDep, request: Request, response: Response) -> AccountsOut:
-    tokens = _account_tokens(request)
-    legacy = request.cookies.get(LEGACY_COOKIE)
-    users = await auth_service.signed_in_accounts(
-        session, [*tokens.values(), *([legacy] if legacy else [])]
-    )
-    live = {user.id for user in users}
-    for user_id in tokens.keys() - live:
-        _clear_cookie(response, account_cookie(user_id))
+    users = await auth_service.signed_in_accounts(session, list(_held(request)))
+    response.headers["Cache-Control"] = "no-store"
     return AccountsOut(items=[AccountOut.model_validate(user) for user in users])
 
 
@@ -182,8 +191,11 @@ async def logout(
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     user_id = data.user_id if data else None
     if user_id is not None:
-        await auth_service.logout(session, tokens.get(user_id))
+        # The old single cookie too, if it's this account's.
+        revoked = await auth_service.logout(session, tokens.get(user_id), legacy, user_id=user_id)
         _clear_cookie(response, account_cookie(user_id))
+        if legacy is not None and legacy in revoked:
+            _clear_cookie(response, LEGACY_COOKIE)
         return response
     await auth_service.logout(session, *tokens.values(), legacy)
     for each in tokens:

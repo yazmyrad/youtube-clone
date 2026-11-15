@@ -2408,7 +2408,7 @@
     },
     "/api/auth/accounts": {
       "get": {
-        "description": "Rotates nothing. Cookies that no longer sign anyone in are cleared.",
+        "description": "Read only: rotates and clears nothing, as it runs alongside other tabs' refreshes. An account whose session ended is just left out.",
         "operationId": "list_accounts_api_auth_accounts_get",
         "responses": {
           "200": {

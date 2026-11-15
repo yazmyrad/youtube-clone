@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
-import { listAccounts, registerAndSignIn, signOut } from "../api/account";
+import { registerAndSignIn, signOut } from "../api/account";
 import { api, authApi, session } from "../api/client";
 import { errorMessage } from "../api/errors";
 import type { components } from "../api/schema";
@@ -37,10 +37,11 @@ function dropAccountData(queryClient: QueryClient) {
 async function fetchMe(): Promise<Me | null> {
   await session.restore();
   if (session.getToken() === null) {
-    // The account in use was signed out (here or in another tab), or none was chosen yet:
-    // carry on as another account still signed in in this browser, as YouTube does.
-    const next = (await listAccounts(authApi).catch(() => []))[0];
-    if (!next || (await session.switchTo(next.id)) === null) return null;
+    // A server that couldn't answer says nothing about the session: try again, rather than
+    // show the page signed out. Never carry on as some other account on its own: the
+    // sign-in page offers the browser's other accounts to choose from.
+    if (session.lastOutcome() === "unavailable") throw new Error("Could not restore the session");
+    return null;
   }
   const { data, response } = await api.GET("/api/users/me");
   if (data) return data;

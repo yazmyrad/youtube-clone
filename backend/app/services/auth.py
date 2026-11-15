@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -49,11 +50,9 @@ async def register(session: AsyncSession, data: RegisterIn) -> User:
     return user
 
 
-async def login(
-    session: AsyncSession, data: LoginIn, signed_in: frozenset[uuid.UUID] = frozenset()
-) -> IssuedTokens:
-    """`signed_in`: the accounts this browser already holds. Signing in again to one of them
-    is fine; a new one beyond MAX_ACCOUNTS is refused."""
+async def login(session: AsyncSession, data: LoginIn, held: tuple[str, ...] = ()) -> IssuedTokens:
+    """`held`: the refresh tokens this browser already has. Signing in again to one of those
+    accounts ends its old session; a new account beyond MAX_ACCOUNTS live ones is refused."""
     user = await session.scalar(select(User).where(User.email == data.email))
     # Always runs argon2, even for an unknown email, so timing doesn't reveal accounts.
     if not await security.verify_password(user.password_hash if user else None, data.password):
@@ -61,11 +60,17 @@ async def login(
     assert user is not None  # noqa: S101 - verify_password fails without a hash
     if not user.is_active:
         raise Forbidden("This account is disabled")
-    if user.id not in signed_in and len(signed_in) >= MAX_ACCOUNTS:
+    rows = await _token_rows(session, held)
+    now = datetime.now(UTC)
+    live = {row.user_id for row in rows if row.revoked_at is None and row.expires_at > now}
+    if user.id not in live and len(live) >= MAX_ACCOUNTS:
         raise Conflict(
             f"You're signed in to {MAX_ACCOUNTS} accounts in this browser. "
             "Sign out of one to add another."
         )
+    # Its cookie is about to be replaced: the session it held mustn't outlive it.
+    for family_id in {row.family_id for row in rows if row.user_id == user.id}:
+        await _revoke_family(session, family_id, now)
     tokens = await _issue_tokens(session, user.id, family_id=uuid.uuid4())
     await session.commit()
     return tokens
@@ -128,19 +133,30 @@ async def signed_in_accounts(session: AsyncSession, refresh_tokens: list[str]) -
     return list(users.unique())
 
 
-async def logout(session: AsyncSession, *refresh_tokens: str | None) -> None:
-    """Revokes each token's whole family. Unknown or missing tokens are ignored, so
-    logging out is always safe to repeat."""
-    hashes = [security.hash_refresh_token(token) for token in refresh_tokens if token]
+async def _token_rows(session: AsyncSession, tokens: Iterable[str | None]) -> list[RefreshToken]:
+    hashes = [security.hash_refresh_token(token) for token in tokens if token]
     if not hashes:
-        return
-    families = await session.scalars(
-        select(RefreshToken.family_id).where(RefreshToken.token_hash.in_(hashes))
+        return []
+    return list(
+        await session.scalars(select(RefreshToken).where(RefreshToken.token_hash.in_(hashes)))
     )
+
+
+async def logout(
+    session: AsyncSession, *refresh_tokens: str | None, user_id: uuid.UUID | None = None
+) -> set[str]:
+    """Revokes each token's whole family; with `user_id`, only tokens of that account, so
+    signing out of one can't end another. Returns the tokens it revoked. Unknown or missing
+    tokens are ignored, so logging out is always safe to repeat."""
+    rows = await _token_rows(session, refresh_tokens)
+    if user_id is not None:
+        rows = [row for row in rows if row.user_id == user_id]
     now = datetime.now(UTC)
-    for family_id in set(families):
+    for family_id in {row.family_id for row in rows}:
         await _revoke_family(session, family_id, now)
     await session.commit()
+    revoked = {row.token_hash for row in rows}
+    return {t for t in refresh_tokens if t and security.hash_refresh_token(t) in revoked}
 
 
 async def _revoke_family(session: AsyncSession, family_id: uuid.UUID, now: datetime) -> None:

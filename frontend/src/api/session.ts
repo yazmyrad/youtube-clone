@@ -50,7 +50,12 @@ export interface Session {
   switchTo: (account: string) => Promise<string | null>;
   /** Forgets which account was in use, after signing out of it. */
   forgetAccount: () => void;
+  /** How the last refresh ended: "unavailable" when the server couldn't answer, which says
+   * nothing about the session and is worth retrying; "refused" when it's over. */
+  lastOutcome: () => RefreshOutcome;
 }
+
+export type RefreshOutcome = "ok" | "refused" | "unavailable" | null;
 
 interface Lease {
   id: string;
@@ -104,6 +109,7 @@ export function createSession(deps: SessionDeps): Session {
   let restored: Promise<unknown> | null = null;
   // Bumped by login and logout, so a refresh that started earlier can't overwrite them.
   let epoch = 0;
+  let outcome: RefreshOutcome = null;
 
   /**
    * The server treats a second use of a refresh token as theft and ends the session, so two
@@ -156,7 +162,10 @@ export function createSession(deps: SessionDeps): Session {
     const startedAt = epoch;
     const previous = token;
     const release = await acquireLease();
-    if (!release) return null;
+    if (!release) {
+      outcome = "unavailable";
+      return null;
+    }
     let fresh: string | null;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
@@ -166,6 +175,7 @@ export function createSession(deps: SessionDeps): Session {
       const account = (previous && subjectOf(previous)) ?? readAccount();
       fresh = await deps.refreshRequest(controller.signal, account);
     } catch {
+      outcome = "unavailable";
       return null; // A temporary failure: the cookie is still good, so keep the session.
     } finally {
       clearTimeout(timeout);
@@ -173,7 +183,9 @@ export function createSession(deps: SessionDeps): Session {
     }
     if (epoch !== startedAt) return token;
     token = fresh;
-    if (fresh !== null) writeAccount(subjectOf(fresh));
+    outcome = fresh === null ? "refused" : "ok";
+    // Only to fill a gap: another tab may have switched since, and this mustn't undo it.
+    if (fresh !== null && readAccount() === null) writeAccount(subjectOf(fresh));
     if (previous !== null) {
       if (fresh === null) lostListeners.forEach((listener) => listener());
       else if (subjectOf(fresh) !== subjectOf(previous)) {
@@ -190,11 +202,13 @@ export function createSession(deps: SessionDeps): Session {
     return inFlight;
   }
 
-  async function switchTo(account: string): Promise<string | null> {
+  /** `follow`: another tab chose `account` and wrote it already; writing it again could undo
+   * a later choice and set tabs switching back and forth. */
+  async function switchTo(account: string, follow = false): Promise<string | null> {
     epoch += 1;
     const before = token;
     token = null;
-    writeAccount(account);
+    if (!follow) writeAccount(account);
     const startedAt = epoch;
     const release = await acquireLease();
     if (!release) return null;
@@ -211,18 +225,30 @@ export function createSession(deps: SessionDeps): Session {
     }
     if (epoch !== startedAt) return token;
     token = fresh;
-    if (fresh !== null && before !== null && subjectOf(fresh) !== subjectOf(before)) {
-      accountListeners.forEach((listener) => listener());
+    outcome = fresh === null ? "refused" : "ok";
+    if (before !== null) {
+      if (fresh === null) lostListeners.forEach((listener) => listener());
+      else if (subjectOf(fresh) !== subjectOf(before)) {
+        accountListeners.forEach((listener) => listener());
+      }
     }
     return fresh;
   }
 
-  // Another tab switched account: follow it, as YouTube's tabs do.
+  // Another tab switched account, or signed out of it: follow, as YouTube's tabs do. What's
+  // in storage now counts, not what the event said: a later write may have replaced it.
   deps.onStorage?.((key) => {
     if (key !== ACCOUNT_KEY) return;
     const account = readAccount();
-    if (account === null || token === null || subjectOf(token) === account) return;
-    void switchTo(account);
+    if (account === null) {
+      if (token === null) return;
+      epoch += 1;
+      token = null;
+      lostListeners.forEach((listener) => listener());
+      return;
+    }
+    if (token !== null && subjectOf(token) === account) return;
+    void switchTo(account, true);
   });
 
   return {
@@ -237,6 +263,8 @@ export function createSession(deps: SessionDeps): Session {
       token = null;
     },
     async restore() {
+      // Once, unless the server couldn't answer: then a later call tries again.
+      if (token === null && outcome === "unavailable") restored = null;
       restored ??= token === null ? refresh() : Promise.resolve();
       await restored;
     },
@@ -254,9 +282,10 @@ export function createSession(deps: SessionDeps): Session {
       return () => accountListeners.delete(listener);
     },
     getAccount: () => (token ? subjectOf(token) : null) ?? readAccount(),
-    switchTo,
+    switchTo: (account) => switchTo(account),
     forgetAccount() {
       writeAccount(null);
     },
+    lastOutcome: () => outcome,
   };
 }

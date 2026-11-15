@@ -426,7 +426,7 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 |---|---|---|
 | `POST /auth/register` | any | Create account |
 | `POST /auth/login` | any | Returns access token, adds the account's refresh cookie (at most 5 accounts per browser) |
-| `GET /auth/accounts` | refresh cookies | The browser's signed-in accounts, for the account switcher; rotates nothing |
+| `GET /auth/accounts` | refresh cookies | The browser's signed-in accounts, for the account switcher; read only (it runs alongside other tabs' refreshes), not cached |
 | `POST /auth/refresh` | refresh cookie + Origin check | Rotate one account's tokens: `user_id` says which (optional with one account) |
 | `POST /auth/logout` | refresh cookie + Origin check | Revoke one account's token family (`user_id`), or every account's |
 | `GET /users/me` | auth | Current user |
@@ -537,7 +537,7 @@ Prefix `/api`, documented at `/docs`. List endpoints use keyset (cursor) paginat
 | Role escalation | Role is never accepted on registration or self-update; schemas forbid extra fields; only admin endpoints change it |
 | JWT flaws | Algorithm pinned, 15-minute expiry, access token kept in memory, user and role loaded from DB per request |
 | Refresh token theft | Random 256-bit value, stored hashed, httpOnly cookie scoped to `/api/auth`; rotation with reuse detection that revokes the whole family |
-| Several accounts in one browser | Each has its own cookie, `refresh_{user_id}`. The name is only a label: a refresh for an account must present a token of that account, so a renamed cookie can't stand in for another. Signing out of one revokes only its family; the access token in the page is always one account's |
+| Several accounts in one browser | Each has its own cookie, `refresh_{user_id}`. The name is only a label: a refresh for an account must present a token of that account, so a renamed cookie can't stand in for another. Signing out of one revokes only that account's tokens; signing in again to one revokes its old session. The cap counts live sessions only. The page never switches account on its own: after the one in use ends, sign-in offers the others to choose from. A switch or sign-out in one tab reaches the others through localStorage |
 | CSRF | API uses bearer tokens, which browsers don't attach automatically; the refresh cookie is `SameSite=Strict`, and refresh and logout also check Origin |
 | Password attacks | argon2; length requirement; login rate limit; same response and comparable timing for unknown users |
 | XSS through titles, comments, descriptions | React escaping, no `dangerouslySetInnerHTML`; strict CSP on the SPA; length limits on the server |

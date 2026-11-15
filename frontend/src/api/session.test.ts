@@ -562,3 +562,104 @@ describe("requestRefresh", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("several accounts, across tabs and failures", () => {
+  function tabs(refresh: SessionDeps["refreshRequest"]) {
+    const storage = memoryStorage();
+    const listeners = new Set<(key: string | null) => void>();
+    const tab = () =>
+      createSession({
+        refreshRequest: refresh,
+        storage: () => storage,
+        sleep: yieldToOthers,
+        onStorage: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      });
+    const broadcast = () => listeners.forEach((listener) => listener("auth.account"));
+    return { storage, tab, broadcast };
+  }
+
+  it("signs the other tabs out of an account signed out of in one", async () => {
+    const { tab, broadcast } = tabs(async (_s, account) => tokenFor(account ?? "x"));
+    const [first, second] = [tab(), tab()];
+    first.setToken(tokenFor("alice"));
+    second.setToken(tokenFor("alice"));
+    const lost = vi.fn();
+    second.onLost(lost);
+
+    first.clear();
+    first.forgetAccount();
+    broadcast();
+
+    expect(second.getToken()).toBeNull();
+    expect(lost).toHaveBeenCalledOnce();
+  });
+
+  it("follows another tab without writing the choice back", async () => {
+    const { storage, tab, broadcast } = tabs(async (_s, account) => tokenFor(account ?? "x"));
+    const second = tab();
+    second.setToken(tokenFor("alice"));
+    const writes = vi.spyOn(storage, "setItem");
+
+    storage.items.set("auth.account", "bob"); // Written by the first tab.
+    broadcast();
+    await vi.waitFor(() => expect(second.getAccount()).toBe("bob"));
+
+    expect(writes.mock.calls.filter(([key]) => key === "auth.account")).toEqual([]);
+  });
+
+  it("follows what's in storage now, not an older event", async () => {
+    const calls: (string | null)[] = [];
+    const { storage, tab, broadcast } = tabs(async (_s, account) => {
+      calls.push(account);
+      return tokenFor(account ?? "x");
+    });
+    const session = tab();
+    session.setToken(tokenFor("carol"));
+
+    storage.items.set("auth.account", "carol"); // bob was chosen, then carol: carol is current.
+    broadcast();
+    await yieldToOthers();
+
+    expect(calls).toEqual([]);
+  });
+
+  it("a refresh doesn't undo another tab's switch", async () => {
+    const { storage, tab } = tabs(async (_s, account) => tokenFor(account ?? "x"));
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+    storage.items.set("auth.account", "bob"); // Another tab switched meanwhile.
+
+    await session.refresh();
+
+    expect(storage.items.get("auth.account")).toBe("bob");
+  });
+
+  it("tells a server that couldn't answer from a session that ended, and tries again", async () => {
+    let fail = true;
+    const { tab } = tabs(async (_s, account) => {
+      if (fail) throw new Error("502");
+      return tokenFor(account ?? "x");
+    });
+    const session = tab();
+
+    await session.restore();
+    expect(session.lastOutcome()).toBe("unavailable");
+
+    fail = false;
+    await session.restore();
+    expect(session.getToken()).not.toBeNull();
+    expect(session.lastOutcome()).toBe("ok");
+  });
+
+  it("says when the session was refused", async () => {
+    const { tab } = tabs(async () => null);
+    const session = tab();
+
+    await session.restore();
+
+    expect(session.lastOutcome()).toBe("refused");
+  });
+});

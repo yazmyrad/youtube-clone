@@ -215,7 +215,8 @@ async def test_the_switcher_drops_accounts_that_ended(
     await session.commit()
 
     assert await browser.accounts() == ["carol"]
-    assert set(browser.jar) == {_name(carol)}  # The dead cookies are cleared.
+    # Read only: another tab's refresh may be rotating one of these cookies right now.
+    assert set(browser.jar) == {_name(alice), _name(bob), _name(carol)}
 
 
 async def test_no_cookies_no_accounts(api: httpx.AsyncClient) -> None:
@@ -264,3 +265,69 @@ async def test_refresh_refuses_other_fields(browser: Browser, create_user: Creat
     )
 
     assert response.status_code == 422
+
+
+async def test_the_list_is_never_cached(browser: Browser, create_user: CreateUser) -> None:
+    await browser.login(await create_user("alice"))
+
+    response = await browser.api.get("/api/auth/accounts", headers=browser._headers())
+
+    assert response.headers["cache-control"] == "no-store"
+
+
+async def test_signing_in_again_ends_the_old_session(
+    browser: Browser, create_user: CreateUser
+) -> None:
+    alice = await create_user("alice")
+    await browser.login(alice)
+    old = browser.jar[_name(alice)]
+
+    await browser.login(alice)
+
+    assert browser.jar[_name(alice)] != old
+    browser.jar[_name(alice)] = old  # A copy someone kept: it no longer works.
+    assert (await browser.refresh(alice)).status_code == 401
+
+
+async def test_ended_sessions_dont_count_against_the_limit(
+    browser: Browser, session: AsyncSession, create_user: CreateUser
+) -> None:
+    users = [await create_user(f"user{i}") for i in range(MAX_ACCOUNTS + 1)]
+    for user in users[:MAX_ACCOUNTS]:
+        await browser.login(user)
+    await session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.token_hash == hash_refresh_token(browser.jar[_name(users[0])]))
+        .values(revoked_at=RefreshToken.created_at)
+    )
+    await session.commit()
+
+    assert (await browser.login(users[-1])).status_code == 200
+
+
+async def test_signing_out_of_one_account_on_the_old_cookie(
+    browser: Browser, create_user: CreateUser
+) -> None:
+    alice, bob = await create_user("alice"), await create_user("bob")
+    await browser.login(bob)
+    await browser.login(alice)
+    browser.jar["refresh_token"] = browser.jar.pop(_name(alice))  # From before this change.
+
+    await browser.logout(alice)
+
+    assert "refresh_token" not in browser.jar
+    assert await browser.accounts() == ["bob"]
+
+
+async def test_signing_out_of_one_never_ends_another(
+    browser: Browser, create_user: CreateUser
+) -> None:
+    alice, bob = await create_user("alice"), await create_user("bob")
+    await browser.login(bob)
+    bobs_token = browser.jar.pop(_name(bob))
+    browser.jar[_name(alice)] = bobs_token  # Bob's token, labelled alice.
+
+    await browser.logout(alice)
+
+    browser.jar = {_name(bob): bobs_token}
+    assert (await browser.refresh(bob)).status_code == 200

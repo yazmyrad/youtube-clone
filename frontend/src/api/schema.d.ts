@@ -47,7 +47,7 @@ export interface paths {
         };
         /**
          * The accounts signed in in this browser, for the account switcher
-         * @description Rotates nothing. Cookies that no longer sign anyone in are cleared.
+         * @description Read only: rotates and clears nothing, as it runs alongside other tabs' refreshes. An account whose session ended is just left out.
          */
         get: operations["list_accounts_api_auth_accounts_get"];
         put?: never;
