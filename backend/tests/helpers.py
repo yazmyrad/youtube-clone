@@ -74,3 +74,14 @@ async def collect_pages(api: httpx.AsyncClient, url: str, **params: Any) -> list
         if cursor is None:
             return pages
     raise AssertionError("pagination never ended")
+
+
+def refresh_cookie(response: httpx.Response) -> str:
+    """The refresh token a response set: each account has its own `refresh_<user id>`."""
+    values = [
+        value
+        for name, value in response.cookies.items()
+        if name.startswith("refresh_") and name != "refresh_token"
+    ]
+    assert len(values) == 1, response.headers.get_list("set-cookie")
+    return values[0]

@@ -38,6 +38,26 @@ export interface paths {
         patch: operations["update_user_api_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/api/auth/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The accounts signed in in this browser, for the account switcher
+         * @description Rotates nothing. Cookies that no longer sign anyone in are cleared.
+         */
+        get: operations["list_accounts_api_auth_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -47,7 +67,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Log in: returns an access token and sets the refresh cookie */
+        /**
+         * Log in: returns an access token and adds the account's refresh cookie
+         * @description Up to 5 accounts can be signed in at once in one browser.
+         */
         post: operations["login_api_auth_login_post"];
         delete?: never;
         options?: never;
@@ -64,7 +87,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke the session and clear the refresh cookie */
+        /**
+         * Sign out of one account, or of all of them
+         * @description With `user_id`, that account only; without, every account in this browser.
+         */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -82,8 +108,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rotate the refresh cookie and get a new access token
-         * @description Reusing a refresh token that was already rotated revokes the whole session.
+         * Rotate an account's refresh cookie and get a new access token
+         * @description `user_id` says which of the browser's accounts; it may be left out when there's only one. Reusing a refresh token that was already rotated revokes that session.
          */
         post: operations["refresh_api_auth_refresh_post"];
         delete?: never;
@@ -771,6 +797,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountOut
+         * @description An account signed in in this browser, as the switcher shows it.
+         */
+        AccountOut: {
+            /** Avatar Url */
+            avatar_url: string | null;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Username */
+            username: string;
+        };
+        /** AccountsOut */
+        AccountsOut: {
+            /** Items */
+            items: components["schemas"]["AccountOut"][];
+        };
         /** AdminUserOut */
         AdminUserOut: {
             /**
@@ -1029,6 +1077,14 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** LogoutIn */
+        LogoutIn: {
+            /**
+             * User Id
+             * @description Sign out of this account only; without it, of all of them
+             */
+            user_id?: string | null;
         };
         /** MeOut */
         MeOut: {
@@ -1327,6 +1383,14 @@ export interface components {
          * @enum {string}
          */
         ReactionType: "like" | "dislike";
+        /** RefreshIn */
+        RefreshIn: {
+            /**
+             * User Id
+             * @description Which signed-in account; optional when there's only one
+             */
+            user_id?: string | null;
+        };
         /** RegisterIn */
         RegisterIn: {
             /** Display Name */
@@ -1831,6 +1895,26 @@ export interface operations {
             };
         };
     };
+    list_accounts_api_auth_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountsOut"];
+                };
+            };
+        };
+    };
     login_api_auth_login_post: {
         parameters: {
             query?: never;
@@ -1871,6 +1955,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorOut"];
                 };
             };
+            /** @description Too many accounts */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1889,7 +1982,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LogoutIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -1925,7 +2022,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RefreshIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1934,6 +2035,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TokenOut"];
+                };
+            };
+            /** @description Which account? */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
                 };
             };
             /** @description Unauthorized */

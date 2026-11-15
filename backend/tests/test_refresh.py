@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.security import hash_refresh_token
 from app.models import RefreshToken, User
-from tests.helpers import PASSWORD, CreateUser
+from tests.helpers import PASSWORD, CreateUser, refresh_cookie
 
 ORIGIN = {"Origin": "http://test"}  # the test client's base URL
 
@@ -18,7 +18,7 @@ async def _login(api: httpx.AsyncClient, email: str) -> str:
     response = await api.post("/api/auth/login", json={"email": email, "password": PASSWORD})
     assert response.status_code == 200
     api.cookies.clear()  # Tests pass the cookie explicitly, so it's clear which one is used.
-    return response.cookies["refresh_token"]
+    return refresh_cookie(response)
 
 
 async def _refresh(
@@ -59,7 +59,7 @@ async def test_refresh_rotates_the_token(
     response = await _refresh(api, refresh_token)
 
     assert response.status_code == 200
-    new_token = response.cookies["refresh_token"]
+    new_token = refresh_cookie(response)
     assert new_token != refresh_token
     me = await api.get(
         "/api/users/me", headers={"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -75,7 +75,7 @@ async def test_reusing_a_rotated_token_revokes_the_family(
     api: httpx.AsyncClient, session: AsyncSession, refresh_token: str
 ) -> None:
     """D54: a stolen, already rotated token kills the session for everyone holding it."""
-    rotated = (await _refresh(api, refresh_token)).cookies["refresh_token"]
+    rotated = refresh_cookie(await _refresh(api, refresh_token))
 
     reuse = await _refresh(api, refresh_token)
 
@@ -160,16 +160,16 @@ async def test_refresh_requires_same_origin(
 async def test_logout_revokes_the_family_and_clears_the_cookie(
     api: httpx.AsyncClient, session: AsyncSession, refresh_token: str
 ) -> None:
-    rotated = (await _refresh(api, refresh_token)).cookies["refresh_token"]
+    rotated = refresh_cookie(await _refresh(api, refresh_token))
 
     response = await api.post(
         "/api/auth/logout", headers=ORIGIN | {"Cookie": f"refresh_token={rotated}"}
     )
 
     assert response.status_code == 204
-    cookie = response.headers["set-cookie"].lower()
-    assert cookie.startswith('refresh_token=""') and "max-age=0" in cookie
-    assert "path=/api/auth" in cookie
+    cleared = [c.lower() for c in response.headers.get_list("set-cookie")]
+    assert any(c.startswith('refresh_token=""') and "max-age=0" in c for c in cleared)
+    assert all("path=/api/auth" in c for c in cleared)
     assert (await _refresh(api, rotated)).status_code == 401
     assert await _active_tokens(session) == 1  # only the session from create_user
 

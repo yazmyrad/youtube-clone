@@ -77,6 +77,7 @@ async def test_seeded_accounts_can_log_in(
             "/api/auth/login", json={"email": credential.email, "password": credential.password}
         )
         assert response.status_code == 200, credential.username
+        api.cookies.clear()  # Each from its own browser: one holds at most 5 accounts.
 
 
 async def test_queues_every_video_through_the_pipeline(

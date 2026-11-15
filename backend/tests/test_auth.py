@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import JWT_ALGORITHM
 from app.models import RefreshToken, User, UserRole
-from tests.helpers import PASSWORD, CreateUser
+from tests.helpers import PASSWORD, CreateUser, refresh_cookie
 
 
 def _register_body(**overrides: object) -> dict[str, object]:
@@ -99,7 +100,8 @@ async def test_login_returns_access_token_and_refresh_cookie(
     assert body["token_type"] == "bearer"
     assert body["expires_in"] == 15 * 60
     cookie = response.headers["set-cookie"].lower()
-    assert cookie.startswith("refresh_token=")
+    # Each account has its own cookie, so a browser can hold several.
+    assert cookie.startswith(f"refresh_{uuid.UUID(user.id).hex}=")
     for attribute in ("httponly", "samesite=strict", "path=/api/auth"):
         assert attribute in cookie
 
@@ -120,7 +122,7 @@ async def test_login_stores_only_a_hash_of_the_refresh_token(
     user = await create_user()
     response = await api.post("/api/auth/login", json={"email": user.email, "password": PASSWORD})
 
-    cookie_value = response.cookies["refresh_token"]
+    cookie_value = refresh_cookie(response)
     hashes = (await session.scalars(select(RefreshToken.token_hash))).all()
     assert len(hashes) == 2  # one from create_user, one from this login
     assert all(cookie_value.encode() not in h for h in hashes)

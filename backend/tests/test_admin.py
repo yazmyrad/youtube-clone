@@ -4,7 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ModerationAction, ModerationActionType, RefreshToken, User, UserRole
-from tests.helpers import PASSWORD, ApiUser, CreateUser, SetRole, create_ready_video
+from tests.helpers import (
+    PASSWORD,
+    ApiUser,
+    CreateUser,
+    SetRole,
+    create_ready_video,
+    refresh_cookie,
+)
 
 ORIGIN = {"Origin": "http://test"}
 
@@ -156,7 +163,7 @@ async def test_disable_applies_on_next_request_and_ends_sessions(
     admin = await _admin(create_user, set_role)
     alice = await create_user()
     login = await api.post("/api/auth/login", json={"email": alice.email, "password": PASSWORD})
-    refresh_token = login.cookies["refresh_token"]
+    refresh_token = refresh_cookie(login)
     api.cookies.clear()
 
     response = await api.patch(

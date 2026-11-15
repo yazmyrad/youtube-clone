@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
@@ -30,3 +31,30 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"  # noqa: S105 - a token type, not a secret
     expires_in: int = Field(description="Access token lifetime in seconds")
+
+
+class RefreshIn(StrictModel):
+    user_id: uuid.UUID | None = Field(
+        default=None, description="Which signed-in account; optional when there's only one"
+    )
+
+
+class LogoutIn(StrictModel):
+    user_id: uuid.UUID | None = Field(
+        default=None, description="Sign out of this account only; without it, of all of them"
+    )
+
+
+class AccountOut(BaseModel):
+    """An account signed in in this browser, as the switcher shows it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    username: str
+    display_name: str
+    avatar_url: str | None
+
+
+class AccountsOut(BaseModel):
+    items: list[AccountOut]

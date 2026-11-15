@@ -75,7 +75,7 @@ curl_tls -o /dev/null "${json[@]}" "$site/api/auth/register" \
     -d '{"username":"tls_user","email":"tls@example.com","password":"correct horse battery","display_name":"TLS"}'
 curl_tls -D "$work/login" -o /dev/null -c "$work/jar" "${json[@]}" "$site/api/auth/login" \
     -d '{"email":"tls@example.com","password":"correct horse battery"}'
-grep -i '^set-cookie: refresh_token=' "$work/login" | grep -qi 'secure' \
+grep -iE '^set-cookie: refresh_[0-9a-f]{32}=' "$work/login" | grep -qi 'secure' \
     && pass "the refresh cookie is Secure" || fail "the refresh cookie isn't Secure"
 refresh() { curl_tls -o /dev/null -w '%{http_code}' -b "$work/jar" -c "$work/jar" -X POST \
     -H "Origin: $1" "$site/api/auth/refresh"; }

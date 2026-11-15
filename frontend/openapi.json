@@ -1,6 +1,59 @@
 {
   "components": {
     "schemas": {
+      "AccountOut": {
+        "description": "An account signed in in this browser, as the switcher shows it.",
+        "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "avatar_url"
+        ],
+        "title": "AccountOut",
+        "type": "object"
+      },
+      "AccountsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccountOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AccountsOut",
+        "type": "object"
+      },
       "AdminUserOut": {
         "properties": {
           "created_at": {
@@ -552,6 +605,26 @@
           "password"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "LogoutIn": {
+        "additionalProperties": false,
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sign out of this account only; without it, of all of them",
+            "title": "User Id"
+          }
+        },
+        "title": "LogoutIn",
         "type": "object"
       },
       "MeOut": {
@@ -1220,6 +1293,26 @@
         ],
         "title": "ReactionType",
         "type": "string"
+      },
+      "RefreshIn": {
+        "additionalProperties": false,
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which signed-in account; optional when there's only one",
+            "title": "User Id"
+          }
+        },
+        "title": "RefreshIn",
+        "type": "object"
       },
       "RegisterIn": {
         "additionalProperties": false,
@@ -2313,8 +2406,31 @@
         ]
       }
     },
+    "/api/auth/accounts": {
+      "get": {
+        "description": "Rotates nothing. Cookies that no longer sign anyone in are cleared.",
+        "operationId": "list_accounts_api_auth_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The accounts signed in in this browser, for the account switcher",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
+        "description": "Up to 5 accounts can be signed in at once in one browser.",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
@@ -2357,6 +2473,16 @@
             },
             "description": "Forbidden"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Too many accounts"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2368,7 +2494,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Log in: returns an access token and sets the refresh cookie",
+        "summary": "Log in: returns an access token and adds the account's refresh cookie",
         "tags": [
           "auth"
         ]
@@ -2376,7 +2502,25 @@
     },
     "/api/auth/logout": {
       "post": {
+        "description": "With `user_id`, that account only; without, every account in this browser.",
         "operationId": "logout_api_auth_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LogoutIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -2402,7 +2546,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Revoke the session and clear the refresh cookie",
+        "summary": "Sign out of one account, or of all of them",
         "tags": [
           "auth"
         ]
@@ -2410,8 +2554,25 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "description": "Reusing a refresh token that was already rotated revokes the whole session.",
+        "description": "`user_id` says which of the browser's accounts; it may be left out when there's only one. Reusing a refresh token that was already rotated revokes that session.",
         "operationId": "refresh_api_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -2422,6 +2583,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Which account?"
           },
           "401": {
             "content": {
@@ -2454,7 +2625,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Rotate the refresh cookie and get a new access token",
+        "summary": "Rotate an account's refresh cookie and get a new access token",
         "tags": [
           "auth"
         ]
