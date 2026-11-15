@@ -3411,7 +3411,7 @@ export interface operations {
                     "application/json": components["schemas"]["MeOut"];
                 };
             };
-            /** @description Bad Request */
+            /** @description Not a valid image, or too small or too large in pixels */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3429,7 +3429,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorOut"];
                 };
             };
-            /** @description Content Too Large */
+            /** @description Larger than 6 MB */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -3438,7 +3438,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorOut"];
                 };
             };
-            /** @description Unsupported Media Type */
+            /** @description Not JPEG, PNG or WebP */
             415: {
                 headers: {
                     [name: string]: unknown;

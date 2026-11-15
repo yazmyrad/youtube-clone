@@ -147,10 +147,18 @@ _IMAGE_BODY = {
         },
     }
 }
+# Described here, not by Python: its name for 413 differs between versions, and the schema
+# must be the same wherever it's generated.
 _IMAGE_ERRORS: dict[int | str, dict[str, object]] = {
-    status.HTTP_400_BAD_REQUEST: {"model": ErrorOut},
-    status.HTTP_413_CONTENT_TOO_LARGE: {"model": ErrorOut},
-    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: {"model": ErrorOut},
+    status.HTTP_400_BAD_REQUEST: {
+        "model": ErrorOut,
+        "description": "Not a valid image, or too small or too large in pixels",
+    },
+    status.HTTP_413_CONTENT_TOO_LARGE: {"model": ErrorOut, "description": "Larger than 6 MB"},
+    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: {
+        "model": ErrorOut,
+        "description": "Not JPEG, PNG or WebP",
+    },
 }
 
 

@@ -4705,7 +4705,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Not a valid image, or too small or too large in pixels"
           },
           "401": {
             "content": {
@@ -4725,7 +4725,7 @@
                 }
               }
             },
-            "description": "Content Too Large"
+            "description": "Larger than 6 MB"
           },
           "415": {
             "content": {
@@ -4735,7 +4735,7 @@
                 }
               }
             },
-            "description": "Unsupported Media Type"
+            "description": "Not JPEG, PNG or WebP"
           },
           "422": {
             "content": {
