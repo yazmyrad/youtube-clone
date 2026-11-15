@@ -160,6 +160,11 @@ auth=(-H "Authorization: Bearer $access_token")
         -c:v libx264 -preset ultrafast -pix_fmt yuv420p "/tmp/$0.mp4" \
         && cat "/tmp/$0.mp4"; status=$?; rm -f "/tmp/$0.mp4"; exit "$status"' "${name}v" \
     > "$work/vertical.mp4" || die "could not generate a vertical test clip"
+# And a picture, for the channel's avatar.
+"${compose[@]}" exec -T worker sh -c '
+    ffmpeg -nostdin -v error -y -f lavfi -i color=c=teal:s=400x300 -frames:v 1 "/tmp/$0.jpg" \
+        && cat "/tmp/$0.jpg"; status=$?; rm -f "/tmp/$0.jpg"; exit "$status"' "${name}p" \
+    > "$work/avatar.jpg" || die "could not generate a test picture"
 
 upload_video() { # [file]; sets video_id to a new private video, its file uploaded and queued.
     local file="${1:-$work/clip.mp4}"
@@ -251,6 +256,35 @@ body_has 'id="root"' && pass "the channel page is the SPA" || fail "the channel 
 listed "/api/channels/$name/videos" "the channel's videos, anonymously"
 [ "$(cat "$work/listed")" = "$id_a" ] && pass "D33 the channel lists only the public video" \
     || fail "D33 the channel listed: $(tr '\n' ' ' < "$work/listed")"
+
+expect "the channel's search" 200 "/api/channels/$name/search?q=$name"
+[ "$(json '[v["id"] for v in d["items"]]' < "$work/body")" = "['$id_a']" ] \
+    && pass "the channel's search finds only its public video" \
+    || fail "the channel's search found: $(cat "$work/body")"
+expect "the channel's videos, most viewed first" 200 "/api/channels/$name/videos?sort=popular"
+expect "an unknown sort is refused" 422 "/api/channels/$name/videos?sort=random"
+
+# Channel images: re-encoded by the API, served public and immutable by nginx.
+expect "upload a channel picture" 200 "/api/users/me/images/avatar" -X PUT "${auth[@]}" \
+    -H 'Content-Type: image/jpeg' --data-binary "@$work/avatar.jpg"
+avatar_url="$(json 'd["avatar_url"]' < "$work/body")"
+expect "a picture of another type is refused" 415 "/api/users/me/images/avatar" -X PUT \
+    "${auth[@]}" -H 'Content-Type: image/svg+xml' --data-binary '<svg/>'
+expect "the channel's picture is served" 200 "$avatar_url"
+has_header 'content-type: image/webp' && pass "the picture is WebP" || fail "the picture isn't WebP"
+has_header 'cache-control: public, max-age=31536000, immutable' \
+    && pass "the picture is cached for good" || fail "the picture's caching is wrong"
+has_header 'x-amz-' && fail "storage headers reach the client" \
+    || pass "the picture carries no storage headers"
+[ "$(grep -ci '^x-content-type-options' "$work/headers")" = 1 ] \
+    && pass "nosniff is set once" || fail "nosniff isn't set exactly once"
+expect "the channel shows its picture" 200 "/api/channels/$name"
+[ "$(json 'd["avatar_url"]' < "$work/body")" = "$avatar_url" ] \
+    && pass "the channel carries the picture" || fail "the channel lacks the picture"
+# nginx resolves the climb first, so it lands on /thumbs/, which refuses it.
+expect "a climb out of the images doesn't reach storage" 403 "/channel-images/%2e%2e/thumbs/x.jpg"
+expect "only well-formed image names reach storage" 404 "${avatar_url%.webp}.png"
+expect "the Customize page is served" 200 "/customize"
 
 fan="${name}f"
 curl -fsS --max-time 20 -o /dev/null "${json_type[@]}" -d "{\"username\":\"$fan\",\"email\":\"$fan@example.com\",\"password\":\"correct horse battery\",\"display_name\":\"Fan\"}" \
@@ -424,7 +458,8 @@ case "$sig" in
     0*) forged_sig="1${sig#0}" ;;
     *) forged_sig="0${sig#?}" ;;
 esac
-past=$(( $(date +%s) - 60 ))
+# By the API's clock, which is the one that judges: a VM's can drift from this host's.
+past=$(( $("${compose[@]}" exec -T api date +%s) - 60 ))
 expired="$past.$(sign hls "$id_a" "$past")"
 
 for file in master.m3u8 360p/index.m3u8 360p/seg_00000.ts; do
