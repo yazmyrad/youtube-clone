@@ -46,7 +46,12 @@ const activeRow = ({ isActive }: { isActive: boolean }) =>
 function ChannelEntry({ channel }: { channel: SubscribedChannel }) {
   return (
     <NavLink to={channelPath(channel.username)} className={activeRow}>
-      <Avatar name={channel.display_name} username={channel.username} className="size-6 text-xs" />
+      <Avatar
+        name={channel.display_name}
+        username={channel.username}
+        src={channel.avatar_url}
+        className="size-6 text-xs"
+      />
       <span className="truncate">{channel.display_name}</span>
     </NavLink>
   );

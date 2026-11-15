@@ -20,7 +20,11 @@ const CHANNEL = {
   display_name: "Ana Codes",
   description: "Short videos about code",
   subscribers_count: 1234,
-  created_at: "2026-01-01T00:00:00Z",
+  avatar_url: null as string | null,
+  banner_url: null as string | null,
+  videos_count: 1,
+  views_count: 1234567,
+  created_at: "2026-01-01T12:00:00Z",
   is_subscribed: false,
 };
 
@@ -31,8 +35,9 @@ const card = (id: string, title: string, visibility = "public") => ({
   views_count: 3,
   published_at: "2026-01-02T03:04:05Z",
   thumbnail_url: `/thumbs/${id}.jpg`,
-  channel: { username: "ana", display_name: "Ana Codes" },
+  channel: { username: "ana", display_name: "Ana Codes", avatar_url: null },
   visibility,
+  is_short: false,
 });
 
 let container: HTMLDivElement;
@@ -121,17 +126,18 @@ describe("handleToUsername", () => {
 it("shows the channel header and its videos", async () => {
   serve(CHANNEL, [card("a", "Rust in 100 Seconds")]);
 
-  await render();
+  await render("/@ana/videos");
   await shows("Rust in 100 Seconds");
 
   expect(container.querySelector("h1")?.textContent).toBe("Ana Codes");
   expect(container.textContent).toContain("@ana");
   expect(container.textContent).toContain("1.2K subscribers");
+  expect(container.textContent).toContain("1 video");
   expect(container.textContent).toContain("Short videos about code");
   expect(api.GET).toHaveBeenCalledWith(
     "/api/channels/{username}/videos",
     expect.objectContaining({
-      params: { path: { username: "ana" }, query: { cursor: undefined } },
+      params: { path: { username: "ana" }, query: { cursor: undefined, sort: "latest" } },
     }),
   );
 });
@@ -184,11 +190,13 @@ it("shows the owner Manage videos, not Subscribe, and labels their hidden-from-o
   auth.user = { username: "ana" };
   serve(CHANNEL, [card("a", "Draft", "private"), card("b", "Link only", "unlisted")]);
 
-  await render();
+  await render("/@ana/videos");
   await shows("Draft");
 
   expect(button("Subscribe")).toBeUndefined();
   expect(container.textContent).toContain("Manage videos");
+  const links = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  expect(links).toContain("/customize");
   expect(container.textContent).toContain("Private");
   expect(container.textContent).toContain("Unlisted");
 });
@@ -220,7 +228,7 @@ it("lists the channel's playlists on its Playlists tab", async () => {
               id: "p1",
               title: "Rust picks",
               visibility: "public",
-              channel: { username: "ana", display_name: "Ana Codes" },
+              channel: { username: "ana", display_name: "Ana Codes", avatar_url: null },
               video_count: 3,
               thumbnail_url: "/thumbs/a.jpg",
               updated_at: "2026-01-02T00:00:00Z",
@@ -258,4 +266,133 @@ it("is a not-found page for an unknown tab", async () => {
   await render("/@ana/about-us");
 
   await shows("This page isn't available");
+});
+
+/** Answers each list by its path and sort, for the Home tab's shelves. */
+function serveLists(lists: Record<string, object[]>, channel: object = CHANNEL) {
+  api.GET.mockImplementation(
+    async (path: string, init: { params?: { query?: { sort?: string; q?: string } } }) => {
+      if (path === "/api/channels/{username}") return { data: channel, response: new Response() };
+      const sort = init.params?.query?.sort;
+      const items = lists[sort ? `${path}?sort=${sort}` : path] ?? [];
+      return { data: { items, next_cursor: null } };
+    },
+  );
+}
+
+function hrefs() {
+  return [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+}
+
+it("opens on Home: the newest video, then shelves of videos, Shorts and the most viewed", async () => {
+  const short = { ...card("s", "A quick tip"), is_short: true };
+  serveLists({
+    "/api/channels/{username}/videos?sort=latest": [
+      card("a", "Newest one"),
+      card("b", "Middle one"),
+      card("c", "Oldest one"),
+    ],
+    "/api/channels/{username}/videos?sort=popular": [card("c", "Oldest one")],
+    "/api/channels/{username}/shorts?sort=latest": [short],
+  });
+
+  await render();
+  await shows("A quick tip");
+
+  const featured = container.querySelector("[aria-label='Featured video']");
+  expect(featured?.textContent).toContain("Newest one");
+  const headings = [...container.querySelectorAll("h2")].map((h) => h.textContent);
+  expect(headings).toEqual(expect.arrayContaining(["Videos", "Shorts", "Popular videos"]));
+  expect(hrefs()).toEqual(
+    expect.arrayContaining(["/@ana/videos", "/@ana/shorts", "/@ana/videos?sort=popular"]),
+  );
+  expect(container.querySelector("nav [aria-current=page]")?.textContent).toBe("Home");
+});
+
+it("sorts the Videos tab by the chip chosen, kept in the address", async () => {
+  serveLists({
+    "/api/channels/{username}/videos?sort=latest": [card("a", "Newest one")],
+    "/api/channels/{username}/videos?sort=popular": [card("p", "Most watched")],
+  });
+
+  await render("/@ana/videos");
+  await shows("Newest one");
+  await act(async () => button("Popular")!.click());
+  await shows("Most watched");
+
+  expect(container.querySelector("[data-testid=where]")?.textContent).toBe(
+    "/@ana/videos?sort=popular",
+  );
+  expect(button("Popular")?.getAttribute("aria-pressed")).toBe("true");
+});
+
+it("shows the banner and the channel's picture", async () => {
+  serveLists(
+    {},
+    { ...CHANNEL, avatar_url: "/channel-images/a.webp", banner_url: "/channel-images/b.webp" },
+  );
+
+  await render();
+  await shows("This channel has no videos yet.");
+
+  const images = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+  expect(images).toEqual(
+    expect.arrayContaining(["/channel-images/a.webp", "/channel-images/b.webp"]),
+  );
+});
+
+it("opens About with the whole description and the channel's numbers, and closes on Escape", async () => {
+  serveLists({});
+
+  await render();
+  await shows("...more");
+  const more = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.includes("...more"),
+  )!;
+  await act(async () => more.click());
+
+  const dialog = container.querySelector("[role=dialog]");
+  expect(dialog?.textContent).toContain("Short videos about code");
+  expect(dialog?.textContent).toContain("1,234,567 views");
+  expect(dialog?.textContent).toContain("1 video");
+  expect(dialog?.textContent).toContain("Joined Jan 1, 2026");
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  });
+  expect(container.querySelector("[role=dialog]")).toBeNull();
+});
+
+it("searches the channel from the magnifier", async () => {
+  api.GET.mockImplementation(async (path: string, init: { params?: { query?: { q?: string } } }) => {
+    if (path === "/api/channels/{username}") return { data: CHANNEL, response: new Response() };
+    if (path === "/api/channels/{username}/search") {
+      const items = init.params?.query?.q === "rust" ? [card("r", "Rust in 100 Seconds")] : [];
+      return { data: { items, next_cursor: null } };
+    }
+    return { data: { items: [], next_cursor: null } };
+  });
+
+  await render();
+  await shows("This channel has no videos yet.");
+  await act(async () => button("")!.click());
+  const input = container.querySelector<HTMLInputElement>("input[type=search]")!;
+  await act(async () => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setValue.call(input, "rust");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => input.form!.requestSubmit());
+  await shows("Rust in 100 Seconds");
+
+  expect(container.querySelector("[data-testid=where]")?.textContent).toBe(
+    "/@ana/search?query=rust",
+  );
+});
+
+it("says so when a channel search finds nothing", async () => {
+  serveLists({});
+
+  await render("/@ana/search?query=haskell");
+
+  await shows('This channel has no videos matching "haskell".');
 });

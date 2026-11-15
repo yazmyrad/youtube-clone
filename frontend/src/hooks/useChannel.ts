@@ -37,15 +37,47 @@ export function useChannel(username: string, enabled = true) {
   });
 }
 
-export function useChannelVideos(username: string) {
+export type VideoSort = "latest" | "popular" | "oldest";
+export const VIDEO_SORTS: { sort: VideoSort; label: string }[] = [
+  { sort: "latest", label: "Latest" },
+  { sort: "popular", label: "Popular" },
+  { sort: "oldest", label: "Oldest" },
+];
+
+/** "?sort=" from the address; anything else is the default. */
+export function parseSort(value: string | null): VideoSort {
+  return VIDEO_SORTS.some((entry) => entry.sort === value) ? (value as VideoSort) : "latest";
+}
+
+export function useChannelVideos(username: string, sort: VideoSort = "latest") {
   const { user, isLoading } = useAuth();
   return useInfiniteQuery({
-    queryKey: [...channelKey(username, user?.username ?? null), "videos"],
+    queryKey: [...channelKey(username, user?.username ?? null), "videos", sort],
     enabled: !isLoading,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) => {
       const { data, error } = await api.GET("/api/channels/{username}/videos", {
-        params: { path: { username }, query: { cursor: pageParam } },
+        params: { path: { username }, query: { cursor: pageParam, sort } },
+        signal,
+      });
+      if (!data) throw new Error(errorMessage(error));
+      return data;
+    },
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+  });
+}
+
+/** The channel's search box: its videos and Shorts with `q` in the title. */
+export function useChannelSearch(username: string, q: string) {
+  const { user, isLoading } = useAuth();
+  const query = q.trim();
+  return useInfiniteQuery({
+    queryKey: [...channelKey(username, user?.username ?? null), "search", query],
+    enabled: !isLoading && query.length >= 2,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) => {
+      const { data, error } = await api.GET("/api/channels/{username}/search", {
+        params: { path: { username }, query: { q: query, cursor: pageParam } },
         signal,
       });
       if (!data) throw new Error(errorMessage(error));

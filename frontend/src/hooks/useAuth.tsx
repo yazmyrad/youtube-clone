@@ -18,7 +18,7 @@ interface Auth {
   logout: () => Promise<void>;
 }
 
-const ME_KEY = ["me"];
+export const ME_KEY = ["me"];
 const AuthContext = createContext<Auth | null>(null);
 
 // One account's data must not be shown to the next. Not queryClient.clear(), which would

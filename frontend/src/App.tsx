@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { ChannelPage } from "./pages/ChannelPage";
+import { CustomizePage } from "./pages/CustomizePage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -31,6 +32,7 @@ export function App() {
         <Route path="/moderation" element={<ModerationPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/upload" element={<UploadPage />} />
+        <Route path="/customize" element={<CustomizePage />} />
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/:handle/:tab?" element={<ChannelPage />} />
         <Route path="/playlist" element={<PlaylistPage />} />

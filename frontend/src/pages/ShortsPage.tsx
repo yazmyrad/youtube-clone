@@ -296,6 +296,7 @@ function ShortInfo({ video, active }: { video: ShortCardData; active: boolean })
           <Avatar
             name={video.channel.display_name}
             username={video.channel.username}
+            src={video.channel.avatar_url}
             className="size-8 text-sm"
           />
           <span className="truncate text-sm font-medium">@{video.channel.username}</span>

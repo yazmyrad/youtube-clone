@@ -19,6 +19,7 @@ export function CommentItem({ comment }: { comment: Comment }) {
       <Avatar
         name={comment.author.display_name}
         username={comment.author.username}
+        src={comment.author.avatar_url}
         className="size-10"
       />
       <div className="min-w-0">
@@ -64,7 +65,12 @@ function CommentForm({ videoId }: { videoId: string }) {
 
   return (
     <form onSubmit={submit} className="flex gap-3">
-      <Avatar name={user.display_name} username={user.username} className="size-10" />
+      <Avatar
+        name={user.display_name}
+        username={user.username}
+        src={user.avatar_url}
+        className="size-10"
+      />
       <div className="min-w-0 flex-1">
         <textarea
           aria-label="Add a comment"

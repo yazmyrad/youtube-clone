@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import type { Me } from "../hooks/useAuth";
 import { Avatar } from "./Avatar";
+import { channelPath } from "./format";
 
 export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
@@ -42,14 +44,33 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
         onClick={() => setOpen((value) => !value)}
         className="rounded-full"
       >
-        <Avatar name={user.display_name} username={user.username} className="size-8 text-sm" />
+        <Avatar
+          name={user.display_name}
+          username={user.username}
+          src={user.avatar_url}
+          className="size-8 text-sm"
+        />
       </button>
       {open && (
         <div className="absolute top-10 right-0 w-64 rounded-xl border border-line bg-page py-2 shadow-lg">
           <div className="border-b border-line px-4 pb-3">
             <p className="truncate font-medium">{user.display_name}</p>
             <p className="truncate text-sm text-ink-muted">@{user.username}</p>
+            <Link
+              to={channelPath(user.username)}
+              onClick={() => setOpen(false)}
+              className="mt-2 inline-block text-sm text-accent hover:underline"
+            >
+              View your channel
+            </Link>
           </div>
+          <Link
+            to="/customize"
+            onClick={() => setOpen(false)}
+            className="mt-2 flex h-10 items-center px-4 text-sm hover:bg-hover"
+          >
+            Customize channel
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}

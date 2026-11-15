@@ -24,3 +24,10 @@ it("shows the first letter, decoratively", () => {
 it("handles a name that starts with an emoji as one letter", () => {
   expect(renderToString(<Avatar name="🎬 Studio" username="studio" />)).toContain(">🎬<");
 });
+
+it("shows the channel's picture when it has one", () => {
+  const html = renderToString(<Avatar name="Ana" username="ana" src="/channel-images/a.webp" />);
+
+  expect(html).toContain('src="/channel-images/a.webp"');
+  expect(html).not.toContain(">A<");
+});

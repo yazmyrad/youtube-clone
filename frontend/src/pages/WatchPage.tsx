@@ -30,6 +30,7 @@ function ChannelRow({ video }: { video: VideoDetails }) {
         <Avatar
           name={video.channel.display_name}
           username={video.channel.username}
+          src={video.channel.avatar_url}
           className="size-10"
         />
       </Link>

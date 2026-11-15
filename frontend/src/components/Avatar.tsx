@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 /** Dark enough for white letters to read (WCAG AA), and distinct from one another. */
 export const AVATAR_COLORS = [
   "#3949ab",
@@ -21,17 +23,33 @@ export function avatarColor(username: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]!;
 }
 
-/** A letter avatar. Decorative: the name is always written next to it. */
+/** The channel's picture, or its letter avatar when it has none (or the picture won't load).
+ * Decorative: the name is always written next to it. */
 export function Avatar({
   name,
   username,
+  src,
   className = "size-9 text-sm",
 }: {
   name: string;
   username: string;
+  src?: string | null;
   /** Size and text size. */
   className?: string;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (src && failed !== src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={() => setFailed(src)}
+        className={`shrink-0 rounded-full bg-hover object-cover ${className}`}
+      />
+    );
+  }
   return (
     <span
       aria-hidden

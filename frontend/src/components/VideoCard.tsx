@@ -84,7 +84,11 @@ export function VideoGridCard({
       <div className="mt-3 flex gap-3">
         {showChannel && (
           <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
-            <Avatar name={video.channel.display_name} username={video.channel.username} />
+            <Avatar
+              name={video.channel.display_name}
+              username={video.channel.username}
+              src={video.channel.avatar_url}
+            />
           </Link>
         )}
         <div className="min-w-0">
@@ -127,7 +131,11 @@ export function VideoRowCard({ video, onThumbnailError, progress }: CardProps) {
         <Meta video={video} />
         <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
           <Link to={channelPath(video.channel.username)} tabIndex={-1} aria-hidden>
-            <Avatar name={video.channel.display_name} username={video.channel.username} />
+            <Avatar
+              name={video.channel.display_name}
+              username={video.channel.username}
+              src={video.channel.avatar_url}
+            />
           </Link>
           <span className="truncate">
             <ChannelLink video={video} />
