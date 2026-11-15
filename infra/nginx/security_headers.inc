@@ -4,5 +4,6 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header X-Frame-Options "DENY" always;
 # Playback and thumbnail URLs carry tokens: never hand a page's URL to another site.
 add_header Referrer-Policy "same-origin" always;
-add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+# The microphone is for voice search, on this site only.
+add_header Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=()" always;
 add_header Cross-Origin-Opener-Policy "same-origin" always;

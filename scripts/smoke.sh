@@ -122,6 +122,8 @@ if [ -z "${SMOKE_DEV:-}" ]; then
     fi
     if has_header 'cache-control: no-cache'; then pass "index.html is revalidated"; else fail "index.html is revalidated"; fi
     if has_header 'x-content-type-options: nosniff'; then pass "index.html is nosniff"; else fail "index.html is nosniff"; fi
+    # Voice search may use the microphone, on this site only; nothing may use the camera.
+    if has_header 'permissions-policy: camera=\(\), microphone=\(self\),'; then pass "only this site may use the microphone"; else fail "only this site may use the microphone"; fi
     # The page is only as good as the script it points at.
     script="$(grep -aoE '/assets/[^"]+\.js' "$work/body" | head -n 1)"
     if [ -n "$script" ]; then

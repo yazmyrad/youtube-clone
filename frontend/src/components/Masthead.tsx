@@ -6,6 +6,7 @@ import { MAX_QUERY } from "../hooks/useSearch";
 import { AccountIcon, BackIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
 import { SiteSettings } from "./SiteSettings";
 import { UserMenu } from "./UserMenu";
+import { VoiceSearch } from "./VoiceSearch";
 
 export function Masthead({ onMenu }: { onMenu: () => void }) {
   const { pathname, search } = useLocation();
@@ -21,12 +22,16 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
   // Show the search that is on screen, also after Back and Forward.
   useEffect(() => setQuery(current), [current]);
 
-  function submitSearch(event: FormEvent) {
-    event.preventDefault();
-    const text = query.trim();
+  function searchFor(text: string) {
     if (!text) return;
+    setQuery(text);
     setSearchOpen(false);
     navigate(`/results?search_query=${encodeURIComponent(text)}`);
+  }
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    searchFor(query.trim());
   }
 
   return (
@@ -83,6 +88,7 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
         >
           <SearchIcon />
         </button>
+        <VoiceSearch onResult={searchFor} />
       </form>
 
       <div className="flex shrink-0 items-center gap-3">
