@@ -156,6 +156,10 @@ With Claude Code, following the plan in `docs/architecture.md` one step at a tim
   step's diff, and a `security-auditor` run after auth, upload and playback work and before
   submission. Their findings, and what was fixed, are in the commit messages.
 - `.claude/settings.json`: a hook that runs ruff after every edit.
+- `chat_history/`: a folder with prompts history, unfortunately due some technical issues the work  
+   environment was switched to macosx so there are two zip folders: 
+   1. youtube-clone-chat-history.zip
+   2. -Users-yhlas-Desktop-youtube-clone.zip
 
 ## Submission checklist
 
