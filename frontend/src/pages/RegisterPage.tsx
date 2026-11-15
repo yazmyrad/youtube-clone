@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
 import { AuthCard, AuthForm, Field } from "../components/AuthForm";
@@ -5,12 +6,19 @@ import { useAuth } from "../hooks/useAuth";
 import { safeNext } from "./safeNext";
 
 export function RegisterPage() {
-  const { user, register } = useAuth();
+  const { user, isLoading, register } = useAuth();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
+  const adding = params.get("add") === "1";
+  // Who was signed in when the page opened: the account being added is someone else.
+  const startedAs = useRef<string | null | undefined>(undefined);
+  if (!isLoading && startedAs.current === undefined) startedAs.current = user?.id ?? null;
 
   // Also what moves the page on once the new account is signed in.
-  if (user) return <Navigate to={next} replace />;
+  // Also what moves the page on after a successful sign-in. Adding an account, the page
+  // stays until the new one is in.
+  if (isLoading) return null;
+  if (user && !(adding && user.id === startedAs.current)) return <Navigate to={next} replace />;
 
   return (
     <AuthCard title="Create your account" subtitle="Upload, comment and subscribe">
@@ -25,7 +33,10 @@ export function RegisterPage() {
           })
         }
         footer={
-          <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-medium text-accent">
+          <Link
+            to={`/login?next=${encodeURIComponent(next)}${adding ? "&add=1" : ""}`}
+            className="font-medium text-accent"
+          >
             Sign in instead
           </Link>
         }

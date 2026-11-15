@@ -424,3 +424,141 @@ describe("authMiddleware", () => {
     expect(fetchFn).toHaveBeenCalledOnce();
   });
 });
+
+/** An access token for `sub`, as far as the session reads it (the server verifies it). */
+const tokenFor = (sub: string, n = 1) => `h.${btoa(JSON.stringify({ sub, n }))}.s`;
+
+describe("several accounts", () => {
+  function accountsWorld() {
+    const storage = memoryStorage();
+    const calls: (string | null)[] = [];
+    const listeners = new Set<(key: string | null) => void>();
+    let n = 0;
+    const refreshRequest: SessionDeps["refreshRequest"] = async (_signal, account) => {
+      calls.push(account);
+      n += 1;
+      return account === "gone" ? null : tokenFor(account ?? "only", n);
+    };
+    const tab = () =>
+      createSession({
+        refreshRequest,
+        storage: () => storage,
+        sleep: yieldToOthers,
+        onStorage: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      });
+    // What the browser does for the other tabs when one writes to localStorage.
+    const broadcast = (key: string) => listeners.forEach((listener) => listener(key));
+    return { storage, calls, tab, broadcast };
+  }
+
+  it("remembers the account signed in to, and refreshes that one", async () => {
+    const { storage, calls, tab } = accountsWorld();
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+    session.clear(); // A reload: the token is gone, the choice of account isn't.
+
+    await session.refresh();
+
+    expect(storage.items.get("auth.account")).toBe("alice");
+    expect(calls).toEqual(["alice"]);
+    expect(session.getAccount()).toBe("alice");
+  });
+
+  it("switches to another account and tells the page", async () => {
+    const { storage, calls, tab } = accountsWorld();
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+    const changed = vi.fn();
+    session.onAccountChanged(changed);
+
+    const token = await session.switchTo("bob");
+
+    expect(token).toBe(tokenFor("bob", 1));
+    expect(calls).toEqual(["bob"]);
+    expect(storage.items.get("auth.account")).toBe("bob");
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
+  it("has no token when the account switched to is signed out", async () => {
+    const { tab } = accountsWorld();
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+
+    expect(await session.switchTo("gone")).toBeNull();
+    expect(session.getToken()).toBeNull();
+  });
+
+  it("makes the other tabs follow a switch", async () => {
+    const { tab, broadcast } = accountsWorld();
+    const [first, second] = [tab(), tab()];
+    first.setToken(tokenFor("alice"));
+    second.setToken(tokenFor("alice"));
+    const changed = vi.fn();
+    second.onAccountChanged(changed);
+
+    await first.switchTo("bob");
+    broadcast("auth.account");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+
+    expect(second.getAccount()).toBe("bob");
+  });
+
+  it("ignores other keys and a switch to the account already in use", async () => {
+    const { calls, tab, broadcast, storage } = accountsWorld();
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+
+    broadcast("auth.refresh.lease");
+    storage.setItem("auth.account", "alice");
+    broadcast("auth.account");
+    await yieldToOthers();
+
+    expect(calls).toEqual([]);
+  });
+
+  it("forgets the account after signing out of it", () => {
+    const { storage, tab } = accountsWorld();
+    const session = tab();
+    session.setToken(tokenFor("alice"));
+
+    session.clear();
+    session.forgetAccount();
+
+    expect(storage.items.has("auth.account")).toBe(false);
+    expect(session.getAccount()).toBeNull();
+  });
+});
+
+describe("requestRefresh", () => {
+  it("names the account to refresh", async () => {
+    const fetchFn = vi.fn(
+      async (_request: Request) =>
+        new Response('{"access_token":"t","token_type":"bearer","expires_in":900}', {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    await requestRefresh(createApi("http://test", fetchFn), new AbortController().signal, "a1");
+
+    expect(await fetchFn.mock.calls[0]![0].json()).toEqual({ user_id: "a1" });
+  });
+
+  it("reads 'which account?' as no session, not a failure", async () => {
+    const fetchFn = async () =>
+      new Response('{"detail":"say which one"}', {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const result = await requestRefresh(
+      createApi("http://test", fetchFn),
+      new AbortController().signal,
+    );
+
+    expect(result).toBeNull();
+  });
+});

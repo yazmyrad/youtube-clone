@@ -49,11 +49,19 @@ export function authMiddleware(session: Session, fetchFn: FetchFn = browserFetch
   };
 }
 
-/** Only a 401 means the session is over. Anything else is the server failing to answer. */
-export async function requestRefresh(client: Api, signal: AbortSignal): Promise<string | null> {
-  const { data, response } = await client.POST("/api/auth/refresh", { signal });
+/** Only a 401 means the session is over, and a 400 that no account was named among several.
+ * Anything else is the server failing to answer. */
+export async function requestRefresh(
+  client: Api,
+  signal: AbortSignal,
+  account: string | null = null,
+): Promise<string | null> {
+  const { data, response } = await client.POST("/api/auth/refresh", {
+    signal,
+    ...(account ? { body: { user_id: account } } : {}),
+  });
   if (data) return data.access_token;
-  if (response.status === 401) return null;
+  if (response.status === 401 || response.status === 400) return null;
   throw new Error(`Refresh failed (${response.status})`);
 }
 
@@ -61,7 +69,13 @@ const unauthenticated = createApi();
 
 export const session = createSession({
   storage: () => window.localStorage,
-  refreshRequest: (signal) => requestRefresh(unauthenticated, signal),
+  refreshRequest: (signal, account) => requestRefresh(unauthenticated, signal, account),
+  onStorage(listener) {
+    if (typeof window === "undefined") return () => {}; // Not a browser: no other tabs.
+    const onStorage = (event: StorageEvent) => listener(event.key);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  },
 });
 
 export const api = createApi();

@@ -1,6 +1,8 @@
 /** The signed-in session. The access token lives only in this module's memory. */
 
 const LEASE_KEY = "auth.refresh.lease";
+/** Which of the browser's signed-in accounts this site is using, in every tab. */
+export const ACCOUNT_KEY = "auth.account";
 /** How long a closed tab can block the others. A live holder keeps renewing its lease. */
 const LEASE_MS = 10_000;
 const LEASE_RENEW_MS = 3_000;
@@ -17,9 +19,11 @@ type LeaseStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export interface SessionDeps {
   /** Returns a new access token, or null if the refresh cookie was refused. Throws if the
    * server couldn't give an answer, which says nothing about the session. */
-  refreshRequest: (signal: AbortSignal) => Promise<string | null>;
+  refreshRequest: (signal: AbortSignal, account: string | null) => Promise<string | null>;
   /** A function, because merely reading window.localStorage can throw. */
   storage: () => LeaseStorage;
+  /** Calls `listener` when another tab writes `key`: how a switch of account reaches them. */
+  onStorage?: (listener: (key: string | null) => void) => () => void;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -39,6 +43,13 @@ export interface Session {
   onLost: (listener: () => void) => () => void;
   /** Calls `listener` when a refresh comes back as another user, after a login in another tab. */
   onAccountChanged: (listener: () => void) => () => void;
+  /** The account in use (its user id), or null. */
+  getAccount: () => string | null;
+  /** Uses another of the browser's signed-in accounts, here and in every other tab. Null if
+   * it can no longer be refreshed. */
+  switchTo: (account: string) => Promise<string | null>;
+  /** Forgets which account was in use, after signing out of it. */
+  forgetAccount: () => void;
 }
 
 interface Lease {
@@ -65,6 +76,25 @@ function subjectOf(accessToken: string): string | null {
 }
 
 export function createSession(deps: SessionDeps): Session {
+  function readAccount(): string | null {
+    try {
+      return deps.storage().getItem(ACCOUNT_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAccount(account: string | null) {
+    try {
+      if (account === null) deps.storage().removeItem(ACCOUNT_KEY);
+      else if (deps.storage().getItem(ACCOUNT_KEY) !== account) {
+        deps.storage().setItem(ACCOUNT_KEY, account);
+      }
+    } catch {
+      // No storage: this tab still knows, from its token.
+    }
+  }
+
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)));
   const lostListeners = new Set<() => void>();
@@ -131,7 +161,10 @@ export function createSession(deps: SessionDeps): Session {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
     try {
-      fresh = await deps.refreshRequest(controller.signal);
+      // This tab's own account first, so another tab's switch doesn't take it over mid-way;
+      // then whichever account the browser is using.
+      const account = (previous && subjectOf(previous)) ?? readAccount();
+      fresh = await deps.refreshRequest(controller.signal, account);
     } catch {
       return null; // A temporary failure: the cookie is still good, so keep the session.
     } finally {
@@ -140,6 +173,7 @@ export function createSession(deps: SessionDeps): Session {
     }
     if (epoch !== startedAt) return token;
     token = fresh;
+    if (fresh !== null) writeAccount(subjectOf(fresh));
     if (previous !== null) {
       if (fresh === null) lostListeners.forEach((listener) => listener());
       else if (subjectOf(fresh) !== subjectOf(previous)) {
@@ -156,11 +190,47 @@ export function createSession(deps: SessionDeps): Session {
     return inFlight;
   }
 
+  async function switchTo(account: string): Promise<string | null> {
+    epoch += 1;
+    const before = token;
+    token = null;
+    writeAccount(account);
+    const startedAt = epoch;
+    const release = await acquireLease();
+    if (!release) return null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+    let fresh: string | null = null;
+    try {
+      fresh = await deps.refreshRequest(controller.signal, account);
+    } catch {
+      fresh = null;
+    } finally {
+      clearTimeout(timeout);
+      release();
+    }
+    if (epoch !== startedAt) return token;
+    token = fresh;
+    if (fresh !== null && before !== null && subjectOf(fresh) !== subjectOf(before)) {
+      accountListeners.forEach((listener) => listener());
+    }
+    return fresh;
+  }
+
+  // Another tab switched account: follow it, as YouTube's tabs do.
+  deps.onStorage?.((key) => {
+    if (key !== ACCOUNT_KEY) return;
+    const account = readAccount();
+    if (account === null || token === null || subjectOf(token) === account) return;
+    void switchTo(account);
+  });
+
   return {
     getToken: () => token,
     setToken(next) {
       epoch += 1;
       token = next;
+      writeAccount(subjectOf(next));
     },
     clear() {
       epoch += 1;
@@ -182,6 +252,11 @@ export function createSession(deps: SessionDeps): Session {
     onAccountChanged(listener) {
       accountListeners.add(listener);
       return () => accountListeners.delete(listener);
+    },
+    getAccount: () => (token ? subjectOf(token) : null) ?? readAccount(),
+    switchTo,
+    forgetAccount() {
+      writeAccount(null);
     },
   };
 }

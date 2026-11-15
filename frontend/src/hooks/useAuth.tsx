@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
-import { registerAndSignIn, signOut } from "../api/account";
+import { listAccounts, registerAndSignIn, signOut } from "../api/account";
 import { api, authApi, session } from "../api/client";
 import { errorMessage } from "../api/errors";
 import type { components } from "../api/schema";
@@ -15,8 +15,15 @@ interface Auth {
   isLoading: boolean;
   login: (credentials: LoginIn) => Promise<void>;
   register: (account: RegisterIn) => Promise<void>;
+  /** Signs out of the account in use; the next signed-in one, if any, takes over. */
   logout: () => Promise<void>;
+  /** Signs out of every account in this browser. */
+  logoutAll: () => Promise<void>;
+  /** Uses another of the browser's signed-in accounts. */
+  switchAccount: (accountId: string) => Promise<void>;
 }
+
+export const ACCOUNTS_KEY = ["accounts"];
 
 export const ME_KEY = ["me"];
 const AuthContext = createContext<Auth | null>(null);
@@ -29,7 +36,12 @@ function dropAccountData(queryClient: QueryClient) {
 
 async function fetchMe(): Promise<Me | null> {
   await session.restore();
-  if (session.getToken() === null) return null;
+  if (session.getToken() === null) {
+    // The account in use was signed out (here or in another tab), or none was chosen yet:
+    // carry on as another account still signed in in this browser, as YouTube does.
+    const next = (await listAccounts(authApi).catch(() => []))[0];
+    if (!next || (await session.switchTo(next.id)) === null) return null;
+  }
   const { data, response } = await api.GET("/api/users/me");
   if (data) return data;
   // A token that's still held means the refresh failed for now. Throwing keeps the last result.
@@ -62,7 +74,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async logout() {
         await signOut(authApi, session);
         dropAccountData(queryClient);
+        if (session.getToken() === null) queryClient.setQueryData(ME_KEY, null);
+        else await queryClient.invalidateQueries({ queryKey: ME_KEY });
+      },
+      async logoutAll() {
+        await signOut(authApi, session, true);
+        dropAccountData(queryClient);
         queryClient.setQueryData(ME_KEY, null);
+      },
+      async switchAccount(accountId) {
+        if (accountId === data?.id) return;
+        const token = await session.switchTo(accountId);
+        dropAccountData(queryClient);
+        if (token === null) throw new Error("That account is signed out. Please sign in again.");
+        await queryClient.invalidateQueries({ queryKey: ME_KEY });
       },
     };
   }, [data, isPending, queryClient]);

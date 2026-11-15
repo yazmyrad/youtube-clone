@@ -26,10 +26,27 @@ export async function registerAndSignIn(
   }
 }
 
+export type SignedInAccount = components["schemas"]["AccountOut"];
+
+/** The accounts signed in in this browser, for the switcher. */
+export async function listAccounts(client: Api): Promise<SignedInAccount[]> {
+  const { data, error } = await client.GET("/api/auth/accounts");
+  if (!data) throw new Error(errorMessage(error));
+  return data.items;
+}
+
 /** The session ends only once the server has revoked it: otherwise a reload would bring it
- * back, on what the user believes is a signed-out computer. */
-export async function signOut(client: Api, session: Session): Promise<void> {
-  const { response } = await client.POST("/api/auth/logout");
+ * back, on what the user believes is a signed-out computer. With `all`, every account in
+ * the browser; otherwise only the one in use, and the next one signed in takes over. */
+export async function signOut(client: Api, session: Session, all = false): Promise<void> {
+  const account = session.getAccount();
+  const { response } = await client.POST("/api/auth/logout", {
+    ...(!all && account ? { body: { user_id: account } } : {}),
+  });
   if (!response.ok) throw new Error(SIGN_OUT_FAILED);
   session.clear();
+  session.forgetAccount();
+  if (all) return;
+  const next = (await listAccounts(client).catch(() => []))[0];
+  if (next) await session.switchTo(next.id);
 }

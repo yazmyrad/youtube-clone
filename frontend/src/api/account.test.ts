@@ -82,3 +82,66 @@ describe("signOut", () => {
     expect(session.getToken()).toBe("token");
   });
 });
+
+describe("signing out with several accounts", () => {
+  const tokenFor = (sub: string) => `h.${btoa(JSON.stringify({ sub }))}.s`;
+
+  function browser(remaining: { id: string }[]) {
+    const items = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => void items.set(key, value),
+      removeItem: (key: string) => void items.delete(key),
+    };
+    const refreshed: (string | null)[] = [];
+    const session = createSession({
+      refreshRequest: async (_signal, account) => {
+        refreshed.push(account);
+        return account ? tokenFor(account) : null;
+      },
+      storage: () => storage,
+      sleep: async () => {},
+    });
+    session.setToken(tokenFor("alice"));
+    const requests: Request[] = [];
+    const client = createApi("http://test", async (request) => {
+      requests.push(request);
+      if (request.url.endsWith("/api/auth/accounts")) {
+        return new Response(JSON.stringify({ items: remaining }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(null, { status: 204 });
+    });
+    return { session, client, requests, refreshed };
+  }
+
+  it("signs out of the account in use only, and carries on as the next one", async () => {
+    const { session, client, requests, refreshed } = browser([{ id: "bob" }]);
+
+    await signOut(client, session);
+
+    expect(await requests[0]!.json()).toEqual({ user_id: "alice" });
+    expect(refreshed).toEqual(["bob"]);
+    expect(session.getAccount()).toBe("bob");
+  });
+
+  it("is signed out when no other account is left", async () => {
+    const { session, client } = browser([]);
+
+    await signOut(client, session);
+
+    expect(session.getToken()).toBeNull();
+    expect(session.getAccount()).toBeNull();
+  });
+
+  it("signs out of every account at once", async () => {
+    const { session, client, requests } = browser([{ id: "bob" }]);
+
+    await signOut(client, session, true);
+
+    expect(requests).toHaveLength(1);
+    expect(await requests[0]!.text()).toBe("");
+    expect(session.getToken()).toBeNull();
+  });
+});
