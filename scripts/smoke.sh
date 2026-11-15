@@ -294,6 +294,36 @@ curl -fsS --max-time 20 -o "$work/login" "${json_type[@]}" \
     "$base/api/auth/login" || die "could not log in as the second user"
 fan_auth=(-H "Authorization: Bearer $(json 'd["access_token"]' < "$work/login")")
 
+# --- Several accounts in one browser ----------------------------------------
+# One cookie jar is one browser: both users sign in to it, and it switches between them.
+
+jar=(-b "$work/jar" -c "$work/jar")
+origin=(-H "Origin: $base")
+for who in "$name" "$fan"; do
+    expect "$who signs in to the browser" 200 /api/auth/login "${jar[@]}" "${json_type[@]}" \
+        -d "{\"email\":\"$who@example.com\",\"password\":\"correct horse battery\"}"
+done
+expect "the browser's accounts" 200 /api/auth/accounts "${jar[@]}"
+[ "$(json 'sorted(a["username"] for a in d["items"])' < "$work/body")" = "['$name', '$fan']" ] \
+    && pass "both accounts are signed in" || fail "the browser holds: $(cat "$work/body")"
+fan_id="$(json 'next(a["id"] for a in d["items"] if a["username"] == "'"$fan"'")' < "$work/body")"
+expect "switch to the second account" 200 /api/auth/refresh -X POST "${jar[@]}" "${origin[@]}" \
+    "${json_type[@]}" -d "{\"user_id\":\"$fan_id\"}"
+expect "the switched-to token is that account's" 200 /api/users/me \
+    -H "Authorization: Bearer $(json 'd["access_token"]' < "$work/body")"
+[ "$(json 'd["username"]' < "$work/body")" = "$fan" ] && pass "switched to $fan" \
+    || fail "switched to: $(cat "$work/body")"
+expect "refresh must say which account" 400 /api/auth/refresh -X POST "${jar[@]}" "${origin[@]}"
+expect "sign out of the second account only" 204 /api/auth/logout -X POST "${jar[@]}" \
+    "${origin[@]}" "${json_type[@]}" -d "{\"user_id\":\"$fan_id\"}"
+expect "the browser's accounts after signing out of one" 200 /api/auth/accounts "${jar[@]}"
+[ "$(json '[a["username"] for a in d["items"]]' < "$work/body")" = "['$name']" ] \
+    && pass "the other account is still signed in" || fail "the browser holds: $(cat "$work/body")"
+expect "sign out of all accounts" 204 /api/auth/logout -X POST "${jar[@]}" "${origin[@]}"
+expect "no accounts left" 200 /api/auth/accounts "${jar[@]}"
+[ "$(json 'd["items"]' < "$work/body")" = "[]" ] && pass "the browser is signed out" \
+    || fail "the browser holds: $(cat "$work/body")"
+
 subscription="/api/channels/$name/subscription"
 expect "D53 subscribing to yourself is refused" 403 "$subscription" -X PUT "${auth[@]}"
 expect "D53 subscribe" 200 "$subscription" -X PUT "${fan_auth[@]}"
