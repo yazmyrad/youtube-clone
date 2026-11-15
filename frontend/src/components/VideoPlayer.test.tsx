@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlaybackUnavailable, type PlaybackGrant } from "../api/playback";
+import { setTheme } from "../theme";
 import { VideoPlayer } from "./VideoPlayer";
 
 const mocks = vi.hoisted(() => {
@@ -257,5 +258,52 @@ describe("without hls.js", () => {
     await show();
 
     expect(alertText()).toContain("browser");
+  });
+});
+
+describe("ambient mode", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  });
+  afterEach(() => {
+    act(() => setTheme("device"));
+    localStorage.clear();
+  });
+
+  const glow = () => container.querySelector("canvas[data-ambient]");
+  const ambientRow = async () => {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>("button[aria-label^='Settings']")!.click(),
+    );
+    return container.querySelector("[role=menuitemcheckbox]");
+  };
+
+  it("glows around the player in the dark theme", async () => {
+    act(() => setTheme("dark"));
+    await show();
+
+    expect(glow()).not.toBeNull();
+    // Behind the player, outside the box that clips the video.
+    expect(glow()!.parentElement!.contains(container.querySelector("[data-player]"))).toBe(true);
+    expect(await ambientRow()).not.toBeNull();
+  });
+
+  it("is neither shown nor offered in the light theme", async () => {
+    act(() => setTheme("light"));
+    await show();
+
+    expect(glow()).toBeNull();
+    expect(await ambientRow()).toBeNull();
+  });
+
+  it("goes when turned off in the settings menu", async () => {
+    act(() => setTheme("dark"));
+    await show();
+
+    const row = (await ambientRow()) as HTMLButtonElement;
+    await act(async () => row.click());
+
+    expect(glow()).toBeNull();
+    expect(row.getAttribute("aria-checked")).toBe("false");
   });
 });

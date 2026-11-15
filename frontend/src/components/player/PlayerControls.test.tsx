@@ -16,7 +16,13 @@ const select = vi.fn();
 
 const QUALITY: Quality = { heights: [360, 720], selected: -1, playing: 720, select };
 
-function Harness({ quality = QUALITY }: { quality?: Quality | null }) {
+function Harness({
+  quality = QUALITY,
+  ambient,
+}: {
+  quality?: Quality | null;
+  ambient?: { on: boolean; onToggle: () => void };
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const state = useMediaState(video);
@@ -31,6 +37,7 @@ function Harness({ quality = QUALITY }: { quality?: Quality | null }) {
         theater={false}
         onTheater={onTheater}
         onNext={onNext}
+        ambient={ambient}
       />
     </div>
   );
@@ -293,4 +300,23 @@ it("unmutes to an audible level", async () => {
 
   expect(element.muted).toBe(false);
   expect(element.volume).toBe(0.5);
+});
+
+it("offers the Ambient mode switch only when the player is given one", async () => {
+  await act(async () => button("Settings")!.click());
+  expect(container.querySelector("[role=menuitemcheckbox]")).toBeNull();
+
+  const onToggle = vi.fn();
+  await act(async () => root.render(<Harness ambient={{ on: true, onToggle }} />));
+  const row = container.querySelector<HTMLButtonElement>("[role=menuitemcheckbox]")!;
+  expect(row.textContent).toBe("Ambient mode");
+  expect(row.getAttribute("aria-checked")).toBe("true");
+  // YouTube lists it first.
+  expect(container.querySelector("[role=menu] button")).toBe(row);
+
+  await act(async () => row.click());
+  expect(onToggle).toHaveBeenCalledTimes(1);
+
+  await act(async () => root.render(<Harness ambient={{ on: false, onToggle }} />));
+  expect(row.getAttribute("aria-checked")).toBe("false");
 });

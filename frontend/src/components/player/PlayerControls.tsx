@@ -39,6 +39,8 @@ interface Props {
   theater?: boolean;
   onTheater?: () => void;
   onNext?: () => void;
+  /** The Ambient mode switch, offered in the dark theme only, as on YouTube. */
+  ambient?: { on: boolean; onToggle: () => void };
 }
 
 /** Keys that scroll the page: the player takes them only when it has focus. */
@@ -282,18 +284,45 @@ function MenuRow({
   );
 }
 
+/** A setting that is on or off, with YouTube's little switch. */
+function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={on}
+      onClick={onToggle}
+      className="flex h-10 w-full items-center gap-3 px-4 text-left text-sm outline-none hover:bg-white/10 focus-visible:bg-white/20"
+    >
+      <span className="flex-1">{label}</span>
+      <span
+        aria-hidden
+        className={`relative h-3.5 w-9 rounded-full transition-colors ${on ? "bg-white/50" : "bg-white/30"}`}
+      >
+        <span
+          className={`absolute top-1/2 size-5 -translate-y-1/2 rounded-full shadow transition-all ${
+            on ? "left-4 bg-white" : "left-0 bg-[#bbbbbb]"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
 function SettingsMenu({
   menu,
   setMenu,
   rate,
   onRate,
   quality,
+  ambient,
 }: {
   menu: Exclude<Menu, null>;
   setMenu: (menu: Menu) => void;
   rate: number;
   onRate: (rate: number) => void;
   quality: Quality | null;
+  ambient?: Props["ambient"];
 }) {
   const box = useRef<HTMLDivElement>(null);
   // Focus follows the menu, so it works from the keyboard as well as the mouse.
@@ -331,6 +360,9 @@ function SettingsMenu({
     >
       {menu === "main" && (
         <>
+          {ambient && (
+            <SwitchRow label="Ambient mode" on={ambient.on} onToggle={ambient.onToggle} />
+          )}
           <MenuRow
             label="Playback speed"
             value={speedLabel(rate)}
@@ -420,6 +452,7 @@ export function PlayerControls({
   theater,
   onTheater,
   onNext,
+  ambient,
 }: Props) {
   const [active, setActive] = useState(true);
   const [menu, setMenu] = useState<Menu>(null);
@@ -706,6 +739,7 @@ export function PlayerControls({
             if (video.current) video.current.playbackRate = rate;
           }}
           quality={quality}
+          ambient={ambient}
         />
       )}
 
