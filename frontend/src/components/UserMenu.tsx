@@ -1,23 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { listAccounts } from "../api/account";
 import { authApi } from "../api/client";
 import { ACCOUNTS_KEY, useAuth, type Me } from "../hooks/useAuth";
+import { useDismiss } from "../hooks/useDismiss";
+import { AppearancePanel, AppearanceRow, menuItem as item, PanelHeader } from "./Appearance";
 import { Avatar } from "./Avatar";
 import { channelPath } from "./format";
-
-const item = "flex h-10 w-full items-center gap-3 px-4 text-left text-sm hover:bg-hover";
-
-const BACK = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
-const FORWARD = "M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z";
-
-const Chevron = ({ back = false }: { back?: boolean }) => (
-  <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
-    <path d={back ? BACK : FORWARD} />
-  </svg>
-);
+import { CheckIcon, ChevronIcon as Chevron } from "./icons";
 
 /** YouTube's "Switch account": the accounts signed in in this browser, and adding one. */
 function Accounts({
@@ -51,17 +43,7 @@ function Accounts({
   const here = encodeURIComponent(pathname + search);
   return (
     <div>
-      <div className="flex items-center gap-2 border-b border-line px-2 pb-2">
-        <button
-          type="button"
-          aria-label="Back"
-          onClick={onBack}
-          className="grid size-10 place-items-center rounded-full hover:bg-hover"
-        >
-          <Chevron back />
-        </button>
-        <h2 className="font-medium">Accounts</h2>
-      </div>
+      <PanelHeader title="Accounts" onBack={onBack} />
       <ul aria-label="Signed-in accounts" className="py-2">
         {accounts.isPending && <li aria-busy="true" className="h-14" />}
         {accounts.data?.map((account) => {
@@ -90,14 +72,9 @@ function Accounts({
                   </span>
                 </span>
                 {current && (
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-5"
-                    fill="currentColor"
-                    aria-label="Current"
-                  >
-                    <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                  </svg>
+                  <span role="img" aria-label="Current">
+                    <CheckIcon />
+                  </span>
                 )}
               </button>
             </li>
@@ -123,25 +100,11 @@ function Accounts({
 
 export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
-  const [panel, setPanel] = useState<"main" | "accounts">("main");
+  const [panel, setPanel] = useState<"main" | "accounts" | "appearance">("main");
   const [failed, setFailed] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, root, close);
 
   async function signOut() {
     setFailed(false);
@@ -153,7 +116,6 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
     }
   }
 
-  const close = () => setOpen(false);
   return (
     <div ref={root} className="relative">
       <button
@@ -175,9 +137,11 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
       </button>
       {open && (
         <div className="absolute top-10 right-0 w-72 rounded-xl border border-line bg-page py-2 shadow-lg">
-          {panel === "accounts" ? (
+          {panel === "accounts" && (
             <Accounts user={user} onBack={() => setPanel("main")} onDone={close} />
-          ) : (
+          )}
+          {panel === "appearance" && <AppearancePanel onBack={() => setPanel("main")} />}
+          {panel === "main" && (
             <>
               <div className="flex gap-3 border-b border-line px-4 pb-3">
                 <Avatar
@@ -209,6 +173,9 @@ export function UserMenu({ user, onLogout }: { user: Me; onLogout: () => Promise
                 <button type="button" onClick={() => void signOut()} className={item}>
                   Sign out
                 </button>
+              </div>
+              <div className="mt-2 border-t border-line pt-2">
+                <AppearanceRow onOpen={() => setPanel("appearance")} />
               </div>
               {failed && (
                 <p role="alert" className="px-4 pt-1 text-sm text-danger">

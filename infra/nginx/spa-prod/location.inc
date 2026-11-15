@@ -26,3 +26,12 @@ location /assets/ {
     add_header Cache-Control "public, max-age=31536000, immutable";
     include /etc/nginx/conf.d/security_headers.inc;
 }
+
+# The theme script that index.html loads before the first paint. It has no content hash in its
+# name, so it is revalidated like the page.
+location = /theme.js {
+    root /usr/share/nginx/html;
+    try_files $uri =404;
+    add_header Cache-Control "no-cache" always;
+    include /etc/nginx/conf.d/security_headers.inc;
+}

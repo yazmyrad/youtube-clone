@@ -110,3 +110,36 @@ export const ShortsIcon = () => (
     <path d="M8 2h8a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8zm2 4.5 5 3.5-5 3.5v-7z" />
   </Icon>
 );
+
+const BACK_CHEVRON = "M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z";
+const FORWARD_CHEVRON = "M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z";
+
+export const ChevronIcon = ({ back = false }: { back?: boolean }) => (
+  <Icon width="20" height="20">
+    <path d={back ? BACK_CHEVRON : FORWARD_CHEVRON} />
+  </Icon>
+);
+
+export const CheckIcon = () => (
+  <Icon width="20" height="20">
+    <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+  </Icon>
+);
+
+export const MoreIcon = () => (
+  <Icon>
+    <path d="M12 16.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
+  </Icon>
+);
+
+export const AppearanceIcon = () => (
+  <Icon>
+    <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18V4a8 8 0 0 1 0 16z" />
+  </Icon>
+);
+
+export const MicIcon = () => (
+  <Icon>
+    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z" />
+  </Icon>
+);

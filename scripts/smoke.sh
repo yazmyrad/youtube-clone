@@ -131,6 +131,10 @@ if [ -z "${SMOKE_DEV:-}" ]; then
     else
         fail "the page points at a built script"
     fi
+    expect "the theme script is served" 200 "/theme.js"
+    if has_header 'content-type: (text|application)/javascript'; then pass "the theme script has a JavaScript type"; else fail "the theme script has a JavaScript type"; fi
+    if has_header 'cache-control: no-cache'; then pass "the theme script is revalidated"; else fail "the theme script is revalidated"; fi
+    if body_has 'appearance.theme'; then pass "the theme script is the theme script"; else fail "the theme script is the theme script"; fi
     expect "the site icon is served" 200 "/favicon.svg"
     expect "/favicon.ico isn't answered by the SPA" 404 "/favicon.ico"
     expect "a missing asset is a real 404" 404 "/assets/does-not-exist.js"

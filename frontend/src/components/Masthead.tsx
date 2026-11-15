@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { useAuth } from "../hooks/useAuth";
 import { MAX_QUERY } from "../hooks/useSearch";
 import { AccountIcon, BackIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
+import { SiteSettings } from "./SiteSettings";
 import { UserMenu } from "./UserMenu";
 
 export function Masthead({ onMenu }: { onMenu: () => void }) {
@@ -104,6 +105,7 @@ export function Masthead({ onMenu }: { onMenu: () => void }) {
           </Link>
         )}
         {user && <UserMenu user={user} onLogout={logout} />}
+        {!user && !isLoading && <SiteSettings />}
         {!user && !isLoading && (
           <Link
             to={`/login?next=${next}`}
