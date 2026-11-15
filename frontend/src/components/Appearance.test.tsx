@@ -94,3 +94,24 @@ it("tells whether the page is dark: the choice, or else the device's", () => {
   act(() => setTheme("device"));
   expect(seen.at(-1)).toBe(true);
 });
+
+it("moves through the options with the arrow keys, as radio buttons do", async () => {
+  await openAppearance();
+  const current = () => container.querySelector<HTMLElement>("[role=radio][tabindex='0']")!;
+  expect(current().textContent).toBe("Use device theme");
+  current().focus();
+
+  act(() => {
+    current().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  });
+
+  expect(checked()).toEqual(["Dark theme"]);
+  expect(document.activeElement?.textContent).toBe("Dark theme");
+  act(() => {
+    current().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+  });
+  act(() => {
+    current().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+  });
+  expect(checked()).toEqual(["Light theme"]);
+});

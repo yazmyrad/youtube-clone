@@ -86,6 +86,9 @@ it("says so when it heard nothing, and listens again from the microphone", () =>
   expect(dialog()!.textContent).toContain("Tap the microphone to try again");
 
   act(() => button("Try again")!.click());
+  // Clicks while it listens do nothing, and the button keeps focus.
+  expect(button("Listening")!.getAttribute("aria-disabled")).toBe("true");
+  act(() => button("Listening")!.click());
   expect(FakeRecognition.instances).toHaveLength(2);
   expect(listener().start).toHaveBeenCalledTimes(1);
   expect(dialog()!.textContent).toContain("Listening...");
@@ -130,4 +133,23 @@ it("offers no microphone on a page that isn't secure", () => {
   vi.stubGlobal("isSecureContext", false);
   act(() => root.render(<VoiceSearch onResult={onResult} />));
   expect(button("Search with your voice")).toBeNull();
+});
+
+it("keeps Tab inside the dialog", () => {
+  open();
+  const cancel = button("Cancel")!;
+  expect(document.activeElement).toBe(cancel);
+  const tab = (shiftKey = false) =>
+    act(() => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true }),
+      );
+    });
+
+  tab();
+  expect(document.activeElement).toBe(button("Listening"));
+  tab();
+  expect(document.activeElement).toBe(cancel);
+  tab(true);
+  expect(document.activeElement).toBe(button("Listening"));
 });

@@ -19,15 +19,15 @@ export function useAmbientSetting(): [boolean, () => void] {
       return true;
     }
   });
-  const toggle = () =>
-    setOn((value) => {
-      try {
-        localStorage.setItem(AMBIENT_KEY, value ? "0" : "1");
-      } catch {
-        // Not remembered, then.
-      }
-      return !value;
-    });
+  const toggle = () => {
+    const next = !on;
+    try {
+      localStorage.setItem(AMBIENT_KEY, next ? "1" : "0");
+    } catch {
+      // Not remembered, then.
+    }
+    setOn(next);
+  };
   return [on, toggle];
 }
 

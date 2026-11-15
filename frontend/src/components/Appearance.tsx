@@ -39,13 +39,31 @@ export function AppearancePanel({ onBack }: { onBack: () => void }) {
     <div>
       <PanelHeader title="Appearance" onBack={onBack} />
       <p className="px-4 pt-3 pb-1 text-xs text-ink-muted">Setting applies to this browser only</p>
-      <div role="radiogroup" aria-label="Appearance">
+      <div
+        role="radiogroup"
+        aria-label="Appearance"
+        // As radio buttons do: the arrow keys move to the next option and choose it.
+        onKeyDown={(event) => {
+          const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+          if (!step) return;
+          event.preventDefault();
+          const at = THEME_OPTIONS.findIndex((option) => option.value === theme);
+          const count = THEME_OPTIONS.length;
+          const next = THEME_OPTIONS[(at + step + count) % count]!;
+          setTheme(next.value);
+          event.currentTarget
+            .querySelector<HTMLElement>(`[data-theme-option=${next.value}]`)
+            ?.focus();
+        }}
+      >
         {THEME_OPTIONS.map((option) => (
           <button
             key={option.value}
             type="button"
             role="radio"
+            data-theme-option={option.value}
             aria-checked={option.value === theme}
+            tabIndex={option.value === theme ? 0 : -1}
             onClick={() => setTheme(option.value)}
             className={menuItem}
           >

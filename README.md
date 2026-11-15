@@ -64,7 +64,8 @@ and `infra/nginx/real_ip_tls.inc` together.
 - It creates demo channels, videos and accounts, **including an admin**. Their passwords are
   random and saved in `demo-credentials.txt`, readable only by the user who ran the script.
 - Without `--domain`, it serves plain HTTP on the machine's IP address, so logins are not
-  encrypted in transit.
+  encrypted in transit. Browsers also allow the microphone only on secure pages, so voice
+  search appears with `--domain` (or on `localhost`), not on a plain-HTTP address.
 
 ### Demo data
 

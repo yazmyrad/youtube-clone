@@ -35,10 +35,10 @@ export function recognitionConstructor(): RecognitionConstructor | null {
   return speech.SpeechRecognition ?? speech.webkitSpeechRecognition ?? null;
 }
 
+const BLOCKED = "Permission to use the microphone is blocked. Allow it in your browser's settings.";
 const PROBLEMS: Record<string, string> = {
-  "not-allowed": "Permission to use the microphone is blocked. Allow it in your browser's settings.",
-  "service-not-allowed":
-    "Permission to use the microphone is blocked. Allow it in your browser's settings.",
+  "not-allowed": BLOCKED,
+  "service-not-allowed": BLOCKED,
   "audio-capture": "No microphone was found. Check that one is connected.",
   network: "Voice search needs an internet connection.",
   "language-not-supported": "Voice search doesn't support your language yet.",
@@ -132,6 +132,15 @@ function VoiceDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Search with your voice"
+        // Focus stays in the dialog while it is open.
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>("button")];
+          const at = buttons.indexOf(document.activeElement as HTMLElement);
+          const step = event.shiftKey ? -1 : 1;
+          event.preventDefault();
+          buttons[(at + step + buttons.length) % buttons.length]?.focus();
+        }}
         className="relative flex min-h-80 w-full max-w-2xl flex-col rounded-xl bg-page p-6 shadow-xl"
       >
         <div className="flex justify-end">
@@ -152,8 +161,11 @@ function VoiceDialog({
           <button
             type="button"
             aria-label={listening ? "Listening" : "Try again"}
-            disabled={listening}
-            onClick={listen}
+            // Not disabled: a focused button that turns disabled would drop focus to the page.
+            aria-disabled={listening}
+            onClick={() => {
+              if (!listening) listen();
+            }}
             className={`relative grid size-16 place-items-center rounded-full ${
               listening ? "bg-brand text-white" : "bg-hover hover:bg-hover-strong"
             }`}
@@ -168,9 +180,7 @@ function VoiceDialog({
               <MicIcon />
             </span>
           </button>
-          {!listening && (
-            <p className="text-sm text-ink-muted">Tap the microphone to try again</p>
-          )}
+          {!listening && <p className="text-sm text-ink-muted">Tap the microphone to try again</p>}
         </div>
       </div>
     </div>

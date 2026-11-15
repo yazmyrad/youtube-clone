@@ -26,9 +26,7 @@ const mocks = vi.hoisted(() => {
     recoverMediaError = vi.fn();
     destroy = vi.fn();
 
-    constructor(
-      readonly config: { xhrSetup: (xhr: { open: unknown }, url: string) => void },
-    ) {
+    constructor(readonly config: { xhrSetup: (xhr: { open: unknown }, url: string) => void }) {
       FakeHls.instances.push(this);
     }
 
