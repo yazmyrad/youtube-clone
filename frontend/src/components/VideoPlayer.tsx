@@ -35,8 +35,9 @@ export function VideoPlayer({
   const [ambientOn, toggleAmbient] = useAmbientSetting();
 
   return (
-    // Its own stacking context, so the glow sits behind the player but above the page.
-    <div className="relative isolate">
+    // No stacking context of its own: the glow's negative z-index puts it behind the page's
+    // text, not only behind the player, so it lights the page without tinting the title.
+    <div className="relative">
       {dark && ambientOn && failure === null && <AmbientGlow video={videoRef} />}
       <div
         ref={containerRef}

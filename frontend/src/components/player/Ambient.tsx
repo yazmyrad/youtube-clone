@@ -91,7 +91,7 @@ export function AmbientGlow({ video }: { video: RefObject<HTMLVideoElement | nul
       height={HEIGHT}
       aria-hidden
       data-ambient
-      className="pointer-events-none absolute inset-0 -z-10 size-full scale-[1.15] opacity-60 blur-[80px]"
+      className="pointer-events-none absolute inset-0 -z-10 size-full scale-[1.15] opacity-80 blur-[80px] saturate-150"
     />
   );
 }
