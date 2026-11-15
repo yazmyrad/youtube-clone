@@ -8,7 +8,6 @@ import asyncio
 import io
 import logging
 import secrets
-import warnings
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -30,7 +29,10 @@ logger = logging.getLogger(__name__)
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
 # A small file can still decode to a huge picture ("decompression bomb"): refused before
 # decoding, by the size in its header.
-MAX_PIXELS = 25_000_000
+MAX_PIXELS = 16_000_000
+# EXIF orientations that turn the picture a quarter: its width and height swap.
+ORIENTATION = 0x0112
+SIDEWAYS = {5, 6, 7, 8}
 ACCEPTED_TYPES = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
 CHANNEL_PREFIX = "channels/"
 # Images decode in threads; this bounds the memory they take at once.
@@ -62,32 +64,37 @@ def process(data: bytes, content_type: str, kind: ImageKind) -> bytes:
         raise UnsupportedMediaType("Upload a JPEG, PNG or WebP image")
     shape = SHAPES[kind]
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            # `formats` stops Pillow from trying every decoder it has on the bytes.
-            with Image.open(io.BytesIO(data), formats=[fmt]) as image:
-                width, height = image.size
-                if width * height > MAX_PIXELS:
-                    raise BadRequest("The image is too large: at most 25 megapixels")
-                image.seek(0)  # An animated image: its first frame.
-                # As the camera was held: a photo taken sideways is checked and cropped upright.
-                upright = ImageOps.exif_transpose(image)
-                if upright.width < shape.min_size[0] or upright.height < shape.min_size[1]:
-                    raise BadRequest(
-                        f"The image is too small: at least {shape.min_size[0]}"
-                        f"x{shape.min_size[1]} pixels"
-                    )
-                alpha = "A" in upright.getbands() or "transparency" in upright.info
-                mode = "RGBA" if alpha else "RGB"
-                fitted = ImageOps.fit(
-                    upright.convert(mode), shape.size, method=Image.Resampling.LANCZOS
+        # `formats` stops Pillow from trying every decoder it has on the bytes. Its own bomb
+        # check only fires far above MAX_PIXELS, which is checked here from the header.
+        with Image.open(io.BytesIO(data), formats=[fmt]) as image:
+            width, height = image.size
+            if width * height > MAX_PIXELS:
+                raise BadRequest("The image is too large: at most 16 megapixels")
+            image.seek(0)  # An animated image: its first frame.
+            # As the camera was held: a photo taken sideways is checked and cropped upright.
+            if image.getexif().get(ORIENTATION) in SIDEWAYS:
+                width, height = height, width
+            if width < shape.min_size[0] or height < shape.min_size[1]:
+                raise BadRequest(
+                    f"The image is too small: at least {shape.min_size[0]}"
+                    f"x{shape.min_size[1]} pixels"
                 )
+            # A JPEG can decode straight at a fraction of its size: less memory, and still
+            # larger than what's made of it.
+            # Square, as the picture may yet turn a quarter.
+            side = max(shape.size) * 2
+            image.draft("RGB", (side, side))
+            upright = ImageOps.exif_transpose(image)
+            alpha = "A" in upright.getbands() or "transparency" in upright.info
+            converted = upright.convert("RGBA" if alpha else "RGB")
+            del upright
+            fitted = ImageOps.fit(converted, shape.size, method=Image.Resampling.LANCZOS)
+            del converted
     except (BadRequest, UnsupportedMediaType):
         raise
     except (
         UnidentifiedImageError,
         Image.DecompressionBombError,
-        Image.DecompressionBombWarning,
         OSError,
         ValueError,
         SyntaxError,
@@ -117,7 +124,7 @@ async def set_image(
     except Exception as exc:
         logger.exception("Couldn't store a channel image")
         raise ServiceUnavailable("Storage is unavailable, try again") from exc
-    old = _swap(user, kind, key)
+    old = await _swap(session, user, kind, key)
     await session.commit()
     await session.refresh(user)
     await _forget(old)
@@ -125,14 +132,17 @@ async def set_image(
 
 
 async def remove_image(session: AsyncSession, user: User, kind: ImageKind) -> User:
-    old = _swap(user, kind, None)
+    old = await _swap(session, user, kind, None)
     await session.commit()
     await session.refresh(user)
     await _forget(old)
     return user
 
 
-def _swap(user: User, kind: ImageKind, key: str | None) -> str | None:
+async def _swap(session: AsyncSession, user: User, kind: ImageKind, key: str | None) -> str | None:
+    """With the row locked, so two uploads at once each delete the image the other replaced,
+    and none is left behind in storage."""
+    await session.refresh(user, attribute_names=[f"{kind}_key"], with_for_update=True)
     column = f"{kind}_key"
     old: str | None = getattr(user, column)
     setattr(user, column, key)

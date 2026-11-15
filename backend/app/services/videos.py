@@ -9,12 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
-from app.core.errors import Conflict, NotFound
+from app.core.errors import BadRequest, Conflict, NotFound
 from app.core.pagination import (
     decode_count_cursor,
     decode_cursor,
     encode_count_cursor,
     encode_cursor,
+    is_count_cursor,
 )
 from app.core.permissions import (
     can_show_thumbnail,
@@ -265,6 +266,8 @@ async def _card_page(
     """Ready videos matching `criteria`, newest first unless `sort` says otherwise, with keyset
     pagination. The criteria decide who may see them. Views keep counting while someone pages
     through the most viewed, so a video can move between pages there; YouTube's does too."""
+    if cursor and is_count_cursor(cursor) != (sort is VideoSort.popular):
+        raise BadRequest("This cursor belongs to a list in another order")
     query = (
         select(Video)
         .options(joinedload(Video.owner, innerjoin=True))

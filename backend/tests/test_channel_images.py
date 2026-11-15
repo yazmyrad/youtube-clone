@@ -1,3 +1,4 @@
+import asyncio
 import io
 import re
 
@@ -242,3 +243,19 @@ async def test_storage_down_keeps_the_old_image(
 
     assert response.status_code == 503
     assert (await api.get("/api/users/me", headers=alice.headers)).json()["avatar_url"] is None
+
+
+async def test_two_uploads_at_once_leave_one_picture(
+    api: httpx.AsyncClient, create_user: CreateUser, minio: str
+) -> None:
+    alice = await create_user("alice")
+
+    await asyncio.gather(*(_put(api, alice.headers, "avatar", _image()) for _ in range(2)))
+
+    client = storage.get_client()
+    listed = client.list_objects_v2(
+        Bucket=get_settings().media_bucket, Prefix=f"{CHANNEL_PREFIX}{alice.id}/"
+    )
+    keys = [item["Key"] for item in listed.get("Contents", [])]
+    url = (await api.get("/api/users/me", headers=alice.headers)).json()["avatar_url"]
+    assert keys == [CHANNEL_PREFIX + url.removeprefix("/channel-images/")]

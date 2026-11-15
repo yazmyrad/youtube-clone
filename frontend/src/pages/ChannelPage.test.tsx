@@ -349,6 +349,7 @@ it("opens About with the whole description and the channel's numbers, and closes
   const more = [...container.querySelectorAll("button")].find((b) =>
     b.textContent?.includes("...more"),
   )!;
+  more.focus(); // As a real click would.
   await act(async () => more.click());
 
   const dialog = container.querySelector("[role=dialog]");
@@ -356,10 +357,31 @@ it("opens About with the whole description and the channel's numbers, and closes
   expect(dialog?.textContent).toContain("1,234,567 views");
   expect(dialog?.textContent).toContain("1 video");
   expect(dialog?.textContent).toContain("Joined Jan 1, 2026");
+  expect(document.activeElement).toBe(dialog);
   await act(async () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   });
   expect(container.querySelector("[role=dialog]")).toBeNull();
+  expect(document.activeElement).toBe(more);
+});
+
+it("keeps Tab inside the About box", async () => {
+  serveLists({});
+
+  await render();
+  await shows("...more");
+  const more = [...container.querySelectorAll("button")].find((b) =>
+    b.textContent?.includes("...more"),
+  )!;
+  await act(async () => more.click());
+  const buttons = [...container.querySelectorAll<HTMLElement>("[role=dialog] button")];
+  buttons.at(-1)!.focus();
+
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }));
+  });
+
+  expect(document.activeElement).toBe(buttons[0]);
 });
 
 it("searches the channel from the magnifier", async () => {

@@ -289,3 +289,40 @@ async def test_search_of_an_unknown_channel_is_404(api: httpx.AsyncClient) -> No
     response = await api.get("/api/channels/nobody/search", params={"q": "rust"})
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("cursor_from", "used_with"),
+    [("popular", "latest"), ("latest", "popular"), ("popular", "oldest")],
+)
+async def test_a_cursor_only_works_in_its_own_order(
+    api: httpx.AsyncClient,
+    session: AsyncSession,
+    create_user: CreateUser,
+    cursor_from: str,
+    used_with: str,
+) -> None:
+    alice = await create_user("alice")
+    for i in range(3):
+        await create_ready_video(api, session, alice, published_at=T0 + timedelta(minutes=i))
+    first = await api.get("/api/channels/alice/videos", params={"limit": 1, "sort": cursor_from})
+    cursor = first.json()["next_cursor"]
+
+    response = await api.get(
+        "/api/channels/alice/videos", params={"limit": 1, "sort": used_with, "cursor": cursor}
+    )
+
+    assert response.status_code == 400
+
+
+async def test_a_popular_cursor_elsewhere_is_refused_not_a_crash(
+    api: httpx.AsyncClient, create_user: CreateUser
+) -> None:
+    alice = await create_user("alice")
+    cursor = "p5_00000000-0000-0000-0000-000000000000"
+
+    response = await api.get(
+        "/api/users/me/history", params={"cursor": cursor}, headers=alice.headers
+    )
+
+    assert response.status_code == 400

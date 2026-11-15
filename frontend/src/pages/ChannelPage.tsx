@@ -79,14 +79,44 @@ function AboutDialog({ channel, onClose }: { channel: Channel; onClose: () => vo
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}${channelPath(channel.username)}`;
 
+  // The latest onClose, so a parent's re-render doesn't re-run the effect and steal focus.
+  const close = useRef(onClose);
   useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    // Back to whatever opened the box, when it closes.
+    const opener = document.activeElement as HTMLElement | null;
     dialog.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        close.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog.current) return;
+      // Tab stays inside the box, as it's modal.
+      const focusable = [
+        ...dialog.current.querySelectorAll<HTMLElement>("button, a[href], [tabindex='0']"),
+      ];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      const outside = !dialog.current.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || outside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || outside)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (!copied) return undefined;
