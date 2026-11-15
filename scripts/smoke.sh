@@ -298,7 +298,9 @@ fan_auth=(-H "Authorization: Bearer $(json 'd["access_token"]' < "$work/login")"
 # One cookie jar is one browser: both users sign in to it, and it switches between them.
 
 jar=(-b "$work/jar" -c "$work/jar")
-origin=(-H "Origin: $base")
+# As a browser writes it: no empty or default port (a base of http://127.0.0.1: is valid).
+site="${base%/}"; site="${site%:}"; site="${site%:80}"
+origin=(-H "Origin: $site")
 for who in "$name" "$fan"; do
     expect "$who signs in to the browser" 200 /api/auth/login "${jar[@]}" "${json_type[@]}" \
         -d "{\"email\":\"$who@example.com\",\"password\":\"correct horse battery\"}"
