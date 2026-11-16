@@ -1,5 +1,6 @@
 # YouTube clone
 
+🇷🇺 [Читать на русском](README.ru.md)
 A video sharing site in the style of YouTube, deployed to a clean Ubuntu machine with one
 command. FastAPI, PostgreSQL, MinIO, an ffmpeg worker and a React front end, behind nginx. The
 design, schema, permission matrix and the checks behind every claim below are in
@@ -158,8 +159,8 @@ With Claude Code, following the plan in `docs/architecture.md` one step at a tim
 - `.claude/settings.json`: a hook that runs ruff after every edit.
 - `chat_history/`: a folder with prompts history, unfortunately due some technical issues the work  
    environment was switched to macosx so there are two zip folders: 
-   1. youtube-clone-chat-history.zip
-   2. -Users-yhlas-Desktop-youtube-clone.zip
+   1. youtube-clone-chat-history.zip - first 50% prompts
+   2. -Users-yhlas-Desktop-youtube-clone.zip - rest of the prompts
 
 ## Submission checklist
 
